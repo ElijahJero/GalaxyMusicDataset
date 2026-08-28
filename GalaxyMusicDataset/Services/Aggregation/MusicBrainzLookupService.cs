@@ -102,7 +102,7 @@ public sealed class MusicBrainzLookupService(
                     lookup.ErrorMessage = null;
                     if (lookup.TrackId is not null)
                     {
-                        await ApplyMatchAsync(lookup.TrackId.Value, best, cancellationToken);
+                        lookup.TrackId = await ApplyMatchAsync(lookup.TrackId.Value, best, cancellationToken);
                     }
 
                     progress.Log($"MB auto-match {best.Score:0.00}: {lookup.ArtistName} – {lookup.TrackName}");
@@ -158,7 +158,7 @@ public sealed class MusicBrainzLookupService(
         lookup.ErrorMessage = null;
         if (lookup.TrackId is not null)
         {
-            await ApplyMatchAsync(lookup.TrackId.Value, match, cancellationToken);
+            lookup.TrackId = await ApplyMatchAsync(lookup.TrackId.Value, match, cancellationToken);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -280,20 +280,19 @@ public sealed class MusicBrainzLookupService(
         return batch.FirstOrDefault(l => IsLookupDue(l, now));
     }
 
-    private async Task ApplyMatchAsync(long trackId, RecordingCandidate match, CancellationToken cancellationToken)
+    private async Task<long> ApplyMatchAsync(long trackId, RecordingCandidate match, CancellationToken cancellationToken)
     {
-        var track = await db.Tracks
-            .Include(t => t.Artist)
-            .Include(t => t.SourcePayloads)
-            .FirstAsync(t => t.Id == trackId, cancellationToken);
+        var track = await LoadTrackForMatchAsync(trackId, cancellationToken);
 
-        var duplicate = await db.Tracks.FirstOrDefaultAsync(
-            t => t.Mbid == match.Mbid && t.Id != track.Id,
-            cancellationToken);
-        if (duplicate is not null)
+        var duplicateId = await db.Tracks
+            .Where(t => t.Mbid == match.Mbid && t.Id != track.Id)
+            .Select(t => (long?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (duplicateId is not null)
         {
+            var duplicate = await LoadTrackForMatchAsync(duplicateId.Value, cancellationToken);
             await MergeTracksAsync(duplicate, track, cancellationToken);
-            track = duplicate;
+            track = await LoadTrackForMatchAsync(duplicate.Id, cancellationToken);
         }
 
         track.Mbid = match.Mbid;
@@ -302,12 +301,20 @@ public sealed class MusicBrainzLookupService(
             track.DurationMs = match.LengthMs;
         }
 
-        if (!string.IsNullOrWhiteSpace(match.ArtistMbid) && track.Artist.Mbid is null)
+        if (track.Artist is not null
+            && !string.IsNullOrWhiteSpace(match.ArtistMbid)
+            && string.IsNullOrWhiteSpace(track.Artist.Mbid))
         {
-            track.Artist.Mbid = match.ArtistMbid;
+            var artistMbidTaken = await db.Artists.AnyAsync(
+                a => a.Mbid == match.ArtistMbid && a.Id != track.Artist.Id,
+                cancellationToken);
+            if (!artistMbidTaken)
+            {
+                track.Artist.Mbid = match.ArtistMbid;
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(match.Album) && track.AlbumId is null)
+        if (track.Artist is not null && !string.IsNullOrWhiteSpace(match.Album) && track.AlbumId is null)
         {
             var album = await catalog.GetOrCreateAlbumAsync(track.Artist, match.Album, match.ReleaseMbid, cancellationToken);
             track.AlbumId = album?.Id;
@@ -316,7 +323,7 @@ public sealed class MusicBrainzLookupService(
         track.UpdatedAt = DateTimeOffset.UtcNow;
         await UpsertPayloadAsync(track, EnrichmentSource.MusicBrainz, match.Mbid, JsonSerializer.Serialize(match), cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(match.ArtistMbid))
+        if (track.Artist is not null && !string.IsNullOrWhiteSpace(match.ArtistMbid))
         {
             try
             {
@@ -352,10 +359,50 @@ public sealed class MusicBrainzLookupService(
                 progress.Log($"Artist alias fetch failed for {match.ArtistMbid}: {ex.Message}");
             }
         }
+
+        return track.Id;
+    }
+
+    private async Task<Track> LoadTrackForMatchAsync(long trackId, CancellationToken cancellationToken)
+    {
+        var track = await db.Tracks
+            .Include(t => t.Artist)
+            .Include(t => t.SourcePayloads)
+            .FirstAsync(t => t.Id == trackId, cancellationToken);
+
+        if (track.Artist is null)
+        {
+            await db.Entry(track).Reference(t => t.Artist).LoadAsync(cancellationToken);
+        }
+
+        if (track.SourcePayloads is null)
+        {
+            await db.Entry(track).Collection(t => t.SourcePayloads).LoadAsync(cancellationToken);
+        }
+
+        return track;
     }
 
     private async Task MergeTracksAsync(Track keep, Track drop, CancellationToken cancellationToken)
     {
+        // ExecuteUpdate does not update already-tracked entities. Reassign those
+        // first so deleting `drop` does not SetNull TrackLookup.TrackId (or fail
+        // Restrict FKs) via the change tracker.
+        foreach (var scrobble in db.ChangeTracker.Entries<Scrobble>().Select(e => e.Entity).Where(s => s.TrackId == drop.Id))
+        {
+            scrobble.TrackId = keep.Id;
+        }
+
+        foreach (var tag in db.ChangeTracker.Entries<TrackTag>().Select(e => e.Entity).Where(t => t.TrackId == drop.Id))
+        {
+            tag.TrackId = keep.Id;
+        }
+
+        foreach (var lookup in db.ChangeTracker.Entries<TrackLookup>().Select(e => e.Entity).Where(l => l.TrackId == drop.Id))
+        {
+            lookup.TrackId = keep.Id;
+        }
+
         await db.Scrobbles.Where(s => s.TrackId == drop.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
         await db.TrackTags.Where(t => t.TrackId == drop.Id)
