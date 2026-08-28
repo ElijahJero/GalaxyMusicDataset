@@ -211,6 +211,11 @@ public sealed class MetadataEnrichmentService(
             payload.FetchedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
             progress.Error($"Last.fm info failed: {ex.Message}");
+            if (ex is JsonApiException api && api.StatusCode is 401 or 403)
+            {
+                payload.Status = SourceFetchStatus.Skipped;
+                payload.ErrorMessage = "Last.fm rejected the API key.";
+            }
             return 1;
         }
     }
@@ -337,6 +342,11 @@ public sealed class MetadataEnrichmentService(
             payload.FetchedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
             progress.Error($"Discogs failed: {ex.Message}");
+            if (ex is JsonApiException api && api.StatusCode is 401 or 403)
+            {
+                payload.Status = SourceFetchStatus.Skipped;
+                payload.ErrorMessage = "Discogs rejected the token.";
+            }
             return 1;
         }
     }
@@ -446,6 +456,11 @@ public sealed class MetadataEnrichmentService(
             payload.FetchedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
             progress.Error($"TheAudioDB failed: {ex.Message}");
+            if (ex is JsonApiException api && api.StatusCode is 401 or 403)
+            {
+                payload.Status = SourceFetchStatus.Skipped;
+                payload.ErrorMessage = "TheAudioDB rejected the API key.";
+            }
             return 1;
         }
     }
@@ -475,7 +490,7 @@ public sealed class MetadataEnrichmentService(
 
     private async Task<Track?> NextTrackNeedingAsync(EnrichmentSource source, CancellationToken cancellationToken)
     {
-        return await db.Tracks
+        var batch = await db.Tracks
             .Include(t => t.Artist)
             .Include(t => t.Album)
             .Include(t => t.SourcePayloads)
@@ -485,7 +500,24 @@ public sealed class MetadataEnrichmentService(
                  p.Status == SourceFetchStatus.NotFound ||
                  p.Status == SourceFetchStatus.Skipped)))
             .OrderBy(t => t.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .Take(25)
+            .ToListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        return batch.FirstOrDefault(t =>
+        {
+            var payload = t.SourcePayloads.FirstOrDefault(p => p.Source == source);
+            if (payload is null || payload.Status == SourceFetchStatus.NotStarted)
+            {
+                return true;
+            }
+
+            if (payload.Status != SourceFetchStatus.Error)
+            {
+                return false;
+            }
+
+            return payload.FetchedAt is null || now - payload.FetchedAt.Value >= TimeSpan.FromMinutes(5);
+        });
     }
 
     private async Task<TrackSourcePayload> EnsurePayloadAsync(long trackId, EnrichmentSource source, CancellationToken cancellationToken)
