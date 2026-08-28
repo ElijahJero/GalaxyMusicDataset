@@ -40,13 +40,13 @@ public sealed class AggregationStatusService(
 
         var jobs = await db.AggregationJobs
             .AsNoTracking()
-            .OrderByDescending(j => j.StartedAt)
+            .OrderByDescending(j => j.Id)
             .Take(20)
             .ToListAsync(cancellationToken);
 
         var recentApi = await db.ApiRequestLogs
             .AsNoTracking()
-            .OrderByDescending(x => x.At)
+            .OrderByDescending(x => x.Id)
             .Take(25)
             .ToListAsync(cancellationToken);
 

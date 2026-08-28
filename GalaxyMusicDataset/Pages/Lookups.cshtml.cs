@@ -29,7 +29,7 @@ public class LookupsModel(AppDbContext db, MusicBrainzLookupService lookups) : P
             query = query.Where(l => l.Status == parsed);
         }
 
-        Rows = await query.OrderByDescending(l => l.LastAttemptUtc ?? l.CreatedAt).Take(200).ToListAsync(cancellationToken);
+        Rows = await query.OrderByDescending(l => l.Id).Take(200).ToListAsync(cancellationToken);
     }
 
     public async Task<IActionResult> OnPostRetryAsync(long id, CancellationToken cancellationToken)

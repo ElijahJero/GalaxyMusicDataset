@@ -37,8 +37,7 @@ public sealed class MusicBrainzLookupService(
         var lookup = await db.TrackLookups
             .Include(l => l.Track)
             .Where(l => l.Status == LookupStatus.Pending || l.Status == LookupStatus.Failed)
-            .OrderBy(l => l.LastAttemptUtc)
-            .ThenBy(l => l.Id)
+            .OrderBy(l => l.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (lookup is null)

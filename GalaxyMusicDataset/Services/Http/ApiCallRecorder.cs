@@ -107,7 +107,7 @@ public sealed class ApiCallRecorder(IServiceScopeFactory scopeFactory)
             await db.SaveChangesAsync(cancellationToken);
 
             var cutoff = await db.ApiRequestLogs
-                .OrderByDescending(x => x.At)
+                .OrderByDescending(x => x.Id)
                 .Skip(500)
                 .Select(x => x.Id)
                 .ToListAsync(cancellationToken);
