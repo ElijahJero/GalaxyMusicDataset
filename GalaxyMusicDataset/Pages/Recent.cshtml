@@ -1,101 +1,300 @@
 @page
 @model RecentModel
+@using GalaxyMusicDataset.Data
 @{
-    ViewData["Title"] = "Recent 50";
+    ViewData["Title"] = "Library";
 }
 
-<h1 class="h3 mb-1">50 most recent scrobbles</h1>
-<p class="text-muted">Debug view of ingested plays with catalog identity, lookup status, tags, and raw source payloads.</p>
+<h1 class="h3 mb-1">Library</h1>
+<p class="text-muted">All unique tracks, 50 per page. Filter, open a row to inspect payloads, and edit catalog fields. Scrobbles stay attached to the track.</p>
+
+@if (Model.Flash is not null)
+{
+    <div class="alert alert-success">@Model.Flash</div>
+}
+
+<form method="get" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label" for="Q">Search</label>
+            <input class="form-control" id="Q" name="q" value="@Model.Q" placeholder="Artist, title, or album" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="Artist">Artist</label>
+            <input class="form-control" id="Artist" name="artist" value="@Model.Artist" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="Title">Title</label>
+            <input class="form-control" id="Title" name="title" value="@Model.Title" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="Album">Album</label>
+            <input class="form-control" id="Album" name="album" value="@Model.Album" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="Sort">Sort</label>
+            <select class="form-select" id="Sort" name="sort">
+                <option value="recent" selected="@(Model.Sort is "recent" or "" or null)">Last played</option>
+                <option value="plays" selected="@(Model.Sort == "plays")">Play count</option>
+                <option value="artist" selected="@(Model.Sort == "artist")">Artist</option>
+                <option value="title" selected="@(Model.Sort == "title")">Title</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="Status">Lookup</label>
+            <select class="form-select" id="Status" name="status">
+                <option value="">Any status</option>
+                @foreach (var status in Enum.GetNames<LookupStatus>())
+                {
+                    <option value="@status" selected="@(Model.Status == status)">@status</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="HasMbid">MBID</label>
+            <select class="form-select" id="HasMbid" name="hasMbid">
+                <option value="">Any</option>
+                <option value="yes" selected="@(Model.HasMbid == "yes")">Has MBID</option>
+                <option value="no" selected="@(Model.HasMbid == "no")">Missing MBID</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="Source">Source hit</label>
+            <select class="form-select" id="Source" name="source">
+                <option value="">Any source</option>
+                @foreach (var source in Enum.GetNames<EnrichmentSource>())
+                {
+                    <option value="@source" selected="@(Model.Source == source)">@source</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-primary" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" asp-page="/Recent">Reset</a>
+        </div>
+    </div>
+</form>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="text-muted">@Model.TotalCount.ToString("N0") tracks · page @Model.P of @Model.TotalPages</div>
+    <partial name="_LibraryPager" model="Model" />
+</div>
 
 @if (Model.Rows.Count == 0)
 {
-    <div class="alert alert-info">No scrobbles in the database yet. Seed sample data or run a Last.fm sync.</div>
+    <div class="alert alert-info">No tracks match. Seed sample data or run a Last.fm sync.</div>
 }
 
 @foreach (var row in Model.Rows)
 {
-    var s = row.Scrobble;
-    var t = s.Track;
+    var t = row.Track;
+    var lastPlayed = row.LastPlayedUnix is null
+        ? "—"
+        : DateTimeOffset.FromUnixTimeSeconds(row.LastPlayedUnix.Value).UtcDateTime.ToString("u");
+    var duration = t.DurationMs is null
+        ? "—"
+        : TimeSpan.FromMilliseconds(t.DurationMs.Value).ToString(@"m\:ss");
     <div class="card mb-3">
         <div class="card-body">
-            <div class="d-flex justify-content-between flex-wrap gap-2">
-                <div>
-                    <div class="fs-5">@t.Artist.Name — @t.Title</div>
-                    <div class="text-muted">@(t.Album?.Title ?? s.OriginalAlbum ?? "No album")</div>
-                </div>
-                <div class="text-end small">
-                    <div>@s.PlayedAt.UtcDateTime.ToString("u")</div>
-                    <div>unix @s.UnixTimestamp</div>
-                    <div>scrobble #@s.Id · track #@t.Id</div>
-                </div>
-            </div>
-            <div class="row mt-3 small">
-                <div class="col-md-6">
-                    <h2 class="h6">Identity</h2>
-                    <ul class="list-unstyled mb-2">
-                        <li>Fingerprint <code>@t.Fingerprint</code></li>
-                        <li>Track MBID @(t.Mbid ?? "—")</li>
-                        <li>Artist MBID @(t.Artist.Mbid ?? "—")</li>
-                        <li>Album MBID @(t.Album?.Mbid ?? "—")</li>
-                        <li>Duration @(t.DurationMs is null ? "—" : $"{t.DurationMs} ms")</li>
-                        <li>Last.fm as-played: @s.OriginalArtist / @s.OriginalTitle / @(s.OriginalAlbum ?? "—")</li>
-                        <li>Last.fm MBIDs track=@(s.LastFmTrackMbid ?? "—") artist=@(s.LastFmArtistMbid ?? "—") album=@(s.LastFmAlbumMbid ?? "—")</li>
-                    </ul>
-                    @if (t.Artist.Aliases.Count > 0)
+            <div class="d-flex gap-3">
+                <div class="library-cover flex-shrink-0">
+                    @if (!string.IsNullOrWhiteSpace(t.Album?.CoverUrl))
                     {
-                        <div>Aliases: @string.Join(" · ", t.Artist.Aliases.Select(a => $"{a.Name} ({a.Source}{(a.Locale is null ? "" : "/" + a.Locale)})"))</div>
-                    }
-                </div>
-                <div class="col-md-6">
-                    <h2 class="h6">Lookup</h2>
-                    @if (row.Lookup is null)
-                    {
-                        <p>No lookup row (should not happen after ingest).</p>
+                        <img src="@t.Album.CoverUrl" alt="" width="88" height="88" class="rounded" />
                     }
                     else
                     {
-                        <ul class="list-unstyled">
-                            <li>Status <strong>@row.Lookup.Status</strong></li>
-                            <li>Attempts @row.Lookup.AttemptCount</li>
-                            <li>Last attempt @(row.Lookup.LastAttemptUtc?.UtcDateTime.ToString("u") ?? "never")</li>
-                            <li>Best score @(row.Lookup.BestScore?.ToString("0.000") ?? "—")</li>
-                            <li>Matched MBID @(row.Lookup.MatchedMbid ?? "—")</li>
-                            <li>Query @(row.Lookup.QueryUsed ?? "—")</li>
-                            <li class="text-danger">@(row.Lookup.ErrorMessage ?? "")</li>
-                        </ul>
+                        <div class="library-cover-empty rounded">No cover</div>
                     }
-                    <h2 class="h6 mt-3">Tags</h2>
-                    @if (t.Tags.Count == 0)
-                    {
-                        <p class="text-muted">None yet.</p>
-                    }
-                    else
-                    {
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
                         <div>
-                            @foreach (var tag in t.Tags.OrderByDescending(x => x.Weight))
+                            <div class="fs-5">@t.Artist.Name — @t.Title</div>
+                            <div class="text-muted">@(t.Album?.Title ?? "No album")@(t.Album?.ReleaseYear is null ? "" : $" ({t.Album.ReleaseYear})")</div>
+                        </div>
+                        <div class="text-end small">
+                            <div>@row.PlayCount.ToString("N0") plays</div>
+                            <div>last @lastPlayed</div>
+                            <div>track #@t.Id · @duration</div>
+                        </div>
+                    </div>
+                    <div class="small mt-2">
+                        MBID @(t.Mbid ?? "—")
+                        · lookup @(row.Lookup?.Status.ToString() ?? "—")
+                        @if (!string.IsNullOrWhiteSpace(t.Isrc))
+                        {
+                            <text>· ISRC @t.Isrc</text>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(t.DiscogsReleaseId))
+                        {
+                            <text>· Discogs @t.DiscogsReleaseId</text>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(t.TheAudioDbTrackId))
+                        {
+                            <text>· AudioDB @t.TheAudioDbTrackId</text>
+                        }
+                    </div>
+                    @if (t.Tags.Count > 0)
+                    {
+                        <div class="mt-2">
+                            @foreach (var tag in t.Tags.OrderByDescending(x => x.Weight).Take(12))
                             {
-                                <span class="badge text-bg-light border me-1 mb-1">@tag.Tag.Name <span class="text-muted">@tag.Source @tag.Weight</span></span>
+                                <span class="badge text-bg-light border me-1 mb-1">@tag.Tag.Name <span class="text-muted">@tag.Source</span></span>
                             }
                         </div>
                     }
+                    @if (!string.IsNullOrWhiteSpace(t.Summary))
+                    {
+                        <p class="small text-muted mt-2 mb-0">@t.Summary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(t.MusicVideoUrl))
+                    {
+                        <div class="small mt-1"><a href="@t.MusicVideoUrl" target="_blank" rel="noopener">Music video</a></div>
+                    }
+                    <div class="mt-2 d-flex gap-2">
+                        <a class="btn btn-sm btn-outline-primary" asp-page="/Recent" asp-all-route-data="@(new Dictionary<string, string?> {
+                            ["p"] = Model.P.ToString(),
+                            ["q"] = Model.Q,
+                            ["artist"] = Model.Artist,
+                            ["title"] = Model.Title,
+                            ["album"] = Model.Album,
+                            ["status"] = Model.Status,
+                            ["hasMbid"] = Model.HasMbid,
+                            ["source"] = Model.Source,
+                            ["sort"] = Model.Sort,
+                            ["edit"] = t.Id.ToString()
+                        })">Edit</a>
+                    </div>
                 </div>
             </div>
-            <h2 class="h6 mt-2">Source payloads</h2>
-            @if (t.SourcePayloads.Count == 0)
+
+            @if (Model.Edit == t.Id)
             {
-                <p class="small text-muted mb-0">No enrichment payloads yet.</p>
+                <form method="post" asp-page-handler="Edit" class="border-top mt-3 pt-3">
+                    <input type="hidden" asp-for="Input.Id" value="@t.Id" />
+                    <input type="hidden" name="p" value="@Model.P" />
+                    <input type="hidden" name="q" value="@Model.Q" />
+                    <input type="hidden" name="artist" value="@Model.Artist" />
+                    <input type="hidden" name="title" value="@Model.Title" />
+                    <input type="hidden" name="album" value="@Model.Album" />
+                    <input type="hidden" name="status" value="@Model.Status" />
+                    <input type="hidden" name="hasMbid" value="@Model.HasMbid" />
+                    <input type="hidden" name="source" value="@Model.Source" />
+                    <input type="hidden" name="sort" value="@Model.Sort" />
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Artist</label>
+                            <input class="form-control" name="Input.ArtistName" value="@t.Artist.Name" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Title</label>
+                            <input class="form-control" name="Input.Title" value="@t.Title" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Album</label>
+                            <input class="form-control" name="Input.AlbumTitle" value="@t.Album?.Title" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Track MBID</label>
+                            <input class="form-control" name="Input.TrackMbid" value="@t.Mbid" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Artist MBID</label>
+                            <input class="form-control" name="Input.ArtistMbid" value="@t.Artist.Mbid" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Album MBID</label>
+                            <input class="form-control" name="Input.AlbumMbid" value="@t.Album?.Mbid" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Duration (seconds)</label>
+                            <input class="form-control" name="Input.DurationSeconds" value="@(t.DurationMs is null ? "" : (t.DurationMs.Value / 1000.0).ToString("0.###"))" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">ISRC</label>
+                            <input class="form-control" name="Input.Isrc" value="@t.Isrc" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Discogs release ID</label>
+                            <input class="form-control" name="Input.DiscogsReleaseId" value="@t.DiscogsReleaseId" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">TheAudioDB track ID</label>
+                            <input class="form-control" name="Input.TheAudioDbTrackId" value="@t.TheAudioDbTrackId" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Cover URL</label>
+                            <input class="form-control" name="Input.CoverUrl" value="@t.Album?.CoverUrl" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Music video URL</label>
+                            <input class="form-control" name="Input.MusicVideoUrl" value="@t.MusicVideoUrl" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Summary</label>
+                            <textarea class="form-control" name="Input.Summary" rows="3">@t.Summary</textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="Input.ResetEnrichment" value="true" id="reset-@t.Id" />
+                                <label class="form-check-label" for="reset-@t.Id">Re-fetch Last.fm / MusicBrainz details / Discogs / TheAudioDB</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                        <a class="btn btn-outline-secondary" asp-page="/Recent" asp-all-route-data="@(new Dictionary<string, string?> {
+                            ["p"] = Model.P.ToString(),
+                            ["q"] = Model.Q,
+                            ["artist"] = Model.Artist,
+                            ["title"] = Model.Title,
+                            ["album"] = Model.Album,
+                            ["status"] = Model.Status,
+                            ["hasMbid"] = Model.HasMbid,
+                            ["source"] = Model.Source,
+                            ["sort"] = Model.Sort
+                        })">Cancel</a>
+                    </div>
+                </form>
             }
-            @foreach (var payload in t.SourcePayloads)
-            {
-                <details class="small mb-2">
-                    <summary>@payload.Source — @payload.Status @(payload.ExternalId is null ? "" : $"id={payload.ExternalId}") @(payload.FetchedAt?.UtcDateTime.ToString("u"))</summary>
-                    @if (!string.IsNullOrWhiteSpace(payload.ErrorMessage))
+
+            <details class="small mt-3">
+                <summary>Identity, lookup, and source payloads</summary>
+                <ul class="list-unstyled mt-2 mb-2">
+                    <li>Fingerprint <code>@t.Fingerprint</code></li>
+                    <li>Artist MBID @(t.Artist.Mbid ?? "—") · Album MBID @(t.Album?.Mbid ?? "—")</li>
+                    <li>Last.fm artist URL @(t.Artist.LastFmUrl ?? "—")</li>
+                    @if (t.Artist.Aliases.Count > 0)
                     {
-                        <div class="text-danger">@payload.ErrorMessage</div>
+                        <li>Aliases: @string.Join(" · ", t.Artist.Aliases.Select(a => a.Name))</li>
                     }
-                    <pre class="payload-json">@(payload.PayloadJson ?? "—")</pre>
-                </details>
-            }
+                    @if (row.Lookup is not null)
+                    {
+                        <li>Lookup @row.Lookup.Status · score @(row.Lookup.BestScore?.ToString("0.000") ?? "—") · matched @(row.Lookup.MatchedMbid ?? "—")</li>
+                        @if (!string.IsNullOrWhiteSpace(row.Lookup.ErrorMessage))
+                        {
+                            <li class="text-danger">@row.Lookup.ErrorMessage</li>
+                        }
+                    }
+                </ul>
+                @foreach (var payload in t.SourcePayloads)
+                {
+                    <details class="mb-2">
+                        <summary>@payload.Source — @payload.Status @(payload.ExternalId is null ? "" : $"id={payload.ExternalId}")</summary>
+                        @if (!string.IsNullOrWhiteSpace(payload.ErrorMessage))
+                        {
+                            <div class="text-danger">@payload.ErrorMessage</div>
+                        }
+                        <pre class="payload-json">@(payload.PayloadJson ?? "—")</pre>
+                    </details>
+                }
+            </details>
         </div>
     </div>
 }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="text-muted">Page @Model.P of @Model.TotalPages</div>
+    <partial name="_LibraryPager" model="Model" />
+</div>

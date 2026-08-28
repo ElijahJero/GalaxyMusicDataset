@@ -7,6 +7,7 @@ public sealed class Artist
     public string? SortName { get; set; }
     public string? Mbid { get; set; }
     public string? LastFmUrl { get; set; }
+    public string? ImageUrl { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

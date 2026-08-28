@@ -13,6 +13,18 @@ public sealed record RecordingCandidate(
     string? Disambiguation,
     double Score);
 
+public sealed record MusicBrainzRecordingDetails(
+    string Mbid,
+    string Title,
+    int? LengthMs,
+    string? FirstIsrc,
+    string? ReleaseMbid,
+    string? AlbumTitle,
+    int? ReleaseYear,
+    IReadOnlyList<(string Name, int Count)> Tags,
+    IReadOnlyList<string> Genres,
+    string RawJson);
+
 public static class RecordingMatchScorer
 {
     public static double Score(

@@ -291,8 +291,9 @@ public sealed class MusicBrainzLookupService(
         if (duplicateId is not null)
         {
             var duplicate = await LoadTrackForMatchAsync(duplicateId.Value, cancellationToken);
-            await MergeTracksAsync(duplicate, track, cancellationToken);
+            await catalog.MergeTracksAsync(duplicate, track, cancellationToken);
             track = await LoadTrackForMatchAsync(duplicate.Id, cancellationToken);
+            progress.Log($"Merged duplicate track into {track.Id} (shared MBID).");
         }
 
         track.Mbid = match.Mbid;
@@ -381,41 +382,6 @@ public sealed class MusicBrainzLookupService(
         }
 
         return track;
-    }
-
-    private async Task MergeTracksAsync(Track keep, Track drop, CancellationToken cancellationToken)
-    {
-        // ExecuteUpdate does not update already-tracked entities. Reassign those
-        // first so deleting `drop` does not SetNull TrackLookup.TrackId (or fail
-        // Restrict FKs) via the change tracker.
-        foreach (var scrobble in db.ChangeTracker.Entries<Scrobble>().Select(e => e.Entity).Where(s => s.TrackId == drop.Id))
-        {
-            scrobble.TrackId = keep.Id;
-        }
-
-        foreach (var tag in db.ChangeTracker.Entries<TrackTag>().Select(e => e.Entity).Where(t => t.TrackId == drop.Id))
-        {
-            tag.TrackId = keep.Id;
-        }
-
-        foreach (var lookup in db.ChangeTracker.Entries<TrackLookup>().Select(e => e.Entity).Where(l => l.TrackId == drop.Id))
-        {
-            lookup.TrackId = keep.Id;
-        }
-
-        await db.Scrobbles.Where(s => s.TrackId == drop.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
-        await db.TrackTags.Where(t => t.TrackId == drop.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
-        await db.TrackLookups.Where(l => l.TrackId == drop.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
-
-        keep.DurationMs ??= drop.DurationMs;
-        keep.AlbumId ??= drop.AlbumId;
-        keep.Mbid ??= drop.Mbid;
-        db.Tracks.Remove(drop);
-        await db.SaveChangesAsync(cancellationToken);
-        progress.Log($"Merged duplicate track {drop.Id} into {keep.Id} (shared MBID).");
     }
 
     private async Task UpsertPayloadAsync(Track track, EnrichmentSource source, string? externalId, string json, CancellationToken cancellationToken)

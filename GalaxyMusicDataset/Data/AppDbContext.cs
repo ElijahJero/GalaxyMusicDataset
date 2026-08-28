@@ -27,6 +27,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Name).HasMaxLength(512);
             e.Property(x => x.SortName).HasMaxLength(512);
             e.Property(x => x.Mbid).HasMaxLength(36);
+            e.Property(x => x.LastFmUrl).HasMaxLength(2048);
+            e.Property(x => x.ImageUrl).HasMaxLength(2048);
         });
 
         modelBuilder.Entity<ArtistAlias>(e =>
@@ -42,6 +44,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => new { x.ArtistId, x.Title });
             e.Property(x => x.Title).HasMaxLength(1024);
             e.Property(x => x.Mbid).HasMaxLength(36);
+            e.Property(x => x.CoverUrl).HasMaxLength(2048);
             e.HasOne(x => x.Artist).WithMany(x => x.Albums).HasForeignKey(x => x.ArtistId).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -53,6 +56,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Title).HasMaxLength(1024);
             e.Property(x => x.Fingerprint).HasMaxLength(64);
             e.Property(x => x.Mbid).HasMaxLength(36);
+            e.Property(x => x.Isrc).HasMaxLength(32);
+            e.Property(x => x.MusicVideoUrl).HasMaxLength(2048);
+            e.Property(x => x.DiscogsReleaseId).HasMaxLength(32);
+            e.Property(x => x.TheAudioDbTrackId).HasMaxLength(32);
             e.HasOne(x => x.Artist).WithMany(x => x.Tracks).HasForeignKey(x => x.ArtistId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Album).WithMany(x => x.Tracks).HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.SetNull);
         });
