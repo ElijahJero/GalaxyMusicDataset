@@ -33,23 +33,31 @@ public sealed class ApiCallRecorder(IServiceScopeFactory scopeFactory)
                 response = await client.SendAsync(attemptRequest, cancellationToken);
                 var duration = Stopwatch.GetElapsedTime(started);
                 var url = attemptRequest.RequestUri?.ToString() ?? "";
-                if ((int)response.StatusCode is 429 or 503 or 502)
+                var status = (int)response.StatusCode;
+                if (HttpResponseHelpers.IsTransientStatus(status))
                 {
-                    Record(source, (int)response.StatusCode, false, (int)duration.TotalMilliseconds, $"HTTP {(int)response.StatusCode}");
-                    await PersistLogAsync(source, attemptRequest.Method.Method, url, (int)response.StatusCode, false, (int)duration.TotalMilliseconds, $"HTTP {(int)response.StatusCode}", cancellationToken);
+                    var message = $"HTTP {status}";
+                    Record(source, status, false, (int)duration.TotalMilliseconds, message);
+                    await PersistLogAsync(source, attemptRequest.Method.Method, url, status, false, (int)duration.TotalMilliseconds, message, cancellationToken);
+
+                    var backoff = HttpResponseHelpers.BusyBackoff(response, attempt);
+                    limiter.Postpone(backoff);
                     if (attempt == maxAttempts)
                     {
-                        return await HttpResponseHelpers.ReadSuccessBodyAsync(response, source, cancellationToken);
+                        throw new JsonApiException(source, $"{source} {message} after {maxAttempts} attempts.", status);
                     }
 
-                    await Task.Delay(HttpResponseHelpers.RetryDelay(response, attempt), cancellationToken);
                     continue;
                 }
 
                 var body = await HttpResponseHelpers.ReadSuccessBodyAsync(response, source, cancellationToken);
-                Record(source, (int)response.StatusCode, true, (int)duration.TotalMilliseconds, null);
-                await PersistLogAsync(source, attemptRequest.Method.Method, url, (int)response.StatusCode, true, (int)duration.TotalMilliseconds, null, cancellationToken);
+                Record(source, status, true, (int)duration.TotalMilliseconds, null);
+                await PersistLogAsync(source, attemptRequest.Method.Method, url, status, true, (int)duration.TotalMilliseconds, null, cancellationToken);
                 return body;
+            }
+            catch (JsonApiException)
+            {
+                throw;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -62,7 +70,8 @@ public sealed class ApiCallRecorder(IServiceScopeFactory scopeFactory)
                     throw;
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(Math.Min(20, Math.Pow(2, attempt))), cancellationToken);
+                var backoff = HttpResponseHelpers.BusyBackoff(response, attempt);
+                limiter.Postpone(backoff);
             }
             finally
             {

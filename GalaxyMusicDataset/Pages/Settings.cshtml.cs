@@ -7,40 +7,61 @@ using Microsoft.Extensions.Options;
 namespace GalaxyMusicDataset.Pages;
 
 public class SettingsModel(
-    IOptionsSnapshot<LastFmOptions> lastFm,
-    IOptionsSnapshot<DiscogsOptions> discogs,
-    IOptionsSnapshot<TheAudioDbOptions> audioDb,
-    IOptionsSnapshot<MusicBrainzOptions> musicBrainz,
-    IOptionsSnapshot<AggregationOptions> aggregation,
+    IOptionsMonitor<LastFmOptions> lastFm,
+    IOptionsMonitor<DiscogsOptions> discogs,
+    IOptionsMonitor<TheAudioDbOptions> audioDb,
+    IOptionsMonitor<MusicBrainzOptions> musicBrainz,
+    IOptionsMonitor<AggregationOptions> aggregation,
     UserSettingsStore store) : PageModel
 {
     [BindProperty]
     public UserSettingsModel Input { get; set; } = new();
 
     public string? Saved { get; set; }
+    public bool LastFmKeySaved { get; set; }
+    public bool DiscogsTokenSaved { get; set; }
+    public bool TheAudioDbKeySaved { get; set; }
 
-    public void OnGet()
-    {
-        Input = new UserSettingsModel
-        {
-            LastFmApiKey = lastFm.Value.ApiKey,
-            LastFmUsername = lastFm.Value.Username,
-            DiscogsToken = discogs.Value.Token,
-            TheAudioDbApiKey = audioDb.Value.ApiKey,
-            MusicBrainzContact = musicBrainz.Value.Contact,
-            EnableMusicBrainz = aggregation.Value.EnableMusicBrainz,
-            EnableLastFmTrackInfo = aggregation.Value.EnableLastFmTrackInfo,
-            EnableDiscogs = aggregation.Value.EnableDiscogs,
-            EnableTheAudioDb = aggregation.Value.EnableTheAudioDb,
-            IncrementalIntervalMinutes = aggregation.Value.IncrementalIntervalMinutes,
-            SeedSampleData = aggregation.Value.SeedSampleData
-        };
-    }
+    public void OnGet() => LoadForm();
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        await store.SaveAsync(Input, cancellationToken);
-        Saved = "Saved to App_Data/user-settings.json. Workers pick up option changes on the next item; restart if a key was just added.";
+        var existing = new StoredSecrets(
+            lastFm.CurrentValue.ApiKey,
+            discogs.CurrentValue.Token,
+            audioDb.CurrentValue.ApiKey);
+        await store.SaveAsync(Input, existing, cancellationToken);
+        Saved = "Saved. Blank secret fields were left unchanged.";
+        var postedKey = Input.LastFmApiKey;
+        var postedDiscogs = Input.DiscogsToken;
+        var postedAudioDb = Input.TheAudioDbApiKey;
+        LoadForm();
+        LastFmKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedKey, existing.LastFmApiKey));
+        DiscogsTokenSaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedDiscogs, existing.DiscogsToken));
+        TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedAudioDb, existing.TheAudioDbApiKey));
         return Page();
+    }
+
+    private void LoadForm()
+    {
+        var lf = lastFm.CurrentValue;
+        var d = discogs.CurrentValue;
+        var a = audioDb.CurrentValue;
+        var mb = musicBrainz.CurrentValue;
+        var agg = aggregation.CurrentValue;
+        LastFmKeySaved = !string.IsNullOrWhiteSpace(lf.ApiKey);
+        DiscogsTokenSaved = !string.IsNullOrWhiteSpace(d.Token);
+        TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(a.ApiKey);
+        Input = new UserSettingsModel
+        {
+            LastFmUsername = lf.Username,
+            MusicBrainzContact = mb.Contact,
+            EnableMusicBrainz = agg.EnableMusicBrainz,
+            EnableLastFmTrackInfo = agg.EnableLastFmTrackInfo,
+            EnableDiscogs = agg.EnableDiscogs,
+            EnableTheAudioDb = agg.EnableTheAudioDb,
+            IncrementalIntervalMinutes = agg.IncrementalIntervalMinutes,
+            SeedSampleData = agg.SeedSampleData
+        };
     }
 }
