@@ -359,5 +359,13 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 
+# Local SQLite database and writable runtime settings
+GalaxyMusicDataset/App_Data/*
+!GalaxyMusicDataset/App_Data/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+user-settings.json
+
 # Fody - auto-generated XML schema
 FodyWeavers.xsd

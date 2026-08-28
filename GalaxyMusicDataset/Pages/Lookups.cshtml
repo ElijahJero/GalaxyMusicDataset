@@ -1,0 +1,55 @@
+@page
+@model LookupsModel
+@{
+    ViewData["Title"] = "Lookups";
+}
+
+<h1 class="h3">Fingerprint lookups</h1>
+<p class="text-muted">One row per unique artist+title. This is what prevents searching MusicBrainz for the same song four times.</p>
+
+<div class="mb-3 d-flex flex-wrap gap-2">
+    <a class="btn btn-sm @(string.IsNullOrEmpty(Model.Status) ? "btn-dark" : "btn-outline-dark")" asp-page="/Lookups">All</a>
+    @foreach (var kv in Model.Counts.OrderBy(k => k.Key))
+    {
+        <a class="btn btn-sm @(Model.Status == kv.Key ? "btn-dark" : "btn-outline-dark")" asp-page="/Lookups" asp-route-Status="@kv.Key">@kv.Key (@kv.Value)</a>
+    }
+</div>
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+        <tr>
+            <th>Artist / track</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Attempts</th>
+            <th>Last</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            <tr>
+                <td>
+                    <div>@row.ArtistName — @row.TrackName</div>
+                    <div class="small text-muted">@(row.AlbumName ?? "no album") · <code>@row.Fingerprint[..12]…</code></div>
+                    @if (!string.IsNullOrWhiteSpace(row.ErrorMessage))
+                    {
+                        <div class="small text-danger">@row.ErrorMessage</div>
+                    }
+                </td>
+                <td>@row.Status</td>
+                <td>@(row.BestScore?.ToString("0.00") ?? "—")</td>
+                <td>@row.AttemptCount</td>
+                <td class="small text-nowrap">@(row.LastAttemptUtc?.UtcDateTime.ToString("u") ?? "queued")</td>
+                <td>
+                    <form method="post" asp-page-handler="Retry" asp-route-id="@row.Id">
+                        <button class="btn btn-sm btn-outline-secondary">Retry</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
