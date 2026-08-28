@@ -292,8 +292,13 @@ public sealed class MusicBrainzLookupService(
             cancellationToken);
         if (duplicate is not null)
         {
-            await MergeTracksAsync(duplicate, track, cancellationToken);
-            track = duplicate;
+            var keepId = duplicate.Id;
+            await catalog.MergeTracksAsync(duplicate, track, cancellationToken);
+            track = await db.Tracks
+                .Include(t => t.Artist)
+                .Include(t => t.SourcePayloads)
+                .FirstAsync(t => t.Id == keepId, cancellationToken);
+            progress.Log($"Merged duplicate track into {track.Id} (shared MBID).");
         }
 
         track.Mbid = match.Mbid;
@@ -352,23 +357,6 @@ public sealed class MusicBrainzLookupService(
                 progress.Log($"Artist alias fetch failed for {match.ArtistMbid}: {ex.Message}");
             }
         }
-    }
-
-    private async Task MergeTracksAsync(Track keep, Track drop, CancellationToken cancellationToken)
-    {
-        await db.Scrobbles.Where(s => s.TrackId == drop.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
-        await db.TrackTags.Where(t => t.TrackId == drop.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
-        await db.TrackLookups.Where(l => l.TrackId == drop.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
-
-        keep.DurationMs ??= drop.DurationMs;
-        keep.AlbumId ??= drop.AlbumId;
-        keep.Mbid ??= drop.Mbid;
-        db.Tracks.Remove(drop);
-        await db.SaveChangesAsync(cancellationToken);
-        progress.Log($"Merged duplicate track {drop.Id} into {keep.Id} (shared MBID).");
     }
 
     private async Task UpsertPayloadAsync(Track track, EnrichmentSource source, string? externalId, string json, CancellationToken cancellationToken)

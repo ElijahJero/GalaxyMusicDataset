@@ -1,0 +1,13 @@
+@model RecentModel
+
+<nav>
+    <ul class="pagination pagination-sm mb-0">
+        <li class="page-item @(Model.P <= 1 ? "disabled" : "")">
+            <a class="page-link" asp-page="/Recent" asp-route-p="@(Model.P - 1)" asp-route-q="@Model.Q" asp-route-artist="@Model.Artist" asp-route-title="@Model.Title" asp-route-album="@Model.Album" asp-route-status="@Model.Status" asp-route-hasMbid="@Model.HasMbid" asp-route-source="@Model.Source" asp-route-sort="@Model.Sort">Prev</a>
+        </li>
+        <li class="page-item disabled"><span class="page-link">@Model.P / @Model.TotalPages</span></li>
+        <li class="page-item @(Model.P >= Model.TotalPages ? "disabled" : "")">
+            <a class="page-link" asp-page="/Recent" asp-route-p="@(Model.P + 1)" asp-route-q="@Model.Q" asp-route-artist="@Model.Artist" asp-route-title="@Model.Title" asp-route-album="@Model.Album" asp-route-status="@Model.Status" asp-route-hasMbid="@Model.HasMbid" asp-route-source="@Model.Source" asp-route-sort="@Model.Sort">Next</a>
+        </li>
+    </ul>
+</nav>

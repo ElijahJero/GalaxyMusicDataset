@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MusicBrainzLookupService>();
         services.AddScoped<TagService>();
         services.AddScoped<MetadataEnrichmentService>();
+        services.AddScoped<TrackEditService>();
         services.AddScoped<SampleDataSeeder>();
         services.AddScoped<AggregationStatusService>();
         services.AddSingleton<UserSettingsStore>();

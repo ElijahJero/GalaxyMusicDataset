@@ -47,3 +47,20 @@ body {
   border-radius: 0.375rem;
   margin-top: 0.5rem;
 }
+
+.library-cover img {
+  object-fit: cover;
+  background: #e9ecef;
+}
+
+.library-cover-empty {
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9ecef;
+  color: #6c757d;
+  font-size: 0.7rem;
+  text-align: center;
+}

@@ -113,4 +113,86 @@ public sealed class CatalogService(AppDbContext db)
             Locale = locale
         });
     }
+
+    public static string? Coalesce(string? current, string? incoming) =>
+        string.IsNullOrWhiteSpace(current) && !string.IsNullOrWhiteSpace(incoming) ? incoming.Trim() : current;
+
+    public static void SetCoverIfEmpty(Album? album, string? url)
+    {
+        if (album is not null && string.IsNullOrWhiteSpace(album.CoverUrl) && !string.IsNullOrWhiteSpace(url))
+        {
+            album.CoverUrl = url.Trim();
+            album.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public async Task MergeTracksAsync(Track keep, Track drop, CancellationToken cancellationToken)
+    {
+        if (keep.Id == drop.Id)
+        {
+            return;
+        }
+
+        await db.Scrobbles.Where(s => s.TrackId == drop.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
+
+        var keepTagKeys = await db.TrackTags
+            .Where(t => t.TrackId == keep.Id)
+            .Select(t => new { t.TagId, t.Source })
+            .ToListAsync(cancellationToken);
+        var keepSet = keepTagKeys.Select(k => (k.TagId, k.Source)).ToHashSet();
+        var dropTags = await db.TrackTags.Where(t => t.TrackId == drop.Id).ToListAsync(cancellationToken);
+        foreach (var tag in dropTags)
+        {
+            if (keepSet.Contains((tag.TagId, tag.Source)))
+            {
+                db.TrackTags.Remove(tag);
+            }
+            else
+            {
+                tag.TrackId = keep.Id;
+            }
+        }
+
+        var keepSources = await db.TrackSourcePayloads
+            .Where(p => p.TrackId == keep.Id)
+            .Select(p => p.Source)
+            .ToListAsync(cancellationToken);
+        var keepSourceSet = keepSources.ToHashSet();
+        var dropPayloads = await db.TrackSourcePayloads.Where(p => p.TrackId == drop.Id).ToListAsync(cancellationToken);
+        foreach (var payload in dropPayloads)
+        {
+            if (keepSourceSet.Contains(payload.Source))
+            {
+                db.TrackSourcePayloads.Remove(payload);
+            }
+            else
+            {
+                payload.TrackId = keep.Id;
+            }
+        }
+
+        await db.TrackLookups.Where(l => l.TrackId == drop.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
+
+        keep.DurationMs ??= drop.DurationMs;
+        keep.AlbumId ??= drop.AlbumId;
+        keep.Mbid ??= drop.Mbid;
+        keep.Isrc ??= drop.Isrc;
+        keep.Summary ??= drop.Summary;
+        keep.MusicVideoUrl ??= drop.MusicVideoUrl;
+        keep.DiscogsReleaseId ??= drop.DiscogsReleaseId;
+        keep.TheAudioDbTrackId ??= drop.TheAudioDbTrackId;
+        keep.UpdatedAt = DateTimeOffset.UtcNow;
+
+        foreach (var entry in db.ChangeTracker.Entries<Scrobble>()
+                     .Where(e => e.Entity.TrackId == drop.Id)
+                     .ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
+
+        db.Tracks.Remove(drop);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
