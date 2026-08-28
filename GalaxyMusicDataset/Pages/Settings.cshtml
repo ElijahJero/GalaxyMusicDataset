@@ -31,7 +31,7 @@
 
     <h2 class="h5">Other APIs</h2>
     <div class="row g-3 mb-3">
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label" asp-for="Input.DiscogsToken">Discogs token</label>
             <input class="form-control" asp-for="Input.DiscogsToken" type="password" value="" autocomplete="new-password" placeholder="@(Model.DiscogsTokenSaved ? "Saved — leave blank to keep" : "")" />
             @if (Model.DiscogsTokenSaved)
@@ -39,7 +39,7 @@
                 <div class="form-text">A Discogs token is already saved.</div>
             }
         </div>
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label" asp-for="Input.TheAudioDbApiKey">TheAudioDB API key</label>
             <input class="form-control" asp-for="Input.TheAudioDbApiKey" type="password" value="" autocomplete="new-password" placeholder="@(Model.TheAudioDbKeySaved ? "Saved — leave blank to keep" : "")" />
             @if (Model.TheAudioDbKeySaved)
@@ -47,9 +47,30 @@
                 <div class="form-text">A TheAudioDB key is already saved.</div>
             }
         </div>
-        <div class="col-md-4">
-            <label class="form-label" asp-for="Input.MusicBrainzContact">MusicBrainz contact (User-Agent)</label>
+    </div>
+
+    <h2 class="h5">MusicBrainz</h2>
+    <p class="text-muted small">Leave the server URL blank (or <code>https://musicbrainz.org</code>) for the public API at about 1 request/second. To go much faster, point it at a mirror you already host — for example <a href="https://github.com/metabrainz/musicbrainz-docker">musicbrainz-docker</a> on <code>http://localhost:5000</code>. This app does not start Docker for you.</p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MusicBrainzBaseUrl">Server URL</label>
+            <input class="form-control" asp-for="Input.MusicBrainzBaseUrl" placeholder="https://musicbrainz.org" />
+            <div class="form-text">Origin of the MusicBrainz website / <code>/ws/2</code> API. <code>localhost:5000</code> is accepted.</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MusicBrainzCoverArtBaseUrl">Cover Art Archive URL</label>
+            <input class="form-control" asp-for="Input.MusicBrainzCoverArtBaseUrl" placeholder="https://coverartarchive.org" />
+            <div class="form-text">Optional. musicbrainz-docker’s port 5000 is not Cover Art Archive — leave this blank unless you host a CAA mirror.</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MusicBrainzContact">Contact (User-Agent)</label>
             <input class="form-control" asp-for="Input.MusicBrainzContact" />
+            <div class="form-text">Required by the public API; still sent to a local mirror.</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MusicBrainzMinIntervalMs">Min interval (ms)</label>
+            <input class="form-control" asp-for="Input.MusicBrainzMinIntervalMs" type="number" min="0" placeholder="Auto" />
+            <div class="form-text">Blank = auto (1200ms public, 50ms self-hosted). <code>0</code> removes the extra delay. Public Cover Art Archive stays at 1200ms.</div>
         </div>
     </div>
 

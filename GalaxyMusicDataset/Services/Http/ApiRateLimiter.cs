@@ -1,10 +1,38 @@
 namespace GalaxyMusicDataset.Services.Http;
 
-public sealed class ApiRateLimiter(TimeSpan minInterval)
+public sealed class ApiRateLimiter
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _lock = new();
     private DateTimeOffset _nextAllowed = DateTimeOffset.MinValue;
+    private TimeSpan _minInterval;
+
+    public ApiRateLimiter(TimeSpan minInterval)
+    {
+        _minInterval = minInterval < TimeSpan.Zero ? TimeSpan.Zero : minInterval;
+    }
+
+    public TimeSpan MinInterval
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _minInterval;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Live-update the gap between calls (settings reload, public vs self-hosted MusicBrainz).
+    /// </summary>
+    public void SetMinInterval(TimeSpan minInterval)
+    {
+        lock (_lock)
+        {
+            _minInterval = minInterval < TimeSpan.Zero ? TimeSpan.Zero : minInterval;
+        }
+    }
 
     public async Task WaitAsync(CancellationToken cancellationToken)
     {
@@ -19,7 +47,7 @@ public sealed class ApiRateLimiter(TimeSpan minInterval)
                     wait = _nextAllowed - DateTimeOffset.UtcNow;
                     if (wait <= TimeSpan.Zero)
                     {
-                        _nextAllowed = DateTimeOffset.UtcNow + minInterval;
+                        _nextAllowed = DateTimeOffset.UtcNow + _minInterval;
                         return;
                     }
                 }

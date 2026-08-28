@@ -132,6 +132,9 @@
                 <p class="small text-muted mt-3 mb-0">
                     Lookups are keyed by artist+title fingerprint so the same song is not searched repeatedly.
                     Auto-match requires high confidence; everything else waits on <a asp-page="/Review">Review</a>.
+                    Server <code>@s.MusicBrainzBaseUrl</code>
+                    @(s.MusicBrainzUsesPublicApi ? "(public API)" : "(self-hosted)")
+                    · @s.MusicBrainzIntervalMs ms between calls.
                 </p>
             </div>
         </div>
@@ -165,7 +168,7 @@
             </div>
             <div class="card-footer small text-muted">
                 Last.fm @(s.EnableLastFmTrackInfo ? "on" : "off")@(s.LastFmConfigured ? "" : ", no key")
-                · MusicBrainz @(s.EnableMusicBrainz ? "on" : "off")
+                · MusicBrainz @(s.EnableMusicBrainz ? "on" : "off") @(s.MusicBrainzUsesPublicApi ? "" : "(self-hosted)")
                 · Discogs @(s.EnableDiscogs ? "on" : "off")@(s.DiscogsConfigured ? "" : ", no token")
                 · TheAudioDB @(s.EnableTheAudioDb ? "on" : "off")@(s.TheAudioDbConfigured ? "" : ", no key")
             </div>
