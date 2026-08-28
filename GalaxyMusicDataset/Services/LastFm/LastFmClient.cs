@@ -29,6 +29,10 @@ public sealed record LastFmTrackInfo(
     string? AlbumTitle,
     string? AlbumMbid,
     string? ArtistMbid,
+    string? ArtistUrl,
+    string? TrackUrl,
+    string? WikiSummary,
+    string? AlbumImageUrl,
     IReadOnlyList<LastFmTag> Tags,
     string RawJson);
 
@@ -134,79 +138,157 @@ public sealed class LastFmClient(
         return new LastFmWindowResult(tracks, reportedTotal, totalPages, ok, warning);
     }
 
-    public async Task<LastFmTrackInfo?> GetTrackInfoAsync(string artist, string track, CancellationToken cancellationToken)
+    public async Task<LastFmTrackInfo?> GetTrackInfoAsync(string artist, string track, string? mbid, CancellationToken cancellationToken)
     {
-        var url = Build("track.getInfo", new Dictionary<string, string?>
+        if (!string.IsNullOrWhiteSpace(mbid))
         {
-            ["artist"] = artist,
-            ["track"] = track,
-            ["username"] = Username,
-            ["autocorrect"] = "0"
-        });
+            var byMbid = await GetTrackInfoCoreAsync(
+                new Dictionary<string, string?> { ["mbid"] = mbid, ["username"] = Username, ["autocorrect"] = "0" },
+                cancellationToken);
+            if (byMbid is not null)
+            {
+                return byMbid;
+            }
+        }
 
+        return await GetTrackInfoCoreAsync(
+            new Dictionary<string, string?>
+            {
+                ["artist"] = artist,
+                ["track"] = track,
+                ["username"] = Username,
+                ["autocorrect"] = "0"
+            },
+            cancellationToken);
+    }
+
+    public Task<LastFmTrackInfo?> GetTrackInfoAsync(string artist, string track, CancellationToken cancellationToken) =>
+        GetTrackInfoAsync(artist, track, null, cancellationToken);
+
+    private async Task<LastFmTrackInfo?> GetTrackInfoCoreAsync(
+        Dictionary<string, string?> query,
+        CancellationToken cancellationToken)
+    {
+        var url = Build("track.getInfo", query);
         try
         {
             var json = await GetJsonAsync(url, cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("error", out _))
-            {
-                return null;
-            }
-
-            if (!root.TryGetProperty("track", out var t))
-            {
-                return null;
-            }
-
-            var duration = t.GetPropertyInt("duration");
-            if (duration is 0)
-            {
-                duration = null;
-            }
-
-            string? albumTitle = null;
-            string? albumMbid = null;
-            if (t.TryGetProperty("album", out var album))
-            {
-                albumTitle = album.GetPropertyString("title");
-                albumMbid = EmptyToNull(album.GetPropertyString("mbid"));
-            }
-
-            string? artistMbid = null;
-            if (t.TryGetProperty("artist", out var artistEl))
-            {
-                artistMbid = EmptyToNull(artistEl.GetPropertyString("mbid"));
-            }
-
-            var tags = new List<LastFmTag>();
-            if (t.TryGetProperty("toptags", out var topTags) && topTags.TryGetProperty("tag", out var tagEl))
-            {
-                foreach (var tag in tagEl.EnumerateFlexibleArray())
-                {
-                    var name = tag.GetPropertyString("name");
-                    if (string.IsNullOrWhiteSpace(name))
-                    {
-                        continue;
-                    }
-
-                    tags.Add(new LastFmTag(name, tag.GetPropertyInt("count") ?? 0));
-                }
-            }
-
-            return new LastFmTrackInfo(
-                EmptyToNull(t.GetPropertyString("mbid")),
-                duration,
-                albumTitle,
-                albumMbid,
-                artistMbid,
-                tags,
-                json);
+            return ParseTrackInfo(json);
         }
-        catch (JsonApiException ex) when (ex.StatusCode == 404)
+        catch (JsonApiException ex) when (ex.StatusCode is 404)
         {
             return null;
         }
+    }
+
+    public static LastFmTrackInfo? ParseTrackInfo(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("error", out _))
+        {
+            return null;
+        }
+
+        if (!root.TryGetProperty("track", out var t))
+        {
+            return null;
+        }
+
+        var duration = t.GetPropertyInt("duration");
+        if (duration is 0)
+        {
+            duration = null;
+        }
+
+        string? albumTitle = null;
+        string? albumMbid = null;
+        string? albumImage = null;
+        if (t.TryGetProperty("album", out var album))
+        {
+            albumTitle = album.GetPropertyString("title");
+            albumMbid = EmptyToNull(album.GetPropertyString("mbid"));
+            albumImage = PickImage(album);
+        }
+
+        string? artistMbid = null;
+        string? artistUrl = null;
+        if (t.TryGetProperty("artist", out var artistEl))
+        {
+            artistMbid = EmptyToNull(artistEl.GetPropertyString("mbid"));
+            artistUrl = EmptyToNull(artistEl.GetPropertyString("url"));
+        }
+
+        var tags = new List<LastFmTag>();
+        if (t.TryGetProperty("toptags", out var topTags) && topTags.TryGetProperty("tag", out var tagEl))
+        {
+            foreach (var tag in tagEl.EnumerateFlexibleArray())
+            {
+                var name = tag.GetPropertyString("name");
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                tags.Add(new LastFmTag(name, tag.GetPropertyInt("count") ?? 0));
+            }
+        }
+
+        string? wiki = null;
+        if (t.TryGetProperty("wiki", out var wikiEl))
+        {
+            wiki = EmptyToNull(wikiEl.GetPropertyString("summary"))
+                   ?? EmptyToNull(wikiEl.GetPropertyString("content"));
+        }
+
+        return new LastFmTrackInfo(
+            EmptyToNull(t.GetPropertyString("mbid")),
+            duration,
+            albumTitle,
+            albumMbid,
+            artistMbid,
+            artistUrl,
+            EmptyToNull(t.GetPropertyString("url")),
+            wiki,
+            albumImage,
+            tags,
+            json);
+    }
+
+    public static string? PickImage(JsonElement parent)
+    {
+        if (!parent.TryGetProperty("image", out var images))
+        {
+            return null;
+        }
+
+        string? best = null;
+        var bestRank = -1;
+        foreach (var image in images.EnumerateFlexibleArray())
+        {
+            var url = EmptyToNull(image.GetPropertyString("#text") ?? image.GetFlexibleText());
+            if (url is null)
+            {
+                continue;
+            }
+
+            var rank = image.GetPropertyString("size") switch
+            {
+                "mega" => 5,
+                "extralarge" => 4,
+                "large" => 3,
+                "medium" => 2,
+                "small" => 1,
+                _ => 0
+            };
+            if (rank >= bestRank)
+            {
+                bestRank = rank;
+                best = url;
+            }
+        }
+
+        return best;
     }
 
     public static LastFmRecentTrack ParseTrack(JsonElement item)

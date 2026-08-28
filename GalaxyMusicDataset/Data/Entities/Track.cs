@@ -8,6 +8,11 @@ public sealed class Track
     public string Title { get; set; } = "";
     public string? Mbid { get; set; }
     public int? DurationMs { get; set; }
+    public string? Isrc { get; set; }
+    public string? Summary { get; set; }
+    public string? MusicVideoUrl { get; set; }
+    public string? DiscogsReleaseId { get; set; }
+    public string? TheAudioDbTrackId { get; set; }
     public string Fingerprint { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
