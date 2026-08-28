@@ -29,3 +29,21 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+.log-box {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  max-height: 22rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.payload-json {
+  font-size: 0.75rem;
+  max-height: 16rem;
+  overflow: auto;
+  background: #f8f9fa;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  margin-top: 0.5rem;
+}

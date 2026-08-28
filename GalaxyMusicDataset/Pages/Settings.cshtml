@@ -1,0 +1,74 @@
+@page
+@model SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<h1 class="h3">Aggregation settings</h1>
+<p class="text-muted">Keys are stored in <code>App_Data/user-settings.json</code> (gitignored). Environment variables and user secrets also work: <code>LastFm__ApiKey</code>, <code>LastFm__Username</code>, <code>Discogs__Token</code>, <code>TheAudioDb__ApiKey</code>.</p>
+
+@if (Model.Saved is not null)
+{
+    <div class="alert alert-success">@Model.Saved</div>
+}
+
+<form method="post" class="card card-body">
+    <h2 class="h5">Last.fm</h2>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.LastFmUsername">Username</label>
+            <input class="form-control" asp-for="Input.LastFmUsername" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.LastFmApiKey">API key</label>
+            <input class="form-control" asp-for="Input.LastFmApiKey" type="password" autocomplete="off" />
+        </div>
+    </div>
+
+    <h2 class="h5">Other APIs</h2>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.DiscogsToken">Discogs token</label>
+            <input class="form-control" asp-for="Input.DiscogsToken" type="password" autocomplete="off" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.TheAudioDbApiKey">TheAudioDB API key</label>
+            <input class="form-control" asp-for="Input.TheAudioDbApiKey" type="password" autocomplete="off" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.MusicBrainzContact">MusicBrainz contact (User-Agent)</label>
+            <input class="form-control" asp-for="Input.MusicBrainzContact" />
+        </div>
+    </div>
+
+    <h2 class="h5">Workers</h2>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.IncrementalIntervalMinutes">Incremental sync interval (minutes)</label>
+            <input class="form-control" asp-for="Input.IncrementalIntervalMinutes" type="number" min="5" />
+        </div>
+        <div class="col-md-8 d-flex flex-wrap align-items-end gap-4">
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableMusicBrainz" />
+                <label class="form-check-label" asp-for="Input.EnableMusicBrainz">MusicBrainz</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableLastFmTrackInfo" />
+                <label class="form-check-label" asp-for="Input.EnableLastFmTrackInfo">Last.fm track.getInfo</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableDiscogs" />
+                <label class="form-check-label" asp-for="Input.EnableDiscogs">Discogs</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableTheAudioDb" />
+                <label class="form-check-label" asp-for="Input.EnableTheAudioDb">TheAudioDB</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.SeedSampleData" />
+                <label class="form-check-label" asp-for="Input.SeedSampleData">Seed sample scrobbles when empty</label>
+            </div>
+        </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+</form>

@@ -1,10 +1,273 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Aggregation";
+    var s = Model.Status;
+    int LookupCount(string name) => s.Lookups.TryGetValue(name, out var n) ? n : 0;
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Data aggregation</h1>
+        <p class="text-muted mb-0">Last.fm ingest, MusicBrainz identity, and metadata enrichment. Analytics pages are not built yet.</p>
+    </div>
+    <form method="post" class="d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" asp-page-handler="Sync" disabled="@(!s.LastFmConfigured)">Sync now</button>
+        <button class="btn btn-outline-primary" asp-page-handler="Backfill" disabled="@(!s.LastFmConfigured)">Backfill 14 days</button>
+        @if (s.EnrichmentPaused)
+        {
+            <button class="btn btn-success" asp-page-handler="Resume">Resume enrichment</button>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" asp-page-handler="Pause">Pause enrichment</button>
+        }
+        <button class="btn btn-outline-warning" asp-page-handler="RetryLookups">Retry failed lookups</button>
+        <button class="btn btn-outline-dark" asp-page-handler="Seed">Seed sample</button>
+    </form>
 </div>
+
+@if (!s.LastFmConfigured)
+{
+    <div class="alert alert-warning">
+        Last.fm is not configured. Add an API key and username on <a asp-page="/Settings">Settings</a>.
+        Until then you can seed sample scrobbles and inspect the recent-tracks debug view.
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Scrobbles</div>
+                <div class="fs-3">@s.ScrobbleCount.ToString("N0")</div>
+                @if (s.LastFmPlaycount is not null)
+                {
+                    <div class="small">Last.fm playcount @s.LastFmPlaycount.Value.ToString("N0") · gap @(s.PlaycountGap?.ToString("N0") ?? "—")</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Catalog</div>
+                <div class="fs-6">@s.TrackCount.ToString("N0") tracks</div>
+                <div class="small">@s.ArtistCount.ToString("N0") artists · @s.AlbumCount.ToString("N0") albums · @s.TagCount.ToString("N0") tags</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">MBID coverage</div>
+                <div class="fs-3">@s.MbidCoveragePercent%</div>
+                <div class="progress mt-2" style="height:6px;">
+                    <div class="progress-bar" style="width:@s.MbidCoveragePercent.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                </div>
+                <div class="small mt-1">@s.TracksWithMbid / @s.TrackCount tracks · @s.TracksWithDuration with duration</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Worker</div>
+                <div class="fw-semibold">@s.Progress.Phase</div>
+                <div class="small text-truncate" title="@s.Progress.CurrentItem">@(s.Progress.CurrentItem ?? "—")</div>
+                <div class="small">
+                    Sync @(s.Progress.SyncRunning ? "running" : "idle") ·
+                    Enrich @(s.Progress.EnrichmentPaused ? "paused" : s.Progress.EnrichmentRunning ? "running" : "idle")
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Last.fm sync</div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-4">Username</dt>
+                    <dd class="col-sm-8">@(s.LastFmUsername ?? "—") @(s.LastFmConfigured ? "" : "(not configured)")</dd>
+                    <dt class="col-sm-4">Last success</dt>
+                    <dd class="col-sm-8">@(s.LastSuccessfulSyncUtc?.UtcDateTime.ToString("u") ?? "never")</dd>
+                    <dt class="col-sm-4">Last attempt</dt>
+                    <dd class="col-sm-8">@(s.LastAttemptUtc?.UtcDateTime.ToString("u") ?? "never")</dd>
+                    <dt class="col-sm-4">Newest scrobble</dt>
+                    <dd class="col-sm-8">@(s.NewestScrobble?.UtcDateTime.ToString("u") ?? "—")</dd>
+                    <dt class="col-sm-4">Oldest scrobble</dt>
+                    <dd class="col-sm-8">@(s.OldestScrobble?.UtcDateTime.ToString("u") ?? "—")</dd>
+                    <dt class="col-sm-4">Backfill</dt>
+                    <dd class="col-sm-8">
+                        @(s.IsBackfillComplete ? "complete" : "in progress")
+                        · cursor @(s.BackfillCursorDay?.UtcDateTime.ToString("yyyy-MM-dd") ?? "—")
+                        · @s.BackfillDaysCompleted days
+                    </dd>
+                    <dt class="col-sm-4">Registered</dt>
+                    <dd class="col-sm-8">@(s.AccountRegisteredUtc?.UtcDateTime.ToString("yyyy-MM-dd") ?? "—")</dd>
+                    <dt class="col-sm-4">Incremental runs</dt>
+                    <dd class="col-sm-8">@s.IncrementalRuns</dd>
+                    <dt class="col-sm-4">Last error</dt>
+                    <dd class="col-sm-8 text-danger">@(s.LastSyncError ?? "—")</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">MusicBrainz lookup queue</div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col"><div class="fw-bold">@LookupCount("Pending")</div><div class="small text-muted">Pending</div></div>
+                    <div class="col"><div class="fw-bold">@LookupCount("InProgress")</div><div class="small text-muted">In progress</div></div>
+                    <div class="col"><div class="fw-bold text-success">@LookupCount("AutoMatched")</div><div class="small text-muted">Auto</div></div>
+                    <div class="col"><div class="fw-bold text-warning">@LookupCount("NeedsReview")</div><div class="small text-muted">Review</div></div>
+                    <div class="col"><div class="fw-bold">@LookupCount("NotFound")</div><div class="small text-muted">Not found</div></div>
+                    <div class="col"><div class="fw-bold text-danger">@LookupCount("Failed")</div><div class="small text-muted">Failed</div></div>
+                    <div class="col"><div class="fw-bold">@LookupCount("ManualMatched")</div><div class="small text-muted">Manual</div></div>
+                </div>
+                <p class="small text-muted mt-3 mb-0">
+                    Lookups are keyed by artist+title fingerprint so the same song is not searched repeatedly.
+                    Auto-match requires high confidence; everything else waits on <a asp-page="/Review">Review</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Source enrichment</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr><th>Source</th><th>Status</th><th class="text-end">Count</th></tr>
+                    </thead>
+                    <tbody>
+                    @if (s.SourcePayloads.Count == 0)
+                    {
+                        <tr><td colspan="3" class="text-muted">No source payloads yet.</td></tr>
+                    }
+                    @foreach (var row in s.SourcePayloads)
+                    {
+                        <tr>
+                            <td>@row.Source</td>
+                            <td>@row.Status</td>
+                            <td class="text-end">@row.Count</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer small text-muted">
+                Last.fm @(s.EnableLastFmTrackInfo ? "on" : "off")@(s.LastFmConfigured ? "" : ", no key")
+                · MusicBrainz @(s.EnableMusicBrainz ? "on" : "off")
+                · Discogs @(s.EnableDiscogs ? "on" : "off")@(s.DiscogsConfigured ? "" : ", no token")
+                · TheAudioDB @(s.EnableTheAudioDb ? "on" : "off")@(s.TheAudioDbConfigured ? "" : ", no key")
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Live API stats</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr><th>API</th><th>OK</th><th>Fail</th><th>Last</th><th>ms</th></tr>
+                    </thead>
+                    <tbody>
+                    @if (s.LiveApiStats.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-muted">No API calls this process.</td></tr>
+                    }
+                    @foreach (var api in s.LiveApiStats)
+                    {
+                        <tr>
+                            <td>@api.Source</td>
+                            <td>@api.Successes</td>
+                            <td>@api.Failures</td>
+                            <td>@(api.LastStatusCode?.ToString() ?? "—")</td>
+                            <td>@api.LastDurationMs</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">Recent jobs</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr><th>Started</th><th>Kind</th><th>Status</th><th>OK</th><th>Fail</th><th>Message</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var job in s.Jobs)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@job.StartedAt.UtcDateTime.ToString("u")</td>
+                            <td>@job.Kind</td>
+                            <td>@job.Status</td>
+                            <td>@job.ItemsSucceeded</td>
+                            <td>@job.ItemsFailed</td>
+                            <td class="small">@job.Message</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <span>Worker log</span>
+                <span class="small text-muted">auto-refresh 8s</span>
+            </div>
+            <div class="card-body log-box">
+                @foreach (var line in s.Progress.RecentLog)
+                {
+                    <div>@line</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Recent API requests</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+            <tr><th>When</th><th>Source</th><th>Status</th><th>ms</th><th>URL / error</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var call in s.RecentApiCalls)
+            {
+                <tr>
+                    <td class="text-nowrap">@call.At.UtcDateTime.ToString("HH:mm:ss")</td>
+                    <td>@call.Source</td>
+                    <td>@(call.StatusCode?.ToString() ?? "err")</td>
+                    <td>@call.DurationMs</td>
+                    <td class="small text-truncate" style="max-width:40rem;">@(call.Error ?? call.Url)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        setTimeout(() => window.location.reload(), 8000);
+    </script>
+}

@@ -1,0 +1,101 @@
+@page
+@model RecentModel
+@{
+    ViewData["Title"] = "Recent 50";
+}
+
+<h1 class="h3 mb-1">50 most recent scrobbles</h1>
+<p class="text-muted">Debug view of ingested plays with catalog identity, lookup status, tags, and raw source payloads.</p>
+
+@if (Model.Rows.Count == 0)
+{
+    <div class="alert alert-info">No scrobbles in the database yet. Seed sample data or run a Last.fm sync.</div>
+}
+
+@foreach (var row in Model.Rows)
+{
+    var s = row.Scrobble;
+    var t = s.Track;
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between flex-wrap gap-2">
+                <div>
+                    <div class="fs-5">@t.Artist.Name — @t.Title</div>
+                    <div class="text-muted">@(t.Album?.Title ?? s.OriginalAlbum ?? "No album")</div>
+                </div>
+                <div class="text-end small">
+                    <div>@s.PlayedAt.UtcDateTime.ToString("u")</div>
+                    <div>unix @s.UnixTimestamp</div>
+                    <div>scrobble #@s.Id · track #@t.Id</div>
+                </div>
+            </div>
+            <div class="row mt-3 small">
+                <div class="col-md-6">
+                    <h2 class="h6">Identity</h2>
+                    <ul class="list-unstyled mb-2">
+                        <li>Fingerprint <code>@t.Fingerprint</code></li>
+                        <li>Track MBID @(t.Mbid ?? "—")</li>
+                        <li>Artist MBID @(t.Artist.Mbid ?? "—")</li>
+                        <li>Album MBID @(t.Album?.Mbid ?? "—")</li>
+                        <li>Duration @(t.DurationMs is null ? "—" : $"{t.DurationMs} ms")</li>
+                        <li>Last.fm as-played: @s.OriginalArtist / @s.OriginalTitle / @(s.OriginalAlbum ?? "—")</li>
+                        <li>Last.fm MBIDs track=@(s.LastFmTrackMbid ?? "—") artist=@(s.LastFmArtistMbid ?? "—") album=@(s.LastFmAlbumMbid ?? "—")</li>
+                    </ul>
+                    @if (t.Artist.Aliases.Count > 0)
+                    {
+                        <div>Aliases: @string.Join(" · ", t.Artist.Aliases.Select(a => $"{a.Name} ({a.Source}{(a.Locale is null ? "" : "/" + a.Locale)})"))</div>
+                    }
+                </div>
+                <div class="col-md-6">
+                    <h2 class="h6">Lookup</h2>
+                    @if (row.Lookup is null)
+                    {
+                        <p>No lookup row (should not happen after ingest).</p>
+                    }
+                    else
+                    {
+                        <ul class="list-unstyled">
+                            <li>Status <strong>@row.Lookup.Status</strong></li>
+                            <li>Attempts @row.Lookup.AttemptCount</li>
+                            <li>Last attempt @(row.Lookup.LastAttemptUtc?.UtcDateTime.ToString("u") ?? "never")</li>
+                            <li>Best score @(row.Lookup.BestScore?.ToString("0.000") ?? "—")</li>
+                            <li>Matched MBID @(row.Lookup.MatchedMbid ?? "—")</li>
+                            <li>Query @(row.Lookup.QueryUsed ?? "—")</li>
+                            <li class="text-danger">@(row.Lookup.ErrorMessage ?? "")</li>
+                        </ul>
+                    }
+                    <h2 class="h6 mt-3">Tags</h2>
+                    @if (t.Tags.Count == 0)
+                    {
+                        <p class="text-muted">None yet.</p>
+                    }
+                    else
+                    {
+                        <div>
+                            @foreach (var tag in t.Tags.OrderByDescending(x => x.Weight))
+                            {
+                                <span class="badge text-bg-light border me-1 mb-1">@tag.Tag.Name <span class="text-muted">@tag.Source @tag.Weight</span></span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+            <h2 class="h6 mt-2">Source payloads</h2>
+            @if (t.SourcePayloads.Count == 0)
+            {
+                <p class="small text-muted mb-0">No enrichment payloads yet.</p>
+            }
+            @foreach (var payload in t.SourcePayloads)
+            {
+                <details class="small mb-2">
+                    <summary>@payload.Source — @payload.Status @(payload.ExternalId is null ? "" : $"id={payload.ExternalId}") @(payload.FetchedAt?.UtcDateTime.ToString("u"))</summary>
+                    @if (!string.IsNullOrWhiteSpace(payload.ErrorMessage))
+                    {
+                        <div class="text-danger">@payload.ErrorMessage</div>
+                    }
+                    <pre class="payload-json">@(payload.PayloadJson ?? "—")</pre>
+                </details>
+            }
+        </div>
+    </div>
+}
