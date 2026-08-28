@@ -35,12 +35,15 @@ public sealed class ExternalClientFactory(
     public MusicBrainzClient CreateMusicBrainz()
     {
         var options = musicBrainzOptions.CurrentValue;
+        MusicBrainzClient.RateLimiter.SetMinInterval(options.WebServiceMinInterval);
+        MusicBrainzClient.CoverArtRateLimiter.SetMinInterval(options.CoverArtMinInterval);
         var ua = string.IsNullOrWhiteSpace(options.Contact)
             ? options.UserAgent
             : $"{options.UserAgent} ({options.Contact})";
         return new MusicBrainzClient(httpClientFactory.CreateClient(nameof(MusicBrainzClient)), recorder)
         {
-            UserAgent = ua
+            UserAgent = ua,
+            Options = options
         };
     }
 

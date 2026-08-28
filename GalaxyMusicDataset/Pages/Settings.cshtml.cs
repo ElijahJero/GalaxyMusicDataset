@@ -56,6 +56,13 @@ public class SettingsModel(
         {
             LastFmUsername = lf.Username,
             MusicBrainzContact = mb.Contact,
+            MusicBrainzBaseUrl = string.Equals(mb.ResolvedBaseUrl, MusicBrainzOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : mb.ResolvedBaseUrl,
+            MusicBrainzCoverArtBaseUrl = string.Equals(mb.ResolvedCoverArtBaseUrl, MusicBrainzOptions.DefaultCoverArtBaseUrl, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : mb.ResolvedCoverArtBaseUrl,
+            MusicBrainzMinIntervalMs = mb.MinIntervalMs,
             EnableMusicBrainz = agg.EnableMusicBrainz,
             EnableLastFmTrackInfo = agg.EnableLastFmTrackInfo,
             EnableDiscogs = agg.EnableDiscogs,

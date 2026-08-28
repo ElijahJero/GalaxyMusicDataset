@@ -28,10 +28,7 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
             {
                 ["ApiKey"] = audioDb
             },
-            ["MusicBrainz"] = new Dictionary<string, string?>
-            {
-                ["Contact"] = posted.MusicBrainzContact
-            },
+            ["MusicBrainz"] = BuildMusicBrainzSection(posted),
             ["Aggregation"] = new Dictionary<string, object?>
             {
                 ["EnableMusicBrainz"] = posted.EnableMusicBrainz,
@@ -53,6 +50,26 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
 
     public static string? KeepIfBlank(string? posted, string? existing) =>
         string.IsNullOrWhiteSpace(posted) ? existing : posted.Trim();
+
+    private static Dictionary<string, object?> BuildMusicBrainzSection(UserSettingsModel posted)
+    {
+        var mb = new Dictionary<string, object?>
+        {
+            ["Contact"] = posted.MusicBrainzContact,
+            ["BaseUrl"] = string.IsNullOrWhiteSpace(posted.MusicBrainzBaseUrl)
+                ? ""
+                : posted.MusicBrainzBaseUrl.Trim(),
+            ["CoverArtBaseUrl"] = string.IsNullOrWhiteSpace(posted.MusicBrainzCoverArtBaseUrl)
+                ? ""
+                : posted.MusicBrainzCoverArtBaseUrl.Trim()
+        };
+        if (posted.MusicBrainzMinIntervalMs is int interval)
+        {
+            mb["MinIntervalMs"] = Math.Max(0, interval);
+        }
+
+        return mb;
+    }
 }
 
 public readonly record struct StoredSecrets(string? LastFmApiKey, string? DiscogsToken, string? TheAudioDbApiKey);
@@ -64,6 +81,9 @@ public sealed class UserSettingsModel
     public string? DiscogsToken { get; set; }
     public string? TheAudioDbApiKey { get; set; }
     public string? MusicBrainzContact { get; set; }
+    public string? MusicBrainzBaseUrl { get; set; }
+    public string? MusicBrainzCoverArtBaseUrl { get; set; }
+    public int? MusicBrainzMinIntervalMs { get; set; }
     public bool EnableMusicBrainz { get; set; } = true;
     public bool EnableLastFmTrackInfo { get; set; } = true;
     public bool EnableDiscogs { get; set; } = true;

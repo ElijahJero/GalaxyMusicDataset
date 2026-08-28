@@ -13,6 +13,7 @@ public sealed class AggregationStatusService(
     IOptionsMonitor<LastFmOptions> lastFm,
     IOptionsMonitor<DiscogsOptions> discogs,
     IOptionsMonitor<TheAudioDbOptions> audioDb,
+    IOptionsMonitor<MusicBrainzOptions> musicBrainz,
     IOptionsMonitor<AggregationOptions> aggregation)
 {
     public async Task<AggregationStatusDto> GetStatusAsync(CancellationToken cancellationToken)
@@ -72,6 +73,9 @@ public sealed class AggregationStatusService(
             DiscogsConfigured = discogs.CurrentValue.IsConfigured,
             TheAudioDbConfigured = audioDb.CurrentValue.IsConfigured,
             EnableMusicBrainz = aggregation.CurrentValue.EnableMusicBrainz,
+            MusicBrainzBaseUrl = musicBrainz.CurrentValue.ResolvedBaseUrl,
+            MusicBrainzUsesPublicApi = musicBrainz.CurrentValue.UsesPublicWebService,
+            MusicBrainzIntervalMs = (int)musicBrainz.CurrentValue.WebServiceMinInterval.TotalMilliseconds,
             EnableLastFmTrackInfo = aggregation.CurrentValue.EnableLastFmTrackInfo,
             EnableDiscogs = aggregation.CurrentValue.EnableDiscogs,
             EnableTheAudioDb = aggregation.CurrentValue.EnableTheAudioDb,
@@ -115,6 +119,9 @@ public sealed class AggregationStatusDto
     public bool DiscogsConfigured { get; set; }
     public bool TheAudioDbConfigured { get; set; }
     public bool EnableMusicBrainz { get; set; }
+    public string? MusicBrainzBaseUrl { get; set; }
+    public bool MusicBrainzUsesPublicApi { get; set; }
+    public int MusicBrainzIntervalMs { get; set; }
     public bool EnableLastFmTrackInfo { get; set; }
     public bool EnableDiscogs { get; set; }
     public bool EnableTheAudioDb { get; set; }

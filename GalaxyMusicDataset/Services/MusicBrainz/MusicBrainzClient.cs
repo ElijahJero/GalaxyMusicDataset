@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.Normalization;
 
@@ -8,11 +9,19 @@ namespace GalaxyMusicDataset.Services.MusicBrainz;
 public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
 {
     /// <summary>
-    /// One request per 1.2s (musicbrainzngs is 1.0s). 503s add extra cooldown.
+    /// Shared throttle for the MusicBrainz Web Service. Interval is 1.2s on the
+    /// public API and much smaller when pointed at a self-hosted mirror.
     /// </summary>
-    public static readonly ApiRateLimiter RateLimiter = new(TimeSpan.FromMilliseconds(1200));
+    public static readonly ApiRateLimiter RateLimiter = new(TimeSpan.FromMilliseconds(MusicBrainzOptions.PublicMinIntervalMs));
+
+    /// <summary>
+    /// Cover Art Archive is a separate host. Public CAA stays at 1.2s even when
+    /// the MusicBrainz WS is local.
+    /// </summary>
+    public static readonly ApiRateLimiter CoverArtRateLimiter = new(TimeSpan.FromMilliseconds(MusicBrainzOptions.PublicMinIntervalMs));
 
     public required string UserAgent { get; init; }
+    public required MusicBrainzOptions Options { get; init; }
 
     public async Task<IReadOnlyList<RecordingCandidate>> SearchRecordingsAsync(
         string artist,
@@ -23,8 +32,8 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
         var seen = new Dictionary<string, RecordingCandidate>(StringComparer.OrdinalIgnoreCase);
         foreach (var query in BuildQueries(artist, title, album))
         {
-            var url = $"https://musicbrainz.org/ws/2/recording/?query={Uri.EscapeDataString(query)}&fmt=json&limit=8";
-            var json = await GetAsync(url, cancellationToken);
+            var url = Options.RecordingSearchUrl(query);
+            var json = await GetWsAsync(url, cancellationToken);
             using var doc = JsonDocument.Parse(json);
             if (!doc.RootElement.TryGetProperty("recordings", out var recordings))
             {
@@ -62,8 +71,8 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
 
     public async Task<string> GetRecordingJsonAsync(string mbid, CancellationToken cancellationToken)
     {
-        var url = $"https://musicbrainz.org/ws/2/recording/{Uri.EscapeDataString(mbid)}?inc=artist-credits+releases+aliases+tags+isrcs+genres&fmt=json";
-        return await GetAsync(url, cancellationToken);
+        var url = Options.RecordingLookupUrl(mbid);
+        return await GetWsAsync(url, cancellationToken);
     }
 
     public async Task<JsonDocument> GetRecordingAsync(string mbid, CancellationToken cancellationToken)
@@ -74,10 +83,10 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
 
     public async Task<string?> GetReleaseFrontCoverUrlAsync(string releaseMbid, CancellationToken cancellationToken)
     {
-        var url = $"https://coverartarchive.org/release/{Uri.EscapeDataString(releaseMbid)}";
+        var url = Options.ReleaseCoverArtUrl(releaseMbid);
         try
         {
-            var json = await GetAsync(url, cancellationToken);
+            var json = await GetCoverArtAsync(url, cancellationToken);
             return ParseCoverArtFrontUrl(json);
         }
         catch (JsonApiException ex) when (ex.StatusCode is 404)
@@ -88,8 +97,8 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
 
     public async Task<JsonDocument> GetArtistAsync(string mbid, CancellationToken cancellationToken)
     {
-        var url = $"https://musicbrainz.org/ws/2/artist/{Uri.EscapeDataString(mbid)}?inc=aliases&fmt=json";
-        var json = await GetAsync(url, cancellationToken);
+        var url = Options.ArtistLookupUrl(mbid);
+        var json = await GetWsAsync(url, cancellationToken);
         return JsonDocument.Parse(json);
     }
 
@@ -306,12 +315,18 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
         return normalized.Trim();
     }
 
-    private async Task<string> GetAsync(string url, CancellationToken cancellationToken)
+    private Task<string> GetWsAsync(string url, CancellationToken cancellationToken) =>
+        SendAsync(url, "MusicBrainz", RateLimiter, cancellationToken);
+
+    private Task<string> GetCoverArtAsync(string url, CancellationToken cancellationToken) =>
+        SendAsync(url, "CoverArtArchive", CoverArtRateLimiter, cancellationToken);
+
+    private async Task<string> SendAsync(string url, string source, ApiRateLimiter limiter, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.UserAgent.Clear();
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        return await recorder.SendAsync(http, request, "MusicBrainz", RateLimiter, cancellationToken, maxAttempts: 8);
+        return await recorder.SendAsync(http, request, source, limiter, cancellationToken, maxAttempts: 8);
     }
 }
