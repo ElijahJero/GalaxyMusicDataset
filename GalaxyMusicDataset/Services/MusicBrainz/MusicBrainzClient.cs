@@ -7,7 +7,10 @@ namespace GalaxyMusicDataset.Services.MusicBrainz;
 
 public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
 {
-    public static readonly ApiRateLimiter RateLimiter = new(TimeSpan.FromMilliseconds(1100));
+    /// <summary>
+    /// One request per 1.2s (musicbrainzngs is 1.0s). 503s add extra cooldown.
+    /// </summary>
+    public static readonly ApiRateLimiter RateLimiter = new(TimeSpan.FromMilliseconds(1200));
 
     public required string UserAgent { get; init; }
 
@@ -44,6 +47,13 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
                 {
                     seen[scored.Mbid] = scored;
                 }
+            }
+
+            // One successful search is enough. Extra album/romaji queries
+            // doubled traffic and were a major source of 503 storms.
+            if (seen.Count > 0)
+            {
+                break;
             }
         }
 
@@ -151,6 +161,6 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
         request.Headers.UserAgent.Clear();
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        return await recorder.SendAsync(http, request, "MusicBrainz", RateLimiter, cancellationToken);
+        return await recorder.SendAsync(http, request, "MusicBrainz", RateLimiter, cancellationToken, maxAttempts: 8);
     }
 }

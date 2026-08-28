@@ -5,14 +5,14 @@
 }
 
 <h1 class="h3">Aggregation settings</h1>
-<p class="text-muted">Keys are stored in <code>App_Data/user-settings.json</code> (gitignored). Environment variables and user secrets also work: <code>LastFm__ApiKey</code>, <code>LastFm__Username</code>, <code>Discogs__Token</code>, <code>TheAudioDb__ApiKey</code>.</p>
+<p class="text-muted">Keys are stored in <code>App_Data/user-settings.json</code> (gitignored). Secret fields are never shown after save — leave them blank to keep the current value, or paste a new value to replace it.</p>
 
 @if (Model.Saved is not null)
 {
     <div class="alert alert-success">@Model.Saved</div>
 }
 
-<form method="post" class="card card-body">
+<form method="post" class="card card-body" autocomplete="off">
     <h2 class="h5">Last.fm</h2>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
@@ -21,7 +21,11 @@
         </div>
         <div class="col-md-6">
             <label class="form-label" asp-for="Input.LastFmApiKey">API key</label>
-            <input class="form-control" asp-for="Input.LastFmApiKey" type="password" autocomplete="off" />
+            <input class="form-control" asp-for="Input.LastFmApiKey" type="password" value="" autocomplete="new-password" placeholder="@(Model.LastFmKeySaved ? "Saved — leave blank to keep" : "")" />
+            @if (Model.LastFmKeySaved)
+            {
+                <div class="form-text">A Last.fm API key is already saved.</div>
+            }
         </div>
     </div>
 
@@ -29,11 +33,19 @@
     <div class="row g-3 mb-3">
         <div class="col-md-4">
             <label class="form-label" asp-for="Input.DiscogsToken">Discogs token</label>
-            <input class="form-control" asp-for="Input.DiscogsToken" type="password" autocomplete="off" />
+            <input class="form-control" asp-for="Input.DiscogsToken" type="password" value="" autocomplete="new-password" placeholder="@(Model.DiscogsTokenSaved ? "Saved — leave blank to keep" : "")" />
+            @if (Model.DiscogsTokenSaved)
+            {
+                <div class="form-text">A Discogs token is already saved.</div>
+            }
         </div>
         <div class="col-md-4">
             <label class="form-label" asp-for="Input.TheAudioDbApiKey">TheAudioDB API key</label>
-            <input class="form-control" asp-for="Input.TheAudioDbApiKey" type="password" autocomplete="off" />
+            <input class="form-control" asp-for="Input.TheAudioDbApiKey" type="password" value="" autocomplete="new-password" placeholder="@(Model.TheAudioDbKeySaved ? "Saved — leave blank to keep" : "")" />
+            @if (Model.TheAudioDbKeySaved)
+            {
+                <div class="form-text">A TheAudioDB key is already saved.</div>
+            }
         </div>
         <div class="col-md-4">
             <label class="form-label" asp-for="Input.MusicBrainzContact">MusicBrainz contact (User-Agent)</label>

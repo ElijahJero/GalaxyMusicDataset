@@ -34,23 +34,10 @@ public sealed class MusicBrainzLookupService(
             return 0;
         }
 
-        var lookup = await db.TrackLookups
-            .Include(l => l.Track)
-            .Where(l => l.Status == LookupStatus.Pending || l.Status == LookupStatus.Failed)
-            .OrderBy(l => l.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
+        var lookup = await PickNextLookupAsync(cancellationToken);
         if (lookup is null)
         {
             return 0;
-        }
-
-        if (lookup.Status == LookupStatus.Failed && lookup.AttemptCount >= 5)
-        {
-            lookup.Status = LookupStatus.NotFound;
-            lookup.ErrorMessage = "Gave up after 5 failed MusicBrainz attempts.";
-            await db.SaveChangesAsync(cancellationToken);
-            return 1;
         }
 
         if (lookup.TrackId is not null)
@@ -136,10 +123,23 @@ public sealed class MusicBrainzLookupService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            lookup.Status = LookupStatus.Failed;
+            // 503/429 are "server busy", not "this recording does not exist".
+            // Leave the row pending so we retry after cooldown instead of
+            // skipping the song as NotFound.
+            lookup.Status = LookupStatus.Pending;
+            lookup.LastAttemptUtc = DateTimeOffset.UtcNow;
             lookup.ErrorMessage = ex.Message;
+            if (ex is JsonApiException api && HttpResponseHelpers.IsTransientStatus(api.StatusCode))
+            {
+                lookup.ErrorMessage = $"MusicBrainz busy (HTTP {api.StatusCode}); will retry after cooldown.";
+                progress.Log($"MB busy for {lookup.ArtistName} – {lookup.TrackName}; backing off.");
+            }
+            else
+            {
+                progress.Error($"MB lookup failed for {lookup.ArtistName} – {lookup.TrackName}: {ex.Message}");
+            }
+
             await db.SaveChangesAsync(cancellationToken);
-            progress.Error($"MB lookup failed for {lookup.ArtistName} – {lookup.TrackName}: {ex.Message}");
             return 1;
         }
     }
@@ -185,17 +185,52 @@ public sealed class MusicBrainzLookupService(
 
         lookup.Status = LookupStatus.Pending;
         lookup.ErrorMessage = null;
+        lookup.LastAttemptUtc = null;
         await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RetryFailedAsync(CancellationToken cancellationToken)
     {
         await db.TrackLookups
-            .Where(l => l.Status == LookupStatus.Failed || l.Status == LookupStatus.NotFound)
+            .Where(l => l.Status == LookupStatus.Failed
+                        || l.Status == LookupStatus.NotFound
+                        || l.Status == LookupStatus.InProgress)
             .ExecuteUpdateAsync(
                 s => s.SetProperty(l => l.Status, LookupStatus.Pending)
-                    .SetProperty(l => l.ErrorMessage, (string?)null),
+                    .SetProperty(l => l.ErrorMessage, (string?)null)
+                    .SetProperty(l => l.LastAttemptUtc, (DateTimeOffset?)null),
                 cancellationToken);
+    }
+
+    public static bool IsLookupDue(TrackLookup lookup, DateTimeOffset now)
+    {
+        if (lookup.Status is not (LookupStatus.Pending or LookupStatus.Failed))
+        {
+            return false;
+        }
+
+        if (lookup.LastAttemptUtc is null)
+        {
+            return true;
+        }
+
+        var cooldown = lookup.ErrorMessage is { } message
+                       && message.Contains("busy", StringComparison.OrdinalIgnoreCase)
+            ? TimeSpan.FromSeconds(30)
+            : TimeSpan.FromSeconds(10);
+        return now - lookup.LastAttemptUtc.Value >= cooldown;
+    }
+
+    private async Task<TrackLookup?> PickNextLookupAsync(CancellationToken cancellationToken)
+    {
+        var batch = await db.TrackLookups
+            .Include(l => l.Track)
+            .Where(l => l.Status == LookupStatus.Pending || l.Status == LookupStatus.Failed)
+            .OrderBy(l => l.Id)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        return batch.FirstOrDefault(l => IsLookupDue(l, now));
     }
 
     private async Task ApplyMatchAsync(long trackId, RecordingCandidate match, CancellationToken cancellationToken)

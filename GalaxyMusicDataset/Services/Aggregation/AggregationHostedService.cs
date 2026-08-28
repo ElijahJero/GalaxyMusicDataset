@@ -20,6 +20,11 @@ public sealed class AggregationHostedService(
             var db = boot.ServiceProvider.GetRequiredService<AppDbContext>();
             var state = await db.SyncStates.FirstAsync(stoppingToken);
             progress.SetEnrichmentPaused(state.EnrichmentPaused);
+            await db.TrackLookups
+                .Where(l => l.Status == LookupStatus.InProgress)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(l => l.Status, LookupStatus.Pending),
+                    stoppingToken);
         }
 
         progress.Log("Aggregation worker started.");

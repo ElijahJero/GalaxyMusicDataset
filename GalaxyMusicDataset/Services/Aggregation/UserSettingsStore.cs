@@ -7,36 +7,39 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
 {
     private readonly string _path = Path.Combine(env.ContentRootPath, "App_Data", "user-settings.json");
 
-    public async Task SaveAsync(UserSettingsModel model, CancellationToken cancellationToken)
+    public async Task SaveAsync(UserSettingsModel posted, StoredSecrets existing, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+        var lastFmKey = KeepIfBlank(posted.LastFmApiKey, existing.LastFmApiKey);
+        var discogs = KeepIfBlank(posted.DiscogsToken, existing.DiscogsToken);
+        var audioDb = KeepIfBlank(posted.TheAudioDbApiKey, existing.TheAudioDbApiKey);
         var payload = new Dictionary<string, object?>
         {
             ["LastFm"] = new Dictionary<string, string?>
             {
-                ["ApiKey"] = model.LastFmApiKey,
-                ["Username"] = model.LastFmUsername
+                ["ApiKey"] = lastFmKey,
+                ["Username"] = posted.LastFmUsername
             },
             ["Discogs"] = new Dictionary<string, string?>
             {
-                ["Token"] = model.DiscogsToken
+                ["Token"] = discogs
             },
             ["TheAudioDb"] = new Dictionary<string, string?>
             {
-                ["ApiKey"] = model.TheAudioDbApiKey
+                ["ApiKey"] = audioDb
             },
             ["MusicBrainz"] = new Dictionary<string, string?>
             {
-                ["Contact"] = model.MusicBrainzContact
+                ["Contact"] = posted.MusicBrainzContact
             },
             ["Aggregation"] = new Dictionary<string, object?>
             {
-                ["EnableMusicBrainz"] = model.EnableMusicBrainz,
-                ["EnableLastFmTrackInfo"] = model.EnableLastFmTrackInfo,
-                ["EnableDiscogs"] = model.EnableDiscogs,
-                ["EnableTheAudioDb"] = model.EnableTheAudioDb,
-                ["IncrementalIntervalMinutes"] = model.IncrementalIntervalMinutes,
-                ["SeedSampleData"] = model.SeedSampleData
+                ["EnableMusicBrainz"] = posted.EnableMusicBrainz,
+                ["EnableLastFmTrackInfo"] = posted.EnableLastFmTrackInfo,
+                ["EnableDiscogs"] = posted.EnableDiscogs,
+                ["EnableTheAudioDb"] = posted.EnableTheAudioDb,
+                ["IncrementalIntervalMinutes"] = posted.IncrementalIntervalMinutes,
+                ["SeedSampleData"] = posted.SeedSampleData
             }
         };
 
@@ -47,7 +50,12 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
             root.Reload();
         }
     }
+
+    public static string? KeepIfBlank(string? posted, string? existing) =>
+        string.IsNullOrWhiteSpace(posted) ? existing : posted.Trim();
 }
+
+public readonly record struct StoredSecrets(string? LastFmApiKey, string? DiscogsToken, string? TheAudioDbApiKey);
 
 public sealed class UserSettingsModel
 {
