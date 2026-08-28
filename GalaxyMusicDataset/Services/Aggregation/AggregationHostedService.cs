@@ -20,11 +20,12 @@ public sealed class AggregationHostedService(
             var db = boot.ServiceProvider.GetRequiredService<AppDbContext>();
             var state = await db.SyncStates.FirstAsync(stoppingToken);
             progress.SetEnrichmentPaused(state.EnrichmentPaused);
-            await db.TrackLookups
-                .Where(l => l.Status == LookupStatus.InProgress)
-                .ExecuteUpdateAsync(
-                    s => s.SetProperty(l => l.Status, LookupStatus.Pending),
-                    stoppingToken);
+            var lookups = boot.ServiceProvider.GetRequiredService<MusicBrainzLookupService>();
+            var requeued = await lookups.RequeueTransientFailuresAsync(stoppingToken);
+            if (requeued > 0)
+            {
+                progress.Log($"Requeued {requeued} MusicBrainz lookup(s) that failed because the server was busy.");
+            }
         }
 
         progress.Log("Aggregation worker started.");

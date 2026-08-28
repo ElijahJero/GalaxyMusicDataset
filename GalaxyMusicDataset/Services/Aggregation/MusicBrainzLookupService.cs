@@ -202,6 +202,53 @@ public sealed class MusicBrainzLookupService(
                 cancellationToken);
     }
 
+    /// <summary>
+    /// Requeue lookups that were previously marked NotFound because MusicBrainz
+    /// was busy (503), not because the recording is missing.
+    /// </summary>
+    public async Task<int> RequeueTransientFailuresAsync(CancellationToken cancellationToken)
+    {
+        var candidates = await db.TrackLookups
+            .Where(l => l.Status == LookupStatus.NotFound
+                        || l.Status == LookupStatus.Failed
+                        || l.Status == LookupStatus.InProgress)
+            .Select(l => new { l.Id, l.ErrorMessage, l.Status })
+            .ToListAsync(cancellationToken);
+
+        var ids = candidates
+            .Where(l => l.Status == LookupStatus.InProgress || IsTransientFailureMessage(l.ErrorMessage))
+            .Select(l => l.Id)
+            .ToList();
+        if (ids.Count == 0)
+        {
+            return 0;
+        }
+
+        await db.TrackLookups
+            .Where(l => ids.Contains(l.Id))
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(l => l.Status, LookupStatus.Pending)
+                    .SetProperty(l => l.ErrorMessage, (string?)null)
+                    .SetProperty(l => l.LastAttemptUtc, (DateTimeOffset?)null),
+                cancellationToken);
+        return ids.Count;
+    }
+
+    public static bool IsTransientFailureMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("Gave up after", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("busy", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("HTTP 503", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("HTTP 429", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("HTTP 502", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("Service Temporarily Unavailable", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool IsLookupDue(TrackLookup lookup, DateTimeOffset now)
     {
         if (lookup.Status is not (LookupStatus.Pending or LookupStatus.Failed))
