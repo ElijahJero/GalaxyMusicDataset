@@ -1,0 +1,96 @@
+@page
+@model SessionsModel
+@{
+    ViewData["Title"] = "Sessions";
+    var extra = Model.Extra();
+    var more = Model.FilterQuery(new Dictionary<string, string?> { ["gap"] = Model.Gap.ToString(), ["take"] = Math.Min(Model.Take + 150, 500).ToString() });
+}
+
+<h1 class="h3 mb-1">Sessions</h1>
+<p class="text-muted">Scrobbles clustered when the gap from the previous play is more than @Model.Gap minutes. Nothing is stored — this is computed on read.</p>
+
+<partial name="_AnalyticsNav" model='"sessions"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Sessions", extra)' />
+
+<form method="get" asp-page="/Sessions" class="d-flex gap-2 align-items-end mb-3">
+    @foreach (var kv in Model.FilterQuery())
+    {
+        if (kv.Key is not "gap" and not "take")
+        {
+            <input type="hidden" name="@kv.Key" value="@kv.Value" />
+        }
+    }
+    <div>
+        <label class="form-label" for="gap">Gap (minutes)</label>
+        <input class="form-control form-control-sm" id="gap" name="gap" type="number" min="1" max="240" value="@Model.Gap" />
+    </div>
+    <button class="btn btn-sm btn-primary" type="submit">Update</button>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Sessions</div>
+            <div class="fs-3">@AnalyticsDisplay.Count(Model.Result.SessionCount)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Avg length</div>
+            <div class="fs-3">@AnalyticsDisplay.Average(Model.Result.AverageLengthMinutes)m</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Median tracks</div>
+            <div class="fs-3">@AnalyticsDisplay.Average(Model.Result.MedianTracks)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Repeat / skip-adjacent</div>
+            <div class="fs-6">@AnalyticsDisplay.Percent(Model.Result.RepeatRate * 100) repeats</div>
+            <div class="small text-muted">@AnalyticsDisplay.Count(Model.Result.SkipAdjacentCount) skip-adjacent of @AnalyticsDisplay.Count(Model.Result.ConsecutivePairs) pairs</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between mb-2">
+    <div class="text-muted">Newest first</div>
+    @if (Model.Result.HasMore)
+    {
+        <a class="btn btn-sm btn-outline-secondary" asp-page="/Sessions" asp-all-route-data="more">Show more</a>
+    }
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+            <tr>
+                <th>Start</th>
+                <th>Length</th>
+                <th class="text-end">Tracks</th>
+                <th>From</th>
+                <th>To</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (Model.Result.Sessions.Count == 0)
+            {
+                <tr><td colspan="5" class="text-muted">No sessions in this range.</td></tr>
+            }
+            @foreach (var session in Model.Result.Sessions)
+            {
+                <tr>
+                    <td class="text-nowrap">@AnalyticsDisplay.Timestamp(session.Start)</td>
+                    <td>@AnalyticsDisplay.Duration((long)session.Length.TotalMilliseconds)</td>
+                    <td class="text-end">@session.TrackCount</td>
+                    <td>@session.FirstArtist<div class="small text-muted">@session.FirstTrack</div></td>
+                    <td>@session.LastArtist<div class="small text-muted">@session.LastTrack</div></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

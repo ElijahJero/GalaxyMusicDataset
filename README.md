@@ -1,6 +1,6 @@
 # GalaxyMusicDataset
 
-Personal Last.fm history warehouse: pull scrobbles, resolve MusicBrainz IDs, attach tags and metadata, inspect progress. Analytics dashboards are specified in [docs/ANALYTICS_PAGES.md](docs/ANALYTICS_PAGES.md) and are not built yet.
+Personal Last.fm history warehouse: pull scrobbles, resolve MusicBrainz IDs, attach tags and metadata, inspect progress, and browse listening analytics.
 
 ## Run
 
@@ -14,6 +14,7 @@ dotnet run --launch-profile http
 Open http://localhost:5107
 
 - **Progress** — ingest/enrichment status, job log, API stats
+- **Analytics** — overview, tops, discovery, time patterns, deep cuts, sessions, wrapped year, artist/track detail ([spec](docs/ANALYTICS_PAGES.md))
 - **Library** (`/Recent`) — all unique tracks, 50 per page, with filters and inline editing
 - **Lookups** — fingerprint cache (one MusicBrainz search per unique song)
 - **Review** — accept/reject low-confidence MusicBrainz matches

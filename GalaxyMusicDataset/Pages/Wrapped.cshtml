@@ -1,0 +1,148 @@
+@page "{year:int?}"
+@model WrappedModel
+@{
+    ViewData["Title"] = Model.Year is null ? "Wrapped" : $"Wrapped {Model.Year}";
+    var result = Model.Result;
+    var artistTable = result is null ? null : new TopTableModel(result.TopArtists, Model.FilterQuery(), "Artist", "/Artists", true);
+    var trackTable = result is null ? null : new TopTableModel(result.TopTracks, Model.FilterQuery(), "Track", "/Tracks", true);
+    var albumTable = result is null ? null : new TopTableModel(result.TopAlbums, Model.FilterQuery(), "Album", null, true);
+}
+
+<h1 class="h3 mb-1">Year in review @(Model.Year)</h1>
+<p class="text-muted">Overview, tops, first-heards, and the heatmap for this calendar year.</p>
+
+<partial name="_AnalyticsNav" model='"wrapped"' />
+
+@if (Model.Years.Count > 0)
+{
+    <div class="mb-3 d-flex flex-wrap gap-2">
+        @foreach (var year in Model.Years)
+        {
+            <a class="btn btn-sm @(year == Model.Year ? "btn-dark" : "btn-outline-dark")" asp-page="/Wrapped" asp-route-year="@year" asp-route-q="@Model.Q">@year</a>
+        }
+    </div>
+}
+
+@if (result is null)
+{
+    <div class="alert alert-info">No scrobbles to wrap yet.</div>
+}
+else
+{
+    <partial name="_StatCards" model="result.Overview" />
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Most replayed</div>
+                <div class="card-body">
+                    @if (result.MostReplayed is null)
+                    {
+                        <div class="text-muted">—</div>
+                    }
+                    else
+                    {
+                        <div class="fs-5"><a asp-page="/Tracks" asp-route-id="@result.MostReplayed.Id">@result.MostReplayed.Name</a></div>
+                        <div class="text-muted">@result.MostReplayed.Subtitle</div>
+                        <div>@AnalyticsDisplay.Count(result.MostReplayed.Plays) plays</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Longest streak</div>
+                <div class="card-body">
+                    <div class="fs-3">@AnalyticsDisplay.Count(result.LongestStreak)</div>
+                    <div class="small text-muted">consecutive days this year</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Busiest hour</div>
+                <div class="card-body">
+                    <div class="fs-3">@result.BusiestHourUtc.ToString("00"):00 UTC</div>
+                    <div class="small text-muted">@AnalyticsDisplay.Count(result.BusiestHourCount) scrobbles</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Heatmap</div>
+        <div class="card-body">
+            <partial name="_Heatmap" model="result.Heatmap" />
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Top artists</div>
+                <partial name="_TopTable" model="artistTable" />
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Top tracks</div>
+                <partial name="_TopTable" model="trackTable" />
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Top albums</div>
+                <partial name="_TopTable" model="albumTable" />
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">New artists</div>
+                <div class="card-body p-0">
+                    @if (result.NewArtists.Count == 0)
+                    {
+                        <div class="p-3 text-muted">No new artists this year.</div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var artist in result.NewArtists)
+                            {
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <a asp-page="/Artists" asp-route-id="@artist.Id">@artist.Name</a>
+                                    <span class="text-muted">@AnalyticsDisplay.Count(artist.Plays) plays</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">First-heard tracks</div>
+                <div class="card-body p-0">
+                    @if (result.Discoveries.Count == 0)
+                    {
+                        <div class="p-3 text-muted">No first-time tracks this year.</div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var item in result.Discoveries.Take(10))
+                            {
+                                <li class="list-group-item">
+                                    <a asp-page="/Tracks" asp-route-id="@item.Id">@item.Name</a>
+                                    <div class="small text-muted">@item.Subtitle · @AnalyticsDisplay.Timestamp(item.FirstHeard)</div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}

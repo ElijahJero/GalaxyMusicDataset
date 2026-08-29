@@ -1,0 +1,129 @@
+@page "{id:long}"
+@model TracksModel
+@{
+    ViewData["Title"] = Model.Detail.Title;
+    var t = Model.Detail;
+    var duration = t.DurationMs is null ? "—" : TimeSpan.FromMilliseconds(t.DurationMs.Value).ToString(@"m\:ss");
+    var max = t.PlayedAt.Count == 0 ? 1 : t.PlayedAt.Max(p => p.ToUnixTimeSeconds());
+    var min = t.PlayedAt.Count == 0 ? 0 : t.PlayedAt.Min(p => p.ToUnixTimeSeconds());
+    var span = Math.Max(1, max - min);
+}
+
+<h1 class="h3 mb-1">@t.Title</h1>
+<p class="text-muted mb-2">
+    <a href="@Url.Page("/Artists", Model.DetailRoute(t.ArtistId))">@t.ArtistName</a>
+    · @(t.AlbumTitle ?? "No album")
+    · @duration
+</p>
+
+<partial name="_AnalyticsNav" model='"track"' />
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        @if (!string.IsNullOrWhiteSpace(t.CoverUrl))
+        {
+            <img src="@t.CoverUrl" alt="" class="rounded img-fluid" style="max-width:12rem;" />
+        }
+        else
+        {
+            <div class="library-cover-empty rounded">No cover</div>
+        }
+    </div>
+    <div class="col-md-9">
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3">Plays</dt>
+            <dd class="col-sm-9">@AnalyticsDisplay.Count(t.PlayCount)</dd>
+            <dt class="col-sm-3">First / last</dt>
+            <dd class="col-sm-9">@AnalyticsDisplay.Timestamp(t.FirstPlayed) · @AnalyticsDisplay.Timestamp(t.LastPlayed)</dd>
+            <dt class="col-sm-3">MBID</dt>
+            <dd class="col-sm-9">
+                @if (!string.IsNullOrEmpty(t.Mbid))
+                {
+                    <a href="https://musicbrainz.org/recording/@t.Mbid" target="_blank" rel="noopener">@t.Mbid</a>
+                }
+                else
+                {
+                    <text>—</text>
+                }
+            </dd>
+            <dt class="col-sm-3">Fingerprint</dt>
+            <dd class="col-sm-9"><code>@t.Fingerprint</code></dd>
+            <dt class="col-sm-3">Lookup</dt>
+            <dd class="col-sm-9">@(t.LookupStatus ?? "—") @(t.LookupScore is null ? "" : $"· {t.LookupScore:0.000}")</dd>
+            @if (!string.IsNullOrEmpty(t.Isrc))
+            {
+                <dt class="col-sm-3">ISRC</dt>
+                <dd class="col-sm-9">@t.Isrc</dd>
+            }
+            @if (!string.IsNullOrEmpty(t.MusicVideoUrl))
+            {
+                <dt class="col-sm-3">Video</dt>
+                <dd class="col-sm-9"><a href="@t.MusicVideoUrl" target="_blank" rel="noopener">Music video</a></dd>
+            }
+        </dl>
+        @if (!string.IsNullOrWhiteSpace(t.Summary))
+        {
+            <p class="small text-muted mt-3 mb-0">@t.Summary</p>
+        }
+    </div>
+</div>
+
+@if (t.Tags.Count > 0)
+{
+    <div class="mb-3">
+        @foreach (var tag in t.Tags)
+        {
+            <span class="badge text-bg-light border me-1 mb-1">@tag.Name <span class="text-muted">@tag.Source</span></span>
+        }
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header">Play timestamps</div>
+    <div class="card-body">
+        @if (t.PlayedAt.Count == 0)
+        {
+            <div class="text-muted">No scrobbles.</div>
+        }
+        else
+        {
+            <div class="play-strip mb-3" title="Each tick is a play">
+                @foreach (var at in t.PlayedAt)
+                {
+                    var left = (at.ToUnixTimeSeconds() - min) * 100.0 / span;
+                    <span class="play-tick" style="left: @left.ToString(System.Globalization.CultureInfo.InvariantCulture)%" title="@AnalyticsDisplay.Timestamp(at)"></span>
+                }
+            </div>
+            <details>
+                <summary>@t.PlayedAt.Count timestamps</summary>
+                <ul class="small mt-2 mb-0">
+                    @foreach (var at in t.PlayedAt.Reverse())
+                    {
+                        <li>@AnalyticsDisplay.Timestamp(at)</li>
+                    }
+                </ul>
+            </details>
+        }
+    </div>
+</div>
+
+<details class="card mb-4">
+    <summary class="card-header">Source payloads</summary>
+    <div class="card-body">
+        @if (t.Sources.Count == 0)
+        {
+            <div class="text-muted">No source payloads. Enrichment still pending, or check the library debug view.</div>
+        }
+        @foreach (var source in t.Sources)
+        {
+            <details class="mb-2">
+                <summary>@source.Source — @source.Status @(source.ExternalId is null ? "" : $"id={source.ExternalId}")</summary>
+                @if (!string.IsNullOrWhiteSpace(source.Error))
+                {
+                    <div class="text-danger">@source.Error</div>
+                }
+                <pre class="payload-json">@(source.Json ?? "—")</pre>
+            </details>
+        }
+    </div>
+</details>

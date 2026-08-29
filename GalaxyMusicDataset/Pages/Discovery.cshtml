@@ -1,0 +1,59 @@
+@page
+@model DiscoveryModel
+@{
+    ViewData["Title"] = "Discovery";
+    var extra = Model.Extra();
+    var items = Model.Kind == "artists" ? Model.Result.Artists : Model.Result.Tracks;
+    var detail = Model.Kind == "artists" ? "/Artists" : "/Tracks";
+    var trackTab = Model.FilterQuery(new Dictionary<string, string?> { ["kind"] = "tracks", ["take"] = Model.Take.ToString() });
+    var artistTab = Model.FilterQuery(new Dictionary<string, string?> { ["kind"] = "artists", ["take"] = Model.Take.ToString() });
+}
+
+<h1 class="h3 mb-1">Discovery</h1>
+<p class="text-muted">First time you played a track or artist, if that first play falls in the selected range.</p>
+
+<partial name="_AnalyticsNav" model='"discovery"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Discovery", extra)' />
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link @(Model.Kind == "tracks" ? "active" : "")" asp-page="/Discovery" asp-all-route-data="trackTab">Tracks</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(Model.Kind == "artists" ? "active" : "")" asp-page="/Discovery" asp-all-route-data="artistTab">Artists</a>
+    </li>
+</ul>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+            <tr>
+                <th>First heard</th>
+                <th>@(Model.Kind == "artists" ? "Artist" : "Track")</th>
+                <th class="text-end">Plays in range</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (items.Count == 0)
+            {
+                <tr><td colspan="3" class="text-muted">No first-time plays in this range.</td></tr>
+            }
+            @foreach (var item in items)
+            {
+                <tr>
+                    <td class="text-nowrap">@AnalyticsDisplay.Timestamp(item.FirstHeard)</td>
+                    <td>
+                        <a href="@Url.Page(detail, Model.DetailRoute(item.Id))">@item.Name</a>
+                        @if (!string.IsNullOrEmpty(item.Subtitle))
+                        {
+                            <div class="small text-muted">@item.Subtitle</div>
+                        }
+                    </td>
+                    <td class="text-end">@AnalyticsDisplay.Count(item.PlaysInRange)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,63 @@
+@model OverviewStats
+@{
+    void Card(string label, string value, string? secondary, string? hint = null)
+    {
+        <div class="col-6 col-lg-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">@label</div>
+                    <div class="fs-3">@value</div>
+                    @if (secondary is not null)
+                    {
+                        <div class="small text-muted">@secondary</div>
+                    }
+                    @if (hint is not null)
+                    {
+                        <div class="small">@hint</div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    var all = Model.AllTime;
+}
+
+<div class="row g-3 mb-4">
+    @{
+        Card(
+            "Scrobbles",
+            AnalyticsDisplay.Count(Model.ScrobbleCount),
+            all is null ? null : $"all-time {AnalyticsDisplay.Count(all.ScrobbleCount)}");
+        Card(
+            "Unique tracks",
+            AnalyticsDisplay.Count(Model.UniqueTracks),
+            all is null ? null : $"all-time {AnalyticsDisplay.Count(all.UniqueTracks)}");
+        Card(
+            "Unique artists",
+            AnalyticsDisplay.Count(Model.UniqueArtists),
+            all is null ? null : $"all-time {AnalyticsDisplay.Count(all.UniqueArtists)}");
+        Card(
+            "Unique albums",
+            AnalyticsDisplay.Count(Model.UniqueAlbums),
+            all is null ? null : $"all-time {AnalyticsDisplay.Count(all.UniqueAlbums)}");
+        Card(
+            "Listening time",
+            AnalyticsDisplay.Duration(Model.ListeningTimeMs),
+            $"{AnalyticsDisplay.Percent(Model.PercentMissingDuration)} of plays missing duration",
+            all is null ? null : $"all-time {AnalyticsDisplay.Duration(all.ListeningTimeMs)}");
+        Card(
+            "Days tracked",
+            AnalyticsDisplay.Count(Model.DaysTrackedAllTime),
+            $"{AnalyticsDisplay.Count(Model.DistinctDaysInRange)} days in range");
+        Card(
+            "Avg / day",
+            AnalyticsDisplay.Average(Model.AveragePerDay),
+            $"{AnalyticsDisplay.Average(Model.AveragePerActiveDay)} on days with plays");
+        Card(
+            "Current streak",
+            AnalyticsDisplay.Count(Model.Streak.Current),
+            $"longest {AnalyticsDisplay.Count(Model.Streak.Longest)}" +
+            (Model.Streak.CurrentStart is null ? "" : $" · {Model.Streak.CurrentStart:yyyy-MM-dd} → {Model.Streak.CurrentEnd:yyyy-MM-dd}"));
+    }
+</div>

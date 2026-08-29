@@ -1,0 +1,60 @@
+@model TopTableModel
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+        <thead>
+        <tr>
+            <th class="text-muted" style="width:3rem;">#</th>
+            <th>@Model.NameHeader</th>
+            <th class="text-end">Plays</th>
+            <th class="text-end">Time</th>
+            @if (Model.ShowMovers)
+            {
+                <th class="text-end">Change</th>
+            }
+        </tr>
+        </thead>
+        <tbody>
+        @if (Model.Items.Count == 0)
+        {
+            <tr><td colspan="@(Model.ShowMovers ? 5 : 4)" class="text-muted">No plays in this range.</td></tr>
+        }
+        @foreach (var item in Model.Items)
+        {
+            <tr>
+                <td class="text-muted">@item.Rank</td>
+                <td>
+                    @if (Model.DetailPage is not null)
+                    {
+                        var rv = new Microsoft.AspNetCore.Routing.RouteValueDictionary(Model.Filter) { ["id"] = item.Id };
+                        <a href="@Url.Page(Model.DetailPage, rv)">@item.Name</a>
+                    }
+                    else
+                    {
+                        @item.Name
+                    }
+                    @if (!string.IsNullOrEmpty(item.Subtitle))
+                    {
+                        <div class="small text-muted">@item.Subtitle</div>
+                    }
+                </td>
+                <td class="text-end">@AnalyticsDisplay.Count(item.Plays)</td>
+                <td class="text-end">@AnalyticsDisplay.Duration(item.DurationMs)</td>
+                @if (Model.ShowMovers)
+                {
+                    <td class="text-end">
+                        @if (item.IsNew)
+                        {
+                            <span class="badge text-bg-success">new</span>
+                        }
+                        else
+                        {
+                            <span class="@(item.Delta > 0 ? "text-success" : item.Delta < 0 ? "text-danger" : "text-muted")">@AnalyticsDisplay.Delta(item)</span>
+                        }
+                    </td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

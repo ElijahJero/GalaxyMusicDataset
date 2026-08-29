@@ -1,0 +1,49 @@
+@page
+@model TopsModel
+@{
+    ViewData["Title"] = "Tops";
+    var extra = Model.Extra();
+    var tabs = new[] { ("artists", "Artists"), ("tracks", "Tracks"), ("albums", "Albums") };
+    var detail = Model.Tab switch
+    {
+        "tracks" => "/Tracks",
+        "albums" => (string?)null,
+        _ => "/Artists"
+    };
+    var header = Model.Tab switch
+    {
+        "tracks" => "Track",
+        "albums" => "Album",
+        _ => "Artist"
+    };
+    var table = new TopTableModel(Model.Result.Items, Model.FilterQuery(), header, detail, true);
+}
+
+<h1 class="h3 mb-1">Top lists</h1>
+<p class="text-muted">Ranked by play count in this range. Change is versus the previous window of equal length.</p>
+
+<partial name="_AnalyticsNav" model='"tops"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Tops", extra)' />
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var tab in tabs)
+    {
+        var routes = Model.FilterQuery(new Dictionary<string, string?> { ["tab"] = tab.Item1, ["take"] = Model.Take.ToString() });
+        <li class="nav-item">
+            <a class="nav-link @(Model.Tab == tab.Item1 ? "active" : "")" asp-page="/Tops" asp-all-route-data="routes">@tab.Item2</a>
+        </li>
+    }
+</ul>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="text-muted">@AnalyticsDisplay.Count(Model.Result.Total) @Model.Tab</div>
+    @if (Model.Result.HasMore)
+    {
+        var more = Model.FilterQuery(new Dictionary<string, string?> { ["tab"] = Model.Tab, ["take"] = Math.Min(Model.Take + 150, 500).ToString() });
+        <a class="btn btn-sm btn-outline-secondary" asp-page="/Tops" asp-all-route-data="more">Show more</a>
+    }
+</div>
+
+<div class="card">
+    <partial name="_TopTable" model="table" />
+</div>

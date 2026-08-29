@@ -1,0 +1,36 @@
+@model string
+@{
+    var current = Model;
+    var items = new (string Page, string Key, string Label)[]
+    {
+        ("/Dashboard", "dashboard", "Overview"),
+        ("/Tops", "tops", "Tops"),
+        ("/Discovery", "discovery", "Discovery"),
+        ("/Patterns", "patterns", "Patterns"),
+        ("/DeepCuts", "deepcuts", "Deep cuts"),
+        ("/Sessions", "sessions", "Sessions")
+    };
+    var filter = ViewData["FilterQuery"] as Dictionary<string, string?> ?? [];
+}
+
+<ul class="nav nav-pills flex-wrap gap-1 mb-3">
+    @foreach (var item in items)
+    {
+        <li class="nav-item">
+            <a class="nav-link py-1 @(current == item.Key ? "active" : "")" asp-page="@item.Page" asp-all-route-data="filter">@item.Label</a>
+        </li>
+    }
+    @if (ViewData["Years"] is IReadOnlyList<int> years && years.Count > 0)
+    {
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle py-1 @(current == "wrapped" ? "active" : "")" href="#" data-bs-toggle="dropdown">Wrapped</a>
+            <ul class="dropdown-menu">
+                @foreach (var year in years)
+                {
+                    var wrapped = new Microsoft.AspNetCore.Routing.RouteValueDictionary(filter) { ["year"] = year };
+                    <li><a class="dropdown-item" href="@Url.Page("/Wrapped", wrapped)">@year</a></li>
+                }
+            </ul>
+        </li>
+    }
+</ul>
