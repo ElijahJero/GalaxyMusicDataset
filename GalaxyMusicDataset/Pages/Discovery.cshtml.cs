@@ -25,7 +25,7 @@ public class DiscoveryModel(AnalyticsQueries analytics) : AnalyticsPageModel
         }
 
         Result = await analytics.GetDiscoveries(TimeRange, Q, Take, cancellationToken);
-        SetChrome("discovery", Years, Extra());
+        SetChrome("discovery", Years);
     }
 
     public Dictionary<string, string?> Extra() => new() { ["kind"] = Kind, ["take"] = Take.ToString() };

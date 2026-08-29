@@ -44,7 +44,7 @@
                 <tr>
                     <td class="text-nowrap">@AnalyticsDisplay.Timestamp(item.FirstHeard)</td>
                     <td>
-                        <a asp-page="@detail" asp-route-id="@item.Id" asp-all-route-data="Model.FilterQuery()">@item.Name</a>
+                        <a href="@Url.Page(detail, Model.DetailRoute(item.Id))">@item.Name</a>
                         @if (!string.IsNullOrEmpty(item.Subtitle))
                         {
                             <div class="small text-muted">@item.Subtitle</div>

@@ -26,7 +26,8 @@
                 <td>
                     @if (Model.DetailPage is not null)
                     {
-                        <a asp-page="@Model.DetailPage" asp-route-id="@item.Id" asp-all-route-data="Model.Filter">@item.Name</a>
+                        var rv = new Microsoft.AspNetCore.Routing.RouteValueDictionary(Model.Filter) { ["id"] = item.Id };
+                        <a href="@Url.Page(Model.DetailPage, rv)">@item.Name</a>
                     }
                     else
                     {

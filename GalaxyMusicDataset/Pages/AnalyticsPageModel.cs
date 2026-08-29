@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Services.Analytics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Routing;
 
 namespace GalaxyMusicDataset.Pages;
 
@@ -56,6 +57,13 @@ public abstract class AnalyticsPageModel : PageModel
             }
         }
 
+        return d;
+    }
+
+    public RouteValueDictionary DetailRoute(long id, IReadOnlyDictionary<string, string?>? extra = null)
+    {
+        var d = new RouteValueDictionary(FilterQuery(extra));
+        d["id"] = id;
         return d;
     }
 

@@ -22,7 +22,7 @@ public class ArtistsModel(AnalyticsQueries analytics) : AnalyticsPageModel
 
         Detail = detail;
         TimelineJson = JsonSerializer.Serialize(detail.Timeline.Select(d => new { day = d.Day.ToString("yyyy-MM-dd"), count = d.Count }));
-        SetChrome("artist", Years, new Dictionary<string, string?> { ["id"] = id.ToString() });
+        SetChrome("artist", Years);
         return Page();
     }
 }

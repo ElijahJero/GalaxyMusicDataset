@@ -38,7 +38,7 @@ public class TopsModel(AnalyticsQueries analytics) : AnalyticsPageModel
             _ => await analytics.GetTopArtists(TimeRange, previous, Q, Take, cancellationToken)
         };
 
-        SetChrome("tops", Years, Extra());
+        SetChrome("tops", Years);
     }
 
     public Dictionary<string, string?> Extra() => new() { ["tab"] = Tab, ["take"] = Take.ToString() };

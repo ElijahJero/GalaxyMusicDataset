@@ -17,7 +17,8 @@
         <span class="small text-muted">Year in review</span>
         @foreach (var year in Model.Years)
         {
-            <a class="btn btn-sm btn-outline-dark" asp-page="/Wrapped" asp-route-year="@year" asp-all-route-data="Model.FilterQuery()">@year</a>
+            var wrapped = new Microsoft.AspNetCore.Routing.RouteValueDictionary(Model.FilterQuery()) { ["year"] = year };
+            <a class="btn btn-sm btn-outline-dark" href="@Url.Page("/Wrapped", wrapped)">@year</a>
         }
     </div>
 }

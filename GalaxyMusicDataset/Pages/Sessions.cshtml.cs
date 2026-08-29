@@ -29,7 +29,7 @@ public class SessionsModel(AnalyticsQueries analytics) : AnalyticsPageModel
         }
 
         Result = await analytics.GetSessions(TimeRange, Q, Gap, Take, cancellationToken);
-        SetChrome("sessions", Years, Extra());
+        SetChrome("sessions", Years);
     }
 
     public Dictionary<string, string?> Extra() => new() { ["gap"] = Gap.ToString(), ["take"] = Take.ToString() };

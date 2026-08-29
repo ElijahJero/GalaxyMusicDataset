@@ -44,8 +44,8 @@
                 else
                 {
                     var r = Model.Overview.MostRecent;
-                    <div class="fs-5"><a asp-page="/Tracks" asp-route-id="@r.TrackId" asp-all-route-data="Model.FilterQuery()">@r.Title</a></div>
-                    <div><a asp-page="/Artists" asp-route-id="@r.ArtistId" asp-all-route-data="Model.FilterQuery()">@r.ArtistName</a></div>
+                    <div class="fs-5"><a href="@Url.Page("/Tracks", Model.DetailRoute(r.TrackId))">@r.Title</a></div>
+                    <div><a href="@Url.Page("/Artists", Model.DetailRoute(r.ArtistId))">@r.ArtistName</a></div>
                     <div class="text-muted">@(r.AlbumTitle ?? "No album")</div>
                     <div class="small mt-2">@AnalyticsDisplay.Timestamp(r.PlayedAt)</div>
                 }

@@ -29,7 +29,7 @@ public class DeepCutsModel(AnalyticsQueries analytics) : AnalyticsPageModel
         }
 
         Result = await analytics.GetDeepCuts(TimeRange, Q, N, Take, cancellationToken);
-        SetChrome("deepcuts", Years, Extra());
+        SetChrome("deepcuts", Years);
     }
 
     public Dictionary<string, string?> Extra() => new() { ["n"] = N.ToString(), ["take"] = Take.ToString() };
