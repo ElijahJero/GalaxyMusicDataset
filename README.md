@@ -13,6 +13,25 @@ dotnet run --launch-profile http
 
 Open http://localhost:5107
 
+## Docker
+
+GitHub Actions builds the image and publishes it to GitHub Container Registry on pushes to `master` and on `v*.*.*` tags: `ghcr.io/elijahjero/galaxymusicdataset`.
+
+The repo is private, so pull with a GitHub token that can read packages:
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+docker compose up -d
+```
+
+Or build locally:
+
+```bash
+docker compose up -d --build
+```
+
+Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`).
+
 - **Progress** — ingest/enrichment status, job log, API stats
 - **Analytics** — overview, tops, **genres/tags**, discovery, time patterns, deep cuts, sessions, wrapped year, artist/track detail ([spec](docs/ANALYTICS_PAGES.md))
 - **Library** (`/Recent`) — all unique tracks, 50 per page, with filters and inline editing
