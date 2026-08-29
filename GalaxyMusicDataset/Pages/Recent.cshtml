@@ -140,7 +140,7 @@
                         <div class="mt-2">
                             @foreach (var tag in t.Tags.OrderByDescending(x => x.Weight).Take(12))
                             {
-                                <span class="badge text-bg-light border me-1 mb-1">@tag.Tag.Name <span class="text-muted">@tag.Source</span></span>
+                                <a class="badge rounded-pill tag-pill me-1 mb-1" asp-page="/Tags" asp-route-name="@tag.Tag.Name">@tag.Tag.Name <span class="text-muted">@tag.Source</span></a>
                             }
                         </div>
                     }
@@ -237,6 +237,10 @@
                             <textarea class="form-control" name="Input.Summary" rows="3">@t.Summary</textarea>
                         </div>
                         <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="Input.LookupFromMbid" value="true" id="lookup-@t.Id" />
+                                <label class="form-check-label" for="lookup-@t.Id">Look up MusicBrainz details for this MBID now (tags, ISRC, album, cover)</label>
+                            </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="Input.ResetEnrichment" value="true" id="reset-@t.Id" />
                                 <label class="form-check-label" for="reset-@t.Id">Re-fetch Last.fm / MusicBrainz details / Discogs / TheAudioDB</label>

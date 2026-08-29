@@ -167,6 +167,22 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
             return null;
         }
 
+        string? artistMbid = null;
+        if (rec.TryGetProperty("artist-credit", out var credits) && credits.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var credit in credits.EnumerateArray())
+            {
+                if (credit.TryGetProperty("artist", out var artistObj))
+                {
+                    artistMbid = artistObj.GetPropertyString("id");
+                    if (!string.IsNullOrWhiteSpace(artistMbid))
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
         string? firstIsrc = null;
         if (rec.TryGetProperty("isrcs", out var isrcs) && isrcs.ValueKind == JsonValueKind.Array)
         {
@@ -232,7 +248,8 @@ public sealed class MusicBrainzClient(HttpClient http, ApiCallRecorder recorder)
             year,
             tags,
             genres,
-            json);
+            json,
+            artistMbid);
     }
 
     public static bool HasRecordingDetails(string? json)

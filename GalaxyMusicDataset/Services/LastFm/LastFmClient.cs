@@ -267,7 +267,7 @@ public sealed class LastFmClient(
         foreach (var image in images.EnumerateFlexibleArray())
         {
             var url = EmptyToNull(image.GetPropertyString("#text") ?? image.GetFlexibleText());
-            if (url is null)
+            if (url is null || IsPlaceholderImage(url))
             {
                 continue;
             }
@@ -290,6 +290,12 @@ public sealed class LastFmClient(
 
         return best;
     }
+
+    public const string PlaceholderImageToken = "2a96cbd8b46e442fc41c2b86b821562f";
+
+    public static bool IsPlaceholderImage(string? url) =>
+        !string.IsNullOrWhiteSpace(url) &&
+        url.Contains(PlaceholderImageToken, StringComparison.OrdinalIgnoreCase);
 
     public static LastFmRecentTrack ParseTrack(JsonElement item)
     {

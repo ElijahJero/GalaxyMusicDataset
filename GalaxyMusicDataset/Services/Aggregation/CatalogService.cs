@@ -117,14 +117,8 @@ public sealed class CatalogService(AppDbContext db)
     public static string? Coalesce(string? current, string? incoming) =>
         string.IsNullOrWhiteSpace(current) && !string.IsNullOrWhiteSpace(incoming) ? incoming.Trim() : current;
 
-    public static void SetCoverIfEmpty(Album? album, string? url)
-    {
-        if (album is not null && string.IsNullOrWhiteSpace(album.CoverUrl) && !string.IsNullOrWhiteSpace(url))
-        {
-            album.CoverUrl = url.Trim();
-            album.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-    }
+    public static void SetCoverIfEmpty(Album? album, string? url) =>
+        CoverArtResolver.TrySetCover(album, url);
 
     public async Task MergeTracksAsync(Track keep, Track drop, CancellationToken cancellationToken)
     {

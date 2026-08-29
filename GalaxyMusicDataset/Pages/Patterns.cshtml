@@ -18,7 +18,7 @@
         @foreach (var year in Model.Years)
         {
             var wrapped = new Microsoft.AspNetCore.Routing.RouteValueDictionary(Model.FilterQuery()) { ["year"] = year };
-            <a class="btn btn-sm btn-outline-dark" href="@Url.Page("/Wrapped", wrapped)">@year</a>
+            <a class="btn btn-sm btn-outline-secondary" href="@Url.Page("/Wrapped", wrapped)">@year</a>
         }
     </div>
 }

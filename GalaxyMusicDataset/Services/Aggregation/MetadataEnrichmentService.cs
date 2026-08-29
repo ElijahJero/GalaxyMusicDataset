@@ -60,7 +60,53 @@ public sealed class MetadataEnrichmentService(
             }
         }
 
-        return 0;
+        return await FillMissingCoversAsync(cancellationToken);
+    }
+
+    public async Task<string> EnrichTrackFromMbidAsync(long trackId, CancellationToken cancellationToken)
+    {
+        var track = await db.Tracks
+            .Include(t => t.Artist)
+            .Include(t => t.Album)
+            .Include(t => t.SourcePayloads)
+            .FirstOrDefaultAsync(t => t.Id == trackId, cancellationToken)
+            ?? throw new InvalidOperationException("Track not found.");
+
+        if (string.IsNullOrWhiteSpace(track.Mbid))
+        {
+            return "This track has no MusicBrainz ID.";
+        }
+
+        QueueRecordingDetails(track, "Queued from manual MBID lookup.");
+        var payload = track.SourcePayloads.First(p => p.Source == EnrichmentSource.MusicBrainz);
+        await EnrichMusicBrainzDetailsForTrackAsync(track, payload, cancellationToken);
+        return payload.Status switch
+        {
+            SourceFetchStatus.Success => $"Loaded MusicBrainz recording {track.Mbid}.",
+            SourceFetchStatus.NotFound => "MusicBrainz had no usable recording for that MBID.",
+            _ => payload.ErrorMessage ?? "MusicBrainz lookup did not complete."
+        };
+    }
+
+    public static void QueueRecordingDetails(Track track, string? reason = null)
+    {
+        var payload = track.SourcePayloads.FirstOrDefault(p => p.Source == EnrichmentSource.MusicBrainz);
+        if (payload is null)
+        {
+            payload = new TrackSourcePayload
+            {
+                TrackId = track.Id,
+                Source = EnrichmentSource.MusicBrainz,
+                Status = SourceFetchStatus.NotStarted
+            };
+            track.SourcePayloads.Add(payload);
+        }
+
+        payload.Status = SourceFetchStatus.NotStarted;
+        payload.PayloadJson = null;
+        payload.ExternalId = null;
+        payload.FetchedAt = null;
+        payload.ErrorMessage = reason;
     }
 
     private async Task<int> EnrichMusicBrainzDetailsAsync(CancellationToken cancellationToken)
@@ -92,6 +138,14 @@ public sealed class MetadataEnrichmentService(
         }
 
         var payload = await EnsurePayloadAsync(track.Id, EnrichmentSource.MusicBrainz, cancellationToken);
+        return await EnrichMusicBrainzDetailsForTrackAsync(track, payload, cancellationToken);
+    }
+
+    private async Task<int> EnrichMusicBrainzDetailsForTrackAsync(
+        Track track,
+        TrackSourcePayload payload,
+        CancellationToken cancellationToken)
+    {
         progress.SetPhase("MusicBrainz recording", $"{track.Artist.Name} – {track.Title}");
         var mb = clients.CreateMusicBrainz();
         try
@@ -115,7 +169,20 @@ public sealed class MetadataEnrichmentService(
 
             ApplyRecordingDetails(track, details);
 
-            if (track.AlbumId is null && !string.IsNullOrWhiteSpace(details.AlbumTitle))
+            if (track.Artist is not null
+                && !string.IsNullOrWhiteSpace(details.ArtistMbid)
+                && string.IsNullOrWhiteSpace(track.Artist.Mbid))
+            {
+                var artistMbidTaken = await db.Artists.AnyAsync(
+                    a => a.Mbid == details.ArtistMbid && a.Id != track.Artist.Id,
+                    cancellationToken);
+                if (!artistMbidTaken)
+                {
+                    track.Artist.Mbid = details.ArtistMbid;
+                }
+            }
+
+            if (track.AlbumId is null && track.Artist is not null && !string.IsNullOrWhiteSpace(details.AlbumTitle))
             {
                 var album = await catalog.GetOrCreateAlbumAsync(track.Artist, details.AlbumTitle, details.ReleaseMbid, cancellationToken);
                 track.AlbumId = album?.Id;
@@ -127,12 +194,12 @@ public sealed class MetadataEnrichmentService(
                 track.Album.ReleaseYear = details.ReleaseYear;
             }
 
-            if (!string.IsNullOrWhiteSpace(details.ReleaseMbid) && string.IsNullOrWhiteSpace(track.Album?.CoverUrl))
+            if (!string.IsNullOrWhiteSpace(details.ReleaseMbid) && CoverArtResolver.NeedsFallback(track.Album?.CoverUrl))
             {
                 try
                 {
                     var cover = await mb.GetReleaseFrontCoverUrlAsync(details.ReleaseMbid, cancellationToken);
-                    CatalogService.SetCoverIfEmpty(track.Album, cover);
+                    CoverArtResolver.TrySetCover(track.Album, cover);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -145,7 +212,7 @@ public sealed class MetadataEnrichmentService(
             await tags.ApplyTagsAsync(track.Id, EnrichmentSource.MusicBrainz, tagPairs, cancellationToken);
             track.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
-            progress.Log($"MB details: {track.Artist.Name} – {track.Title}");
+            progress.Log($"MB details: {track.Artist?.Name} – {track.Title}");
             return 1;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -164,6 +231,43 @@ public sealed class MetadataEnrichmentService(
 
             return 1;
         }
+    }
+
+    private async Task<int> FillMissingCoversAsync(CancellationToken cancellationToken)
+    {
+        var batch = await db.Tracks
+            .Include(t => t.Artist)
+            .Include(t => t.Album)
+            .Include(t => t.SourcePayloads)
+            .Where(t => t.AlbumId != null && (
+                t.Album!.CoverUrl == null ||
+                t.Album.CoverUrl == "" ||
+                t.Album.CoverUrl.Contains(CoverArtResolver.LastFmPlaceholderToken)))
+            .OrderBy(t => t.Id)
+            .Take(80)
+            .ToListAsync(cancellationToken);
+
+        foreach (var candidate in batch)
+        {
+            if (candidate.Album is null || !CoverArtResolver.NeedsFallback(candidate.Album.CoverUrl))
+            {
+                continue;
+            }
+
+            var fromPayloads = CoverArtResolver.CoverFromPayloads(
+                candidate.SourcePayloads.Select(p => (p.Source, p.PayloadJson)));
+            if (!CoverArtResolver.TrySetCover(candidate.Album, fromPayloads))
+            {
+                continue;
+            }
+
+            candidate.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            progress.Log($"Cover from stored payload: {candidate.Album.Title}");
+            return 1;
+        }
+
+        return 0;
     }
 
     private async Task<int> EnrichLastFmAsync(CancellationToken cancellationToken)

@@ -1,5 +1,7 @@
 html {
   font-size: 14px;
+  --galaxy-accent: #5b9fd4;
+  --galaxy-accent-strong: #1b6ec2;
 }
 
 @media (min-width: 768px) {
@@ -9,7 +11,7 @@ html {
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem var(--bs-body-bg), 0 0 0 0.25rem var(--galaxy-accent);
 }
 
 html {
@@ -42,7 +44,8 @@ body {
   font-size: 0.75rem;
   max-height: 16rem;
   overflow: auto;
-  background: #f8f9fa;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
   padding: 0.75rem;
   border-radius: 0.375rem;
   margin-top: 0.5rem;
@@ -50,7 +53,7 @@ body {
 
 .library-cover img {
   object-fit: cover;
-  background: #e9ecef;
+  background: var(--bs-tertiary-bg);
 }
 
 .library-cover-empty {
@@ -59,8 +62,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e9ecef;
-  color: #6c757d;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
   font-size: 0.7rem;
   text-align: center;
 }
@@ -80,7 +83,7 @@ body {
 .heatmap-day,
 .heatmap-corner {
   font-size: 0.65rem;
-  color: #6c757d;
+  color: var(--bs-secondary-color);
   text-align: center;
 }
 
@@ -94,16 +97,13 @@ body {
 .heatmap-cell {
   min-height: 14px;
   border-radius: 2px;
-  background: rgb(27, 110, 194);
-  opacity: var(--level, 0.08);
-  background-color: color-mix(in srgb, #1b6ec2 calc(var(--level, 0) * 100%), #e9ecef);
-  opacity: 1;
+  background-color: color-mix(in srgb, var(--galaxy-accent) calc(var(--level, 0) * 100%), var(--bs-tertiary-bg));
 }
 
 .play-strip {
   position: relative;
   height: 1.5rem;
-  background: #f1f3f5;
+  background: var(--bs-tertiary-bg);
   border-radius: 0.25rem;
 }
 
@@ -112,14 +112,38 @@ body {
   top: 0.25rem;
   width: 3px;
   height: 1rem;
-  background: #1b6ec2;
+  background: var(--galaxy-accent);
   border-radius: 1px;
 }
 
 .nav-pills .nav-link {
-  color: #1b6ec2;
+  color: var(--galaxy-accent);
 }
 
 .nav-pills .nav-link.active {
-  background-color: #1b6ec2;
+  background-color: var(--galaxy-accent-strong);
+}
+
+.tag-pill {
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color);
+  font-size: calc(0.75rem * var(--tag-scale, 1));
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tag-pill:hover {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] {
+  --galaxy-accent: #7eb6e6;
+  --galaxy-accent-strong: #3d8fd1;
+}
+
+[data-bs-theme="light"] {
+  --galaxy-accent: #1b6ec2;
+  --galaxy-accent-strong: #1b6ec2;
 }

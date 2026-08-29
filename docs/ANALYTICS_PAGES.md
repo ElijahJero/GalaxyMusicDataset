@@ -61,7 +61,16 @@ Tabs: Artists, Tracks, Albums. Same time range.
 - **Movers:** the same ranking for the previous window of equal length. `delta`, `%`, and **new**
 - Limit 50 with “show more”
 
-### 3. Discovery (`/Discovery`)
+### 3. Genres & tags (`/Tags`)
+
+Play-weighted rollup of `TrackTags` for the selected range. Duplicate names from multiple sources count a track’s plays once.
+
+- **Top genres** — MusicBrainz genres (weight ≥ 80), Discogs genres/styles, TheAudioDB genre/style
+- **Crowd tags** — all sources including Last.fm
+- Click a name for tracks and artists that carry it
+- Overview and Wrapped also surface the top genres
+
+### 4. Discovery (`/Discovery`)
 
 “First time you played X” in the selected range.
 
@@ -69,7 +78,7 @@ Tabs: Artists, Tracks, Albums. Same time range.
 - Filter `first-heard` ∈ range
 - Sort newest discovery first
 
-### 4. Time patterns (`/Patterns`)
+### 5. Time patterns (`/Patterns`)
 
 **Heatmap (hour × weekday)** — 7 rows (Mon–Sun) × 24 columns. Cell = scrobble count. UTC.
 
@@ -77,21 +86,21 @@ Tabs: Artists, Tracks, Albums. Same time range.
 
 **Monthly / yearly volume** — bar chart of scrobbles and minutes by month.
 
-**Year in review (`/Wrapped/{year}`)** — overview + tops + discovery + heatmap for that calendar year, plus new artists, most replayed track, longest streak, busiest hour.
+**Year in review (`/Wrapped/{year}`)** — overview + tops + genres + discovery + heatmap for that calendar year, plus new artists, most replayed track, longest streak, busiest hour.
 
-### 5. Artist detail (`/Artists/{id}`)
+### 6. Artist detail (`/Artists/{id}`)
 
 Name, aliases, MBID, tags rolled up from tracks. Plays, unique tracks, first/last, timeline, top tracks. MusicBrainz link when MBID exists.
 
-### 6. Track detail (`/Tracks/{id}`)
+### 7. Track detail (`/Tracks/{id}`)
 
-Artist, album, MBID, duration, fingerprint, lookup status. Play count, first/last, timestamp strip, tags by source, collapsed source payloads.
+Artist, album, MBID, duration, fingerprint, lookup status. Play count, first/last, timestamp strip, tags by source, collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
 
-### 7. Deep cuts (`/DeepCuts`)
+### 8. Deep cuts (`/DeepCuts`)
 
 Tracks with `play_count = 1` vs tracks with `play_count >= N` (default 10). Two tables, same range.
 
-### 8. Sessions (`/Sessions`)
+### 9. Sessions (`/Sessions`)
 
 Cluster scrobbles into sessions on read (no `Sessions` table):
 
@@ -107,6 +116,7 @@ Shows session list, average length, median tracks/session, **repeat rate** (cons
 
 - `GetOverview(TimeRange)`
 - `GetTopArtists/Tracks/Albums(TimeRange, previousRange)`
+- `GetTagCloud(TimeRange)` / `GetTagDetail(name, TimeRange)`
 - `GetDiscoveries(TimeRange)`
 - `GetHeatmap(TimeRange)`
 - `GetStreak()`

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Pages;
 
-public class RecentModel(AppDbContext db, TrackEditService editor) : PageModel
+public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnrichmentService enrichment) : PageModel
 {
     public const int PageSize = 50;
 
@@ -157,7 +157,13 @@ public class RecentModel(AppDbContext db, TrackEditService editor) : PageModel
     public async Task<IActionResult> OnPostEditAsync(CancellationToken cancellationToken)
     {
         var result = await editor.SaveAsync(Input, cancellationToken);
-        TempData["LibraryFlash"] = result.Message;
+        var flash = result.Message;
+        if (Input.LookupFromMbid && !string.IsNullOrWhiteSpace(Input.TrackMbid))
+        {
+            flash += " " + await enrichment.EnrichTrackFromMbidAsync(result.TrackId, cancellationToken);
+        }
+
+        TempData["LibraryFlash"] = flash;
         return RedirectToPage(FilterRoute(result.TrackId));
     }
 

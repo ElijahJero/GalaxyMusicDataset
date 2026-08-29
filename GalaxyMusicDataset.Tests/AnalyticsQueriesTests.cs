@@ -167,6 +167,31 @@ public class AnalyticsQueriesTests
         Assert.Equal("Lose-Lose Days", wrapped.MostReplayed.Name);
         Assert.Contains(wrapped.NewArtists, a => a.Name == "Ouro Kronii");
         Assert.True(wrapped.LongestStreak >= 2);
+        Assert.Contains(wrapped.TopGenres, g => g.Name == "hip hop");
+    }
+
+    [Fact]
+    public async Task Tag_cloud_ranks_genres_by_plays_and_dedupes_sources()
+    {
+        await using var harness = await SeedAsync();
+        var queries = new AnalyticsQueries(harness.Db);
+        var range = TimeRangeParser.ForCalendarYear(2024);
+        var cloud = await queries.GetTagCloud(range, null, 20, CancellationToken.None);
+
+        var hipHop = cloud.Genres.Single(t => t.Name == "hip hop");
+        Assert.Equal(4, hipHop.Plays);
+        Assert.Equal(1, hipHop.TrackCount);
+        Assert.Contains("MusicBrainz", hipHop.Sources);
+        Assert.Contains("LastFm", cloud.Tags.Single(t => t.Name == "hip hop").Sources);
+
+        var seenLive = cloud.Tags.Single(t => t.Name == "seen live");
+        Assert.Equal(1, seenLive.Plays);
+        Assert.DoesNotContain(cloud.Genres, t => t.Name == "seen live");
+
+        var detail = await queries.GetTagDetail("hip hop", range, null, 20, CancellationToken.None);
+        Assert.NotNull(detail);
+        Assert.Contains(detail.Tracks, t => t.Name == "Lose-Lose Days");
+        Assert.Contains(detail.Artists, a => a.Name == "Mori Calliope");
     }
 
     private static async Task<TestDb> SeedAsync()
@@ -189,6 +214,16 @@ public class AnalyticsQueriesTests
         var lullaby = await AddTrack(harness.Db, calliope, unalive, "Left For Dead Lullaby", 180_000);
         var way = await AddTrack(harness.Db, kronii, wayAlbum, "Way 2 U", 180_000);
         var untitled = await AddTrack(harness.Db, calliope, null, "INSOMNIAC BLACK", null);
+
+        var hipHop = new Tag { Name = "hip hop", NormalizedName = "hip hop" };
+        var seenLive = new Tag { Name = "seen live", NormalizedName = "seen live" };
+        harness.Db.Tags.AddRange(hipHop, seenLive);
+        await harness.Db.SaveChangesAsync();
+        harness.Db.TrackTags.AddRange(
+            new TrackTag { TrackId = lose.Id, TagId = hipHop.Id, Source = EnrichmentSource.MusicBrainz, Weight = 80 },
+            new TrackTag { TrackId = lose.Id, TagId = hipHop.Id, Source = EnrichmentSource.LastFm, Weight = 12 },
+            new TrackTag { TrackId = way.Id, TagId = seenLive.Id, Source = EnrichmentSource.LastFm, Weight = 8 });
+        await harness.Db.SaveChangesAsync();
 
         // Monday 2024-01-01 10:00 UTC — two plays of Lose-Lose Days, 20s apart (skip-adjacent)
         await AddPlay(harness.Db, lose, Unix(2024, 1, 1, 10, 0));

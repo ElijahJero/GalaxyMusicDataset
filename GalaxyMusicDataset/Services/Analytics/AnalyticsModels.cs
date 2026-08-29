@@ -153,4 +153,24 @@ public sealed record WrappedResult(
     RankedItem? MostReplayed,
     int LongestStreak,
     int BusiestHourUtc,
-    int BusiestHourCount);
+    int BusiestHourCount,
+    IReadOnlyList<TagStat> TopGenres);
+
+public sealed record TagStat(
+    string Name,
+    int Plays,
+    int TrackCount,
+    long DurationMs,
+    IReadOnlyList<string> Sources);
+
+public sealed record TagCloudResult(
+    IReadOnlyList<TagStat> Genres,
+    IReadOnlyList<TagStat> Tags,
+    int TaggedPlayCount,
+    int UntaggedPlayCount);
+
+public sealed record TagDetailResult(
+    string Name,
+    IReadOnlyList<RankedItem> Tracks,
+    IReadOnlyList<RankedItem> Artists,
+    IReadOnlyList<string> Sources);
