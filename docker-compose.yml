@@ -1,0 +1,22 @@
+services:
+  app:
+    image: ghcr.io/elijahjero/galaxymusicdataset:latest
+    build:
+      context: .
+      dockerfile: GalaxyMusicDataset/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - galaxy-data:/app/App_Data
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      LastFm__ApiKey: ${LASTFM_API_KEY:-}
+      LastFm__Username: ${LASTFM_USERNAME:-}
+      Discogs__Token: ${DISCOGS_TOKEN:-}
+      TheAudioDb__ApiKey: ${THEAUDIODB_API_KEY:-}
+      MusicBrainz__BaseUrl: ${MUSICBRAINZ_BASE_URL:-https://musicbrainz.org}
+    restart: unless-stopped
+
+volumes:
+  galaxy-data:

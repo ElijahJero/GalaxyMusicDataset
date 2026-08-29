@@ -27,4 +27,9 @@ RUN dotnet publish "./GalaxyMusicDataset.csproj" -c $BUILD_CONFIGURATION -o /app
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+USER root
+RUN mkdir -p /app/App_Data && chown -R $APP_UID:$APP_UID /app/App_Data
+USER $APP_UID
+ENV ASPNETCORE_HTTP_PORTS=8080
+VOLUME ["/app/App_Data"]
 ENTRYPOINT ["dotnet", "GalaxyMusicDataset.dll"]
