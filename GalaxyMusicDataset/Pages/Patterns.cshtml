@@ -1,0 +1,68 @@
+@page
+@model PatternsModel
+@{
+    ViewData["Title"] = "Patterns";
+    var bucketTotal = Math.Max(1, Model.TimeOfDay.Sum(b => b.Count));
+}
+
+<h1 class="h3 mb-1">Time patterns</h1>
+<p class="text-muted">When you listen: hour × weekday heatmap, time-of-day buckets, and monthly volume. Hours are UTC.</p>
+
+<partial name="_AnalyticsNav" model='"patterns"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Patterns")' />
+
+@if (Model.Years.Count > 0)
+{
+    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+        <span class="small text-muted">Year in review</span>
+        @foreach (var year in Model.Years)
+        {
+            <a class="btn btn-sm btn-outline-dark" asp-page="/Wrapped" asp-route-year="@year" asp-all-route-data="Model.FilterQuery()">@year</a>
+        }
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header">Hour × weekday</div>
+    <div class="card-body">
+        <partial name="_Heatmap" model="Model.Heatmap" />
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Time of day</div>
+    <div class="card-body">
+        <div class="row g-3">
+            @foreach (var bucket in Model.TimeOfDay)
+            {
+                var hours = bucket.StartHour < bucket.EndHourExclusive
+                    ? $"{bucket.StartHour:00}–{bucket.EndHourExclusive:00}"
+                    : $"{bucket.StartHour:00}–{bucket.EndHourExclusive:00}+";
+                <div class="col-6 col-md-3">
+                    <div class="text-muted small">@bucket.Name <span class="text-muted">(@hours UTC)</span></div>
+                    <div class="fs-4">@AnalyticsDisplay.Count(bucket.Count)</div>
+                    <div class="small">@AnalyticsDisplay.Duration(bucket.DurationMs) · @AnalyticsDisplay.Percent(bucket.Count * 100.0 / bucketTotal)</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Monthly volume</div>
+    <div class="card-body">
+        @if (Model.Monthly.Count == 0)
+        {
+            <div class="text-muted">Nothing to plot.</div>
+        }
+        else
+        {
+            <canvas id="monthly-volume" height="140" data-chart="monthly" data-payload="@Model.MonthlyJson"></canvas>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/analytics.js" asp-append-version="true"></script>
+}

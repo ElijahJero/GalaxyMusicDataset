@@ -9,7 +9,7 @@
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
     <div>
         <h1 class="h3 mb-1">Data aggregation</h1>
-        <p class="text-muted mb-0">Last.fm ingest, MusicBrainz identity, and metadata enrichment. Analytics pages are not built yet.</p>
+        <p class="text-muted mb-0">Last.fm ingest, MusicBrainz identity, and metadata enrichment. Open the <a asp-page="/Dashboard">dashboard</a> for listening stats.</p>
     </div>
     <form method="post" class="d-flex flex-wrap gap-2">
         <button class="btn btn-primary" asp-page-handler="Sync" disabled="@(!s.LastFmConfigured)">Sync now</button>

@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Analytics;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
@@ -41,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<TrackEditService>();
         services.AddScoped<SampleDataSeeder>();
         services.AddScoped<AggregationStatusService>();
+        services.AddScoped<AnalyticsQueries>();
         services.AddSingleton<UserSettingsStore>();
         services.AddHostedService<AggregationHostedService>();
         return services;

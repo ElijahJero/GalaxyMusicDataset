@@ -1,0 +1,55 @@
+@model TimeRangeViewModel
+@{
+    var presets = new (string Key, string Label)[]
+    {
+        ("7d", "7 days"),
+        ("30d", "30 days"),
+        ("90d", "90 days"),
+        ("1y", "1 year"),
+        ("all", "All time"),
+        ("custom", "Custom")
+    };
+}
+
+<form method="get" asp-page="@Model.Page" asp-route-id="@Model.RouteId" class="card card-body mb-3">
+    @foreach (var extra in Model.Extra)
+    {
+        if (!string.IsNullOrEmpty(extra.Value) && extra.Key != "id")
+        {
+            <input type="hidden" name="@extra.Key" value="@extra.Value" />
+        }
+    }
+    <div class="row g-2 align-items-end">
+        <div class="col-lg-5">
+            <div class="form-label">Range</div>
+            <div class="btn-group flex-wrap" role="group" aria-label="Time range">
+                @foreach (var preset in presets)
+                {
+                    <input type="radio" class="btn-check" name="range" id="range-@preset.Key" value="@preset.Key" checked="@(Model.Preset == preset.Key)" />
+                    <label class="btn btn-outline-secondary btn-sm" for="range-@preset.Key">@preset.Label</label>
+                }
+            </div>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="from">From</label>
+            <input class="form-control form-control-sm" id="from" name="from" type="date" value="@Model.From" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="to">To</label>
+            <input class="form-control form-control-sm" id="to" name="to" type="date" value="@Model.To" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="q">Search</label>
+            <input class="form-control form-control-sm" id="q" name="q" value="@Model.Q" placeholder="Artist, track, album, alias" />
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+            <a class="btn btn-outline-secondary btn-sm" asp-page="@Model.Page" asp-route-id="@Model.RouteId">Reset</a>
+            <span class="small text-muted align-self-center">
+                @TimeRangeParser.IsoDate(Model.RangeFrom) –
+                @TimeRangeParser.IsoDate(Model.RangeTo.AddSeconds(-1))
+                UTC
+            </span>
+        </div>
+    </div>
+</form>

@@ -1,0 +1,94 @@
+@page "{id:long}"
+@model ArtistsModel
+@{
+    ViewData["Title"] = Model.Detail.Name;
+    var d = Model.Detail;
+}
+
+<h1 class="h3 mb-1">@d.Name</h1>
+<p class="text-muted mb-2">
+    @if (!string.IsNullOrEmpty(d.SortName) && d.SortName != d.Name)
+    {
+        <span>@d.SortName · </span>
+    }
+    @if (!string.IsNullOrEmpty(d.Mbid))
+    {
+        <a href="https://musicbrainz.org/artist/@d.Mbid" target="_blank" rel="noopener">MusicBrainz</a>
+        <span> · </span>
+    }
+    @if (!string.IsNullOrEmpty(d.LastFmUrl))
+    {
+        <a href="@d.LastFmUrl" target="_blank" rel="noopener">Last.fm</a>
+        <span> · </span>
+    }
+    MBID @(d.Mbid ?? "—")
+</p>
+
+<partial name="_AnalyticsNav" model='"artist"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Artists", routeId: d.Id)' />
+
+@if (d.Aliases.Count > 0)
+{
+    <p class="small">Aliases: @string.Join(" · ", d.Aliases)</p>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Plays</div>
+            <div class="fs-3">@AnalyticsDisplay.Count(d.PlayCount)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Unique tracks</div>
+            <div class="fs-3">@AnalyticsDisplay.Count(d.UniqueTracksPlayed)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">First played</div>
+            <div>@AnalyticsDisplay.Timestamp(d.FirstPlayed)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Last played</div>
+            <div>@AnalyticsDisplay.Timestamp(d.LastPlayed)</div>
+        </div></div>
+    </div>
+</div>
+
+@if (d.Tags.Count > 0)
+{
+    <div class="mb-3">
+        @foreach (var tag in d.Tags)
+        {
+            <span class="badge text-bg-light border me-1 mb-1">@tag.Name <span class="text-muted">@tag.Source</span></span>
+        }
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header">Play history</div>
+    <div class="card-body">
+        @if (d.Timeline.Count == 0)
+        {
+            <div class="text-muted">No plays in this range.</div>
+        }
+        else
+        {
+            <canvas id="artist-timeline" height="120" data-chart="sparkline" data-payload="@Model.TimelineJson"></canvas>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Top tracks</div>
+    <partial name="_TopTable" model='new TopTableModel(d.TopTracks, Model.FilterQuery(), "Track", "/Tracks", false)' />
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/analytics.js" asp-append-version="true"></script>
+}

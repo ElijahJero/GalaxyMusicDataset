@@ -1,0 +1,60 @@
+@page
+@model DashboardModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<h1 class="h3 mb-1">Overview</h1>
+<p class="text-muted">Listening stats for the selected range. All-time numbers sit under each card.</p>
+
+<partial name="_AnalyticsNav" model='"dashboard"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Dashboard")' />
+
+@if (Model.Overview.ScrobbleCount == 0)
+{
+    <div class="alert alert-info">No scrobbles in this range. Seed sample data or run a Last.fm sync from <a asp-page="/Index">Progress</a>.</div>
+}
+
+<partial name="_StatCards" model="Model.Overview" />
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">Daily volume</div>
+            <div class="card-body">
+                @if (Model.Overview.DailyVolume.Count == 0)
+                {
+                    <div class="text-muted">Nothing to plot.</div>
+                }
+                else
+                {
+                    <canvas id="daily-sparkline" height="120" data-chart="sparkline" data-payload="@Model.DailyJson"></canvas>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">Most recent</div>
+            <div class="card-body">
+                @if (Model.Overview.MostRecent is null)
+                {
+                    <div class="text-muted">No plays yet.</div>
+                }
+                else
+                {
+                    var r = Model.Overview.MostRecent;
+                    <div class="fs-5"><a asp-page="/Tracks" asp-route-id="@r.TrackId" asp-all-route-data="Model.FilterQuery()">@r.Title</a></div>
+                    <div><a asp-page="/Artists" asp-route-id="@r.ArtistId" asp-all-route-data="Model.FilterQuery()">@r.ArtistName</a></div>
+                    <div class="text-muted">@(r.AlbumTitle ?? "No album")</div>
+                    <div class="small mt-2">@AnalyticsDisplay.Timestamp(r.PlayedAt)</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/analytics.js" asp-append-version="true"></script>
+}

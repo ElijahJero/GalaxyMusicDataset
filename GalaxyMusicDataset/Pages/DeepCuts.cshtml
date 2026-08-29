@@ -1,0 +1,58 @@
+@page
+@model DeepCutsModel
+@{
+    ViewData["Title"] = "Deep cuts";
+    var extra = Model.Extra();
+    var moreTake = Math.Min(Model.Take + 150, 500).ToString();
+    var more = Model.FilterQuery(new Dictionary<string, string?> { ["n"] = Model.N.ToString(), ["take"] = moreTake });
+    var oneOffs = new TopTableModel(Model.Result.OneOffs, Model.FilterQuery(), "Track", "/Tracks", false);
+    var heavy = new TopTableModel(Model.Result.Heavy, Model.FilterQuery(), "Track", "/Tracks", false);
+}
+
+<h1 class="h3 mb-1">Deep cuts</h1>
+<p class="text-muted">One-off finds versus rinsed tracks in this range.</p>
+
+<partial name="_AnalyticsNav" model='"deepcuts"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/DeepCuts", extra)' />
+
+<form method="get" asp-page="/DeepCuts" class="d-flex gap-2 align-items-end mb-3">
+    @foreach (var kv in Model.FilterQuery())
+    {
+        if (kv.Key is not "n" and not "take")
+        {
+            <input type="hidden" name="@kv.Key" value="@kv.Value" />
+        }
+    }
+    <div>
+        <label class="form-label" for="n">Heavy threshold</label>
+        <input class="form-control form-control-sm" id="n" name="n" type="number" min="2" max="500" value="@Model.N" />
+    </div>
+    <button class="btn btn-sm btn-primary" type="submit">Update</button>
+</form>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between">
+                <span>Played once (@AnalyticsDisplay.Count(Model.Result.OneOffTotal))</span>
+                @if (Model.Result.OneOffsHasMore)
+                {
+                    <a class="small" asp-page="/DeepCuts" asp-all-route-data="more">Show more</a>
+                }
+            </div>
+            <partial name="_TopTable" model="oneOffs" />
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between">
+                <span>Played @(Model.N)+ times (@AnalyticsDisplay.Count(Model.Result.HeavyTotal))</span>
+                @if (Model.Result.HeavyHasMore)
+                {
+                    <a class="small" asp-page="/DeepCuts" asp-all-route-data="more">Show more</a>
+                }
+            </div>
+            <partial name="_TopTable" model="heavy" />
+        </div>
+    </div>
+</div>
