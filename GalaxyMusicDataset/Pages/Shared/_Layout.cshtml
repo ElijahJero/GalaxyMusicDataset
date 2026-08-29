@@ -1,9 +1,17 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - GalaxyMusicDataset</title>
+    <script>
+        (() => {
+            try {
+                const theme = localStorage.getItem("galaxy-theme") || "dark";
+                document.documentElement.setAttribute("data-bs-theme", theme);
+            } catch { /* ignore */ }
+        })();
+    </script>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -11,7 +19,7 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm bg-body-tertiary border-bottom box-shadow mb-3">
             <div class="container">
                 <a class="navbar-brand" asp-area="" asp-page="/Index">GalaxyMusicDataset</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
@@ -21,13 +29,14 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-page="/Index">Progress</a>
+                            <a class="nav-link" asp-page="/Index">Progress</a>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-dark" href="#" data-bs-toggle="dropdown">Analytics</a>
+                            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Analytics</a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" asp-page="/Dashboard">Overview</a></li>
                                 <li><a class="dropdown-item" asp-page="/Tops">Tops</a></li>
+                                <li><a class="dropdown-item" asp-page="/Tags">Genres</a></li>
                                 <li><a class="dropdown-item" asp-page="/Discovery">Discovery</a></li>
                                 <li><a class="dropdown-item" asp-page="/Patterns">Patterns</a></li>
                                 <li><a class="dropdown-item" asp-page="/DeepCuts">Deep cuts</a></li>
@@ -35,18 +44,19 @@
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-page="/Recent">Library</a>
+                            <a class="nav-link" asp-page="/Recent">Library</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-page="/Lookups">Lookups</a>
+                            <a class="nav-link" asp-page="/Lookups">Lookups</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-page="/Review">Review</a>
+                            <a class="nav-link" asp-page="/Review">Review</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-page="/Settings">Settings</a>
+                            <a class="nav-link" asp-page="/Settings">Settings</a>
                         </li>
                     </ul>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-theme-toggle aria-pressed="true" title="Toggle color theme">Light</button>
                 </div>
             </div>
         </nav>

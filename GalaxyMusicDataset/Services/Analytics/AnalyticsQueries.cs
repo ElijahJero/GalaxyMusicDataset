@@ -1,5 +1,6 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
+using GalaxyMusicDataset.Services.Normalization;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Services.Analytics;
@@ -548,6 +549,7 @@ public sealed class AnalyticsQueries(AppDbContext db)
         var albums = await GetTopAlbums(range, previous, search, 10, cancellationToken);
         var discoveries = await GetDiscoveries(range, search, 20, cancellationToken);
         var heatmap = await GetHeatmap(range, search, cancellationToken);
+        var tags = await GetTagCloud(range, search, 10, cancellationToken);
         var newArtists = discoveries.Artists
             .Select((d, i) => new RankedItem(d.Id, d.Name, null, d.PlaysInRange, null, i + 1, 0, d.PlaysInRange, null, true))
             .ToList();
@@ -570,7 +572,8 @@ public sealed class AnalyticsQueries(AppDbContext db)
             tracks.Items.FirstOrDefault(),
             longest,
             busiest?.Hour ?? 0,
-            busiest?.Count ?? 0);
+            busiest?.Count ?? 0,
+            tags.Genres);
     }
 
     public async Task<IReadOnlyList<int>> GetYears(CancellationToken cancellationToken)
@@ -585,6 +588,137 @@ public sealed class AnalyticsQueries(AppDbContext db)
         var y0 = DateTimeOffset.FromUnixTimeSeconds(min).UtcDateTime.Year;
         var y1 = DateTimeOffset.FromUnixTimeSeconds(max).UtcDateTime.Year;
         return Enumerable.Range(y0, y1 - y0 + 1).Reverse().ToList();
+    }
+
+    public async Task<TagCloudResult> GetTagCloud(
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        take = ClampTake(take);
+        var playRows = await Filter(range, search)
+            .GroupBy(s => s.TrackId)
+            .Select(g => new TrackPlayRow(g.Key, g.Count(), g.Sum(s => (long?)s.Track.DurationMs) ?? 0L))
+            .ToListAsync(cancellationToken);
+
+        var playMap = playRows.ToDictionary(x => x.TrackId);
+        if (playMap.Count == 0)
+        {
+            return new TagCloudResult([], [], 0, 0);
+        }
+
+        var trackIds = playMap.Keys.ToList();
+        var links = await db.TrackTags.AsNoTracking()
+            .Where(tt => trackIds.Contains(tt.TrackId))
+            .Select(tt => new TagLinkRow(tt.TrackId, tt.Tag.Name, tt.Tag.NormalizedName, tt.Source, tt.Weight))
+            .ToListAsync(cancellationToken);
+
+        var taggedTrackIds = links.Select(l => l.TrackId).ToHashSet();
+        var taggedPlays = taggedTrackIds.Sum(id => playMap[id].Plays);
+        var untaggedPlays = playRows.Where(x => !taggedTrackIds.Contains(x.TrackId)).Sum(x => x.Plays);
+
+        var genres = RollupTags(links.Where(l => IsGenreLike(l.Source, l.Weight)), playMap, take);
+        var allTags = RollupTags(links, playMap, take);
+        return new TagCloudResult(genres, allTags, taggedPlays, untaggedPlays);
+    }
+
+    public async Task<TagDetailResult?> GetTagDetail(
+        string name,
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        take = ClampTake(take);
+        var normalized = TextNormalizer.Normalize(name);
+        var tag = await db.Tags.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.NormalizedName == normalized || t.Name == name, cancellationToken);
+        if (tag is null)
+        {
+            return null;
+        }
+
+        var trackIds = await db.TrackTags.AsNoTracking()
+            .Where(tt => tt.TagId == tag.Id)
+            .Select(tt => tt.TrackId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        if (trackIds.Count == 0)
+        {
+            return new TagDetailResult(tag.Name, [], [], []);
+        }
+
+        var rows = await Filter(range, search)
+            .Where(s => trackIds.Contains(s.TrackId))
+            .GroupBy(s => new { s.TrackId, s.Track.Title, Artist = s.Track.Artist.Name, s.Track.ArtistId })
+            .Select(g => new
+            {
+                g.Key.TrackId,
+                g.Key.Title,
+                g.Key.Artist,
+                g.Key.ArtistId,
+                Plays = g.Count(),
+                Duration = g.Sum(s => (long?)s.Track.DurationMs)
+            })
+            .ToListAsync(cancellationToken);
+
+        var tracks = rows
+            .OrderByDescending(x => x.Plays)
+            .ThenBy(x => x.Title)
+            .Take(take)
+            .Select((x, i) => new RankedItem(x.TrackId, x.Title, x.Artist, x.Plays, x.Duration, i + 1, 0, x.Plays, null, false))
+            .ToList();
+        var artists = rows
+            .GroupBy(x => new { x.ArtistId, x.Artist })
+            .Select(g => new { g.Key.ArtistId, g.Key.Artist, Plays = g.Sum(x => x.Plays), Duration = g.Sum(x => x.Duration ?? 0) })
+            .OrderByDescending(x => x.Plays)
+            .ThenBy(x => x.Artist)
+            .Take(take)
+            .Select((x, i) => new RankedItem(x.ArtistId, x.Artist, null, x.Plays, x.Duration, i + 1, 0, x.Plays, null, false))
+            .ToList();
+        var sources = await db.TrackTags.AsNoTracking()
+            .Where(tt => tt.TagId == tag.Id)
+            .Select(tt => tt.Source.ToString())
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return new TagDetailResult(tag.Name, tracks, artists, sources.OrderBy(s => s).ToList());
+    }
+
+    public static bool IsGenreLike(EnrichmentSource source, int weight) => source switch
+    {
+        EnrichmentSource.Discogs => true,
+        EnrichmentSource.TheAudioDb => weight >= 40,
+        EnrichmentSource.MusicBrainz => weight >= 80,
+        _ => false
+    };
+
+    private static List<TagStat> RollupTags(
+        IEnumerable<TagLinkRow> links,
+        Dictionary<long, TrackPlayRow> playMap,
+        int take)
+    {
+        return links
+            .GroupBy(l => l.NormalizedName)
+            .Select(g =>
+            {
+                var trackIds = g.Select(x => x.TrackId).Distinct().ToList();
+                var plays = trackIds.Sum(id => playMap.GetValueOrDefault(id)?.Plays ?? 0);
+                var duration = trackIds.Sum(id => playMap.GetValueOrDefault(id)?.Duration ?? 0);
+                var display = g.OrderByDescending(x => x.Weight).First().Name;
+                var sources = g.Select(x => x.Source.ToString()).Distinct().OrderBy(s => s).ToList();
+                return new TagStat(display, plays, trackIds.Count, duration, sources);
+            })
+            .OrderByDescending(t => t.Plays)
+            .ThenBy(t => t.Name)
+            .Take(take)
+            .ToList();
     }
 
     private async Task<OverviewStats> ComputeOverview(
@@ -786,4 +920,8 @@ public sealed class AnalyticsQueries(AppDbContext db)
     private sealed record IdNameCount(long Id, string Name, string? Subtitle, int Plays, long? DurationMs);
 
     private sealed record PlayRow(long UnixTimestamp, long TrackId, int? DurationMs, string Artist, string Title);
+
+    private sealed record TrackPlayRow(long TrackId, int Plays, long Duration);
+
+    private sealed record TagLinkRow(long TrackId, string Name, string NormalizedName, EnrichmentSource Source, int Weight);
 }

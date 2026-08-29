@@ -25,6 +25,7 @@ public sealed class SampleDataSeeder(AppDbContext db, ScrobbleIngestService inge
         await db.SaveChangesAsync(cancellationToken);
 
         var result = await ingest.IngestAsync(tracks, cancellationToken);
+        await SeedSampleMetadataAsync(cancellationToken);
         job.ItemsProcessed = tracks.Count;
         job.ItemsSucceeded = result.Inserted;
         job.ItemsSkipped = result.Duplicates + result.Skipped;
@@ -34,6 +35,36 @@ public sealed class SampleDataSeeder(AppDbContext db, ScrobbleIngestService inge
         await db.SaveChangesAsync(cancellationToken);
         progress.Log(job.Message);
         return result.Inserted;
+    }
+
+    private async Task SeedSampleMetadataAsync(CancellationToken cancellationToken)
+    {
+        var tags = new TagService(db);
+        var byTitle = await db.Tracks
+            .Include(t => t.Album)
+            .ToListAsync(cancellationToken);
+
+        async Task Tag(string title, EnrichmentSource source, params (string Name, int Weight)[] pairs)
+        {
+            var track = byTitle.FirstOrDefault(t => t.Title == title);
+            if (track is null)
+            {
+                return;
+            }
+
+            await tags.ApplyTagsAsync(track.Id, source, pairs, cancellationToken);
+        }
+
+        await Tag("Now Loading!!!!", EnrichmentSource.MusicBrainz, ("j-pop", 80), ("anison", 80));
+        await Tag("Now Loading!!!!", EnrichmentSource.Discogs, ("Pop", 50), ("Anison", 40));
+        await Tag("Now Loading!!!!", EnrichmentSource.LastFm, ("anime", 18), ("j-pop", 20));
+        await Tag("Lose-Lose Days", EnrichmentSource.MusicBrainz, ("hip hop", 80));
+        await Tag("Lose-Lose Days", EnrichmentSource.LastFm, ("hip hop", 14), ("rap", 10));
+        await Tag("Way 2 U", EnrichmentSource.TheAudioDb, ("Electronic", 50));
+        await Tag("Way 2 U", EnrichmentSource.LastFm, ("virtual youtuber", 9));
+        await Tag("Lilac", EnrichmentSource.MusicBrainz, ("j-pop", 80));
+        await Tag("INSOMNIAC BLACK", EnrichmentSource.LastFm, ("rap", 8));
+        await Tag("Left For Dead Lullaby", EnrichmentSource.Discogs, ("Hip Hop", 50));
     }
 
     public static IReadOnlyList<LastFmRecentTrack> DefaultSample()

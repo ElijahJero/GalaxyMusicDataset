@@ -1,0 +1,13 @@
+@model IReadOnlyList<TagRollup>
+@if (Model.Count > 0)
+{
+    <div class="mb-3">
+        @foreach (var tag in Model)
+        {
+            var routes = new Dictionary<string, string?> { ["name"] = tag.Name };
+            <a class="badge rounded-pill tag-pill me-1 mb-1" asp-page="/Tags" asp-all-route-data="routes">
+                @tag.Name <span class="text-muted">@tag.Source</span>
+            </a>
+        }
+    </div>
+}

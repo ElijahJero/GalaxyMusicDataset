@@ -10,11 +10,16 @@
 }
 
 <h1 class="h3 mb-1">@t.Title</h1>
-<p class="text-muted mb-2">
+<p class="text-muted mb-3">
     <a href="@Url.Page("/Artists", Model.DetailRoute(t.ArtistId))">@t.ArtistName</a>
     · @(t.AlbumTitle ?? "No album")
     · @duration
 </p>
+
+@if (Model.Flash is not null)
+{
+    <div class="alert alert-success">@Model.Flash</div>
+}
 
 <partial name="_AnalyticsNav" model='"track"' />
 
@@ -40,6 +45,10 @@
                 @if (!string.IsNullOrEmpty(t.Mbid))
                 {
                     <a href="https://musicbrainz.org/recording/@t.Mbid" target="_blank" rel="noopener">@t.Mbid</a>
+                    <form method="post" asp-page-handler="LookupMbid" class="d-inline ms-2">
+                        <input type="hidden" name="id" value="@t.Id" />
+                        <button class="btn btn-sm btn-outline-secondary" type="submit">Fetch MusicBrainz details</button>
+                    </form>
                 }
                 else
                 {
@@ -70,12 +79,7 @@
 
 @if (t.Tags.Count > 0)
 {
-    <div class="mb-3">
-        @foreach (var tag in t.Tags)
-        {
-            <span class="badge text-bg-light border me-1 mb-1">@tag.Name <span class="text-muted">@tag.Source</span></span>
-        }
-    </div>
+    <partial name="_TagPills" model="t.Tags" />
 }
 
 <div class="card mb-4">

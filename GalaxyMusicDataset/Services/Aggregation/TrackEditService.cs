@@ -22,9 +22,10 @@ public sealed class TrackEditInput
     public string? DiscogsReleaseId { get; set; }
     public string? TheAudioDbTrackId { get; set; }
     public bool ResetEnrichment { get; set; }
+    public bool LookupFromMbid { get; set; }
 }
 
-public sealed record TrackEditResult(long TrackId, string Message, bool Merged);
+public sealed record TrackEditResult(long TrackId, string Message, bool Merged, bool LookupQueued = false);
 
 public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
 {
@@ -73,6 +74,7 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
         }
 
         track.Title = title;
+        var previousMbid = track.Mbid;
         track.Mbid = EmptyToNull(input.TrackMbid);
         track.Isrc = EmptyToNull(input.Isrc);
         track.Summary = EmptyToNull(input.Summary);
@@ -157,11 +159,40 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
             }
         }
 
+        var mbidChanged = !string.Equals(previousMbid, track.Mbid, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(track.Mbid) && (input.LookupFromMbid || mbidChanged))
+        {
+            MetadataEnrichmentService.QueueRecordingDetails(
+                track,
+                input.LookupFromMbid
+                    ? "Queued from manual MBID lookup."
+                    : "Queued because the MBID changed.");
+            var lookup = await db.TrackLookups.FirstOrDefaultAsync(l => l.Fingerprint == track.Fingerprint, cancellationToken);
+            if (lookup is not null)
+            {
+                lookup.Status = LookupStatus.ManualMatched;
+                lookup.MatchedMbid = track.Mbid;
+                lookup.LastAttemptUtc = DateTimeOffset.UtcNow;
+                lookup.ErrorMessage = null;
+                lookup.TrackId = track.Id;
+            }
+        }
+
         await db.SaveChangesAsync(cancellationToken);
+        var lookupQueued = !string.IsNullOrWhiteSpace(track.Mbid) && (input.LookupFromMbid || mbidChanged);
         var message = merged
             ? $"Saved and merged a duplicate into track #{track.Id}."
             : "Saved.";
-        return new TrackEditResult(track.Id, message, merged);
+        if (input.LookupFromMbid)
+        {
+            message += " Fetching MusicBrainz recording details.";
+        }
+        else if (mbidChanged && !string.IsNullOrWhiteSpace(track.Mbid))
+        {
+            message += " MusicBrainz details queued for this MBID.";
+        }
+
+        return new TrackEditResult(track.Id, message, merged, lookupQueued);
     }
 
     private async Task AbsorbAsync(Track keep, Track drop, CancellationToken cancellationToken)

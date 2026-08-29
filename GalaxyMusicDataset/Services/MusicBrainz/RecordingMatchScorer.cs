@@ -23,7 +23,8 @@ public sealed record MusicBrainzRecordingDetails(
     int? ReleaseYear,
     IReadOnlyList<(string Name, int Count)> Tags,
     IReadOnlyList<string> Genres,
-    string RawJson);
+    string RawJson,
+    string? ArtistMbid = null);
 
 public static class RecordingMatchScorer
 {

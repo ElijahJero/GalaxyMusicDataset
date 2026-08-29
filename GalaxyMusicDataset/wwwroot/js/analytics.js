@@ -4,7 +4,21 @@
     return;
   }
 
-  const axisColor = "#6c757d";
+  const styles = getComputedStyle(document.documentElement);
+  const accent = (styles.getPropertyValue("--galaxy-accent") || "#5b9fd4").trim();
+  const accentStrong = (styles.getPropertyValue("--galaxy-accent-strong") || "#1b6ec2").trim();
+  const axisColor = (styles.getPropertyValue("--bs-secondary-color") || "#6c757d").trim();
+  const genrePalette = [
+    accentStrong,
+    accent,
+    "#c084fc",
+    "#34d399",
+    "#f59e0b",
+    "#f472b6",
+    "#22d3ee",
+    "#fb7185"
+  ];
+
   Chart.defaults.font.family = "inherit";
   Chart.defaults.color = axisColor;
 
@@ -24,8 +38,8 @@
           labels: payload.map((p) => p.day),
           datasets: [{
             data: payload.map((p) => p.count),
-            borderColor: "#1b6ec2",
-            backgroundColor: "rgba(27, 110, 194, 0.15)",
+            borderColor: accentStrong,
+            backgroundColor: "color-mix(in srgb, " + accentStrong + " 25%, transparent)",
             fill: true,
             tension: 0.3,
             pointRadius: payload.length > 40 ? 0 : 2,
@@ -51,12 +65,12 @@
             {
               label: "Scrobbles",
               data: payload.map((p) => p.count),
-              backgroundColor: "#1b6ec2"
+              backgroundColor: accentStrong
             },
             {
               label: "Minutes",
               data: payload.map((p) => p.minutes),
-              backgroundColor: "rgba(27, 110, 194, 0.35)"
+              backgroundColor: accent
             }
           ]
         },
@@ -65,6 +79,25 @@
           maintainAspectRatio: false,
           plugins: { legend: { position: "bottom" } },
           scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+      });
+    } else if (kind === "genres") {
+      new Chart(canvas, {
+        type: "doughnut",
+        data: {
+          labels: payload.map((p) => p.label),
+          datasets: [{
+            data: payload.map((p) => p.count),
+            backgroundColor: payload.map((_, i) => genrePalette[i % genrePalette.length]),
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom" }
+          }
         }
       });
     }

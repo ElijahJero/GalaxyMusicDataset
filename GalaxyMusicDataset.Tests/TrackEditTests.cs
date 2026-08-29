@@ -109,4 +109,59 @@ public class TrackEditTests
         Assert.Equal(1, await harness.Db.Tracks.CountAsync());
         Assert.Equal(2, await harness.Db.Scrobbles.CountAsync(s => s.TrackId == result.TrackId));
     }
+
+    [Fact]
+    public async Task Edit_queues_musicbrainz_details_when_mbid_is_set()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var catalog = new CatalogService(harness.Db);
+        var artist = await catalog.GetOrCreateArtistAsync("Kyasu", null, CancellationToken.None);
+        var track = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Lilac",
+            Fingerprint = TrackFingerprint.Compute("Kyasu", "Lilac"),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        harness.Db.Tracks.Add(track);
+        await harness.Db.SaveChangesAsync();
+        harness.Db.TrackLookups.Add(new TrackLookup
+        {
+            Fingerprint = track.Fingerprint,
+            TrackId = track.Id,
+            ArtistName = "Kyasu",
+            TrackName = "Lilac",
+            Status = LookupStatus.NotFound,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        harness.Db.TrackSourcePayloads.Add(new TrackSourcePayload
+        {
+            TrackId = track.Id,
+            Source = EnrichmentSource.MusicBrainz,
+            Status = SourceFetchStatus.Success,
+            PayloadJson = """{"id":"old","title":"Lilac","isrcs":[]}"""
+        });
+        await harness.Db.SaveChangesAsync();
+
+        var editor = new TrackEditService(harness.Db, catalog);
+        var result = await editor.SaveAsync(new TrackEditInput
+        {
+            Id = track.Id,
+            ArtistName = "Kyasu",
+            Title = "Lilac",
+            TrackMbid = "3f309fb6-fed0-461e-bfd9-c6d7467a4bd4",
+            LookupFromMbid = true
+        }, CancellationToken.None);
+
+        Assert.True(result.LookupQueued);
+        await harness.Db.Entry(track).ReloadAsync();
+        Assert.Equal("3f309fb6-fed0-461e-bfd9-c6d7467a4bd4", track.Mbid);
+        var payload = await harness.Db.TrackSourcePayloads.SingleAsync(p => p.TrackId == track.Id);
+        Assert.Equal(SourceFetchStatus.NotStarted, payload.Status);
+        Assert.Null(payload.PayloadJson);
+        var lookup = await harness.Db.TrackLookups.SingleAsync();
+        Assert.Equal(LookupStatus.ManualMatched, lookup.Status);
+        Assert.Equal(track.Mbid, lookup.MatchedMbid);
+    }
 }

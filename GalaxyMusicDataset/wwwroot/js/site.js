@@ -1,4 +1,27 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+﻿(() => {
+  const key = "galaxy-theme";
+  const root = document.documentElement;
 
-// Write your JavaScript code.
+  const apply = (theme) => {
+    root.setAttribute("data-bs-theme", theme);
+    try {
+      localStorage.setItem(key, theme);
+    } catch {
+      /* ignore */
+    }
+
+    for (const button of document.querySelectorAll("[data-theme-toggle]")) {
+      const dark = theme === "dark";
+      button.setAttribute("aria-pressed", dark ? "true" : "false");
+      button.textContent = dark ? "Light" : "Dark";
+    }
+  };
+
+  apply(root.getAttribute("data-bs-theme") || "dark");
+  for (const button of document.querySelectorAll("[data-theme-toggle]")) {
+    button.addEventListener("click", () => {
+      const next = root.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
+      apply(next);
+    });
+  }
+})();

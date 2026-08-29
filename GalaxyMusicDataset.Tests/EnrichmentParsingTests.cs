@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Discogs;
@@ -135,6 +136,7 @@ public class EnrichmentParsingTests
               "id": "rec-1",
               "title": "Lilac",
               "length": 181000,
+              "artist-credit": [{ "name": "Kyasu", "artist": { "id": "artist-1", "name": "Kyasu" } }],
               "isrcs": ["JPB601234567"],
               "genres": [{ "name": "j-pop", "count": 2 }],
               "tags": [{ "name": "anime", "count": 4 }],
@@ -146,6 +148,7 @@ public class EnrichmentParsingTests
         Assert.Equal("JPB601234567", details!.FirstIsrc);
         Assert.Equal(2024, details.ReleaseYear);
         Assert.Equal("rel-1", details.ReleaseMbid);
+        Assert.Equal("artist-1", details.ArtistMbid);
         Assert.True(MusicBrainzClient.HasRecordingDetails(json));
         Assert.False(MusicBrainzClient.HasRecordingDetails("""{"Mbid":"rec-1","Title":"Lilac"}"""));
 
@@ -163,5 +166,49 @@ public class EnrichmentParsingTests
         MetadataEnrichmentService.ApplyRecordingDetails(track, details);
         Assert.Equal("JPB601234567", track.Isrc);
         Assert.Equal(181000, track.DurationMs);
+    }
+
+    [Fact]
+    public void Cover_art_skips_lastfm_placeholder_and_prefers_discogs()
+    {
+        var placeholder = $"https://lastfm.freetls.fastly.net/i/u/300x300/{CoverArtResolver.LastFmPlaceholderToken}.png";
+        var album = new Album { Title = "Lilac" };
+        Assert.True(CoverArtResolver.NeedsFallback(null));
+        Assert.True(CoverArtResolver.NeedsFallback(placeholder));
+        Assert.False(CoverArtResolver.TrySetCover(album, placeholder));
+        Assert.Null(album.CoverUrl);
+
+        Assert.True(CoverArtResolver.TrySetCover(album, "https://example.com/discogs.jpg"));
+        Assert.Equal("https://example.com/discogs.jpg", album.CoverUrl);
+        Assert.False(CoverArtResolver.TrySetCover(album, "https://example.com/later.jpg"));
+
+        var lastFmJson = """
+            {
+              "track": {
+                "name": "Lilac",
+                "album": {
+                  "title": "Lilac",
+                  "image": [
+                    { "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png", "size": "extralarge" }
+                  ]
+                }
+              }
+            }
+            """;
+        Assert.Null(LastFmClient.ParseTrackInfo(lastFmJson)!.AlbumImageUrl);
+
+        var discogsJson = """
+            {
+              "id": 99,
+              "title": "Lilac",
+              "images": [{ "type": "primary", "uri150": "https://example.com/pri.jpg" }]
+            }
+            """;
+        var cover = CoverArtResolver.CoverFromPayloads(
+        [
+            (EnrichmentSource.LastFm, lastFmJson),
+            (EnrichmentSource.Discogs, discogsJson)
+        ]);
+        Assert.Equal("https://example.com/pri.jpg", cover);
     }
 }

@@ -18,7 +18,7 @@
     <div class="mb-3 d-flex flex-wrap gap-2">
         @foreach (var year in Model.Years)
         {
-            <a class="btn btn-sm @(year == Model.Year ? "btn-dark" : "btn-outline-dark")" asp-page="/Wrapped" asp-route-year="@year" asp-route-q="@Model.Q">@year</a>
+            <a class="btn btn-sm @(year == Model.Year ? "btn-primary" : "btn-outline-secondary")" asp-page="/Wrapped" asp-route-year="@year" asp-route-q="@Model.Q">@year</a>
         }
     </div>
 }
@@ -66,6 +66,30 @@ else
                     <div class="small text-muted">@AnalyticsDisplay.Count(result.BusiestHourCount) scrobbles</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Top genres</span>
+            <a class="small" asp-page="/Tags" asp-route-range="custom" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-q="@Model.Q">All tags</a>
+        </div>
+        <div class="card-body">
+            @if (result.TopGenres.Count == 0)
+            {
+                <div class="text-muted">No genre tags for this year yet.</div>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var tag in result.TopGenres)
+                    {
+                        <a class="badge rounded-pill tag-pill" asp-page="/Tags" asp-route-name="@tag.Name" asp-route-range="custom" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-q="@Model.Q">
+                            @tag.Name <span class="text-muted">@AnalyticsDisplay.Count(tag.Plays)</span>
+                        </a>
+                    }
+                </div>
+            }
         </div>
     </div>
 

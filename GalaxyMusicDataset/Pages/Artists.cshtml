@@ -61,12 +61,7 @@
 
 @if (d.Tags.Count > 0)
 {
-    <div class="mb-3">
-        @foreach (var tag in d.Tags)
-        {
-            <span class="badge text-bg-light border me-1 mb-1">@tag.Name <span class="text-muted">@tag.Source</span></span>
-        }
-    </div>
+    <partial name="_TagPills" model="d.Tags" />
 }
 
 <div class="card mb-4">

@@ -1,0 +1,127 @@
+@page
+@model TagsModel
+@{
+    ViewData["Title"] = Model.Detail is null ? "Genres & tags" : Model.Detail.Name;
+}
+
+<h1 class="h3 mb-1">@(Model.Detail?.Name ?? "Genres & tags")</h1>
+<p class="text-muted">
+    Ranked by plays in this range. Genres come from MusicBrainz, Discogs, and TheAudioDB.
+    Crowd tags include Last.fm.
+</p>
+
+<partial name="_AnalyticsNav" model='"tags"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/Tags", Model.Extra())' />
+
+@if (Model.Detail is not null)
+{
+    <div class="mb-3">
+        <a class="btn btn-sm btn-outline-secondary" asp-page="/Tags" asp-all-route-data="Model.FilterQuery()">All tags</a>
+        <span class="small text-muted ms-2">Sources: @string.Join(" · ", Model.Detail.Sources)</span>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Tracks</div>
+                <partial name="_TopTable" model='new TopTableModel(Model.Detail.Tracks, Model.FilterQuery(), "Track", "/Tracks", false)' />
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Artists</div>
+                <partial name="_TopTable" model='new TopTableModel(Model.Detail.Artists, Model.FilterQuery(), "Artist", "/Artists", false)' />
+            </div>
+        </div>
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">Top genres</div>
+            <div class="card-body">
+                @if (Model.Cloud.Genres.Count == 0)
+                {
+                    <div class="text-muted">No genre tags yet. They land here after MusicBrainz, Discogs, or TheAudioDB enrichment.</div>
+                }
+                else
+                {
+                    <canvas height="220" data-chart="genres" data-payload="@Model.GenreJson"></canvas>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header">Most played genres</div>
+            @if (Model.Cloud.Genres.Count == 0)
+            {
+                <div class="card-body text-muted">Nothing to list.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th class="text-muted" style="width:3rem;">#</th>
+                            <th>Genre</th>
+                            <th class="text-end">Plays</th>
+                            <th class="text-end">Tracks</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var (tag, i) in Model.Cloud.Genres.Select((t, i) => (t, i)))
+                        {
+                            var routes = Model.FilterQuery(new Dictionary<string, string?> { ["name"] = tag.Name });
+                            <tr>
+                                <td class="text-muted">@(i + 1)</td>
+                                <td>
+                                    <a asp-page="/Tags" asp-all-route-data="routes">@tag.Name</a>
+                                    <div class="small text-muted">@string.Join(" · ", tag.Sources)</div>
+                                </td>
+                                <td class="text-end">@AnalyticsDisplay.Count(tag.Plays)</td>
+                                <td class="text-end">@AnalyticsDisplay.Count(tag.TrackCount)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Crowd tags</div>
+    <div class="card-body">
+        <p class="small text-muted mb-3">
+            @AnalyticsDisplay.Count(Model.Cloud.TaggedPlayCount) plays have tags
+            · @AnalyticsDisplay.Count(Model.Cloud.UntaggedPlayCount) still untagged
+        </p>
+        @if (Model.Cloud.Tags.Count == 0)
+        {
+            <div class="text-muted">No tags stored yet. Last.fm track.getInfo and the other enrichers fill this in.</div>
+        }
+        else
+        {
+            var max = Math.Max(1, Model.Cloud.Tags.Max(t => t.Plays));
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var tag in Model.Cloud.Tags)
+                {
+                    var routes = Model.FilterQuery(new Dictionary<string, string?> { ["name"] = tag.Name });
+                    var weight = 0.85 + 0.55 * (tag.Plays / (double)max);
+                    <a class="badge rounded-pill tag-pill" asp-page="/Tags" asp-all-route-data="routes" style="--tag-scale: @weight.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                        @tag.Name
+                        <span class="text-muted">@AnalyticsDisplay.Count(tag.Plays)</span>
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/analytics.js" asp-append-version="true"></script>
+}
