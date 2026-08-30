@@ -118,19 +118,36 @@ public sealed class MetadataEnrichmentService(
             .Where(t => t.Mbid != null && t.Mbid != "" &&
                         !t.SourcePayloads.Any(p =>
                             p.Source == EnrichmentSource.MusicBrainz &&
-                            p.Status == SourceFetchStatus.Success &&
-                            p.PayloadJson != null &&
-                            p.PayloadJson.Contains("\"isrcs\"")))
+                            ((p.Status == SourceFetchStatus.Success &&
+                              p.PayloadJson != null &&
+                              p.PayloadJson.Contains("\"isrcs\"")) ||
+                             p.Status == SourceFetchStatus.NotFound ||
+                             p.Status == SourceFetchStatus.Skipped)))
             .OrderBy(t => t.Id)
             .Take(25)
             .ToListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
         var track = batch.FirstOrDefault(t =>
         {
             var payload = t.SourcePayloads.FirstOrDefault(p => p.Source == EnrichmentSource.MusicBrainz);
-            return payload?.FetchedAt is null
-                   || payload.ErrorMessage is null
-                   || !payload.ErrorMessage.StartsWith("Recording details", StringComparison.Ordinal)
-                   || DateTimeOffset.UtcNow - payload.FetchedAt.Value >= TimeSpan.FromMinutes(2);
+            if (payload is null)
+            {
+                return true;
+            }
+
+            if (payload.Status is SourceFetchStatus.NotFound or SourceFetchStatus.Skipped)
+            {
+                return false;
+            }
+
+            if (payload.Status == SourceFetchStatus.Error
+                || (payload.ErrorMessage is not null
+                    && payload.ErrorMessage.StartsWith("Recording details", StringComparison.Ordinal)))
+            {
+                return payload.FetchedAt is null || now - payload.FetchedAt.Value >= TimeSpan.FromMinutes(2);
+            }
+
+            return true;
         });
         if (track is null)
         {
@@ -215,11 +232,23 @@ public sealed class MetadataEnrichmentService(
             progress.Log($"MB details: {track.Artist?.Name} – {track.Title}");
             return 1;
         }
+        catch (JsonApiException ex) when (ex.StatusCode is 404)
+        {
+            await PersistRecordingFailureAsync(
+                payload,
+                SourceFetchStatus.NotFound,
+                "MusicBrainz recording not found.",
+                cancellationToken);
+            progress.Log($"MB recording missing for {track.Artist.Name} – {track.Title}.");
+            return 1;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            payload.ErrorMessage = "Recording details: " + ex.Message;
-            payload.FetchedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
+            await PersistRecordingFailureAsync(
+                payload,
+                SourceFetchStatus.Error,
+                "Recording details: " + ex.Message,
+                cancellationToken);
             if (ex is JsonApiException api && HttpResponseHelpers.IsTransientStatus(api.StatusCode))
             {
                 progress.Log($"MB recording busy for {track.Artist.Name} – {track.Title}; will retry.");
@@ -231,6 +260,23 @@ public sealed class MetadataEnrichmentService(
 
             return 1;
         }
+    }
+
+    private async Task PersistRecordingFailureAsync(
+        TrackSourcePayload payload,
+        SourceFetchStatus status,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        payload.Status = status;
+        payload.ErrorMessage = error;
+        payload.FetchedAt = DateTimeOffset.UtcNow;
+        foreach (var entry in db.ChangeTracker.Entries<TrackTag>().Where(e => e.State == EntityState.Added).ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<int> FillMissingCoversAsync(CancellationToken cancellationToken)
