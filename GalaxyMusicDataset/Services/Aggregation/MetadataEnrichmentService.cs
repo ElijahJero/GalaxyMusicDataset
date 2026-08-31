@@ -186,17 +186,9 @@ public sealed class MetadataEnrichmentService(
 
             ApplyRecordingDetails(track, details);
 
-            if (track.Artist is not null
-                && !string.IsNullOrWhiteSpace(details.ArtistMbid)
-                && string.IsNullOrWhiteSpace(track.Artist.Mbid))
+            if (track.Artist is not null)
             {
-                var artistMbidTaken = await db.Artists.AnyAsync(
-                    a => a.Mbid == details.ArtistMbid && a.Id != track.Artist.Id,
-                    cancellationToken);
-                if (!artistMbidTaken)
-                {
-                    track.Artist.Mbid = details.ArtistMbid;
-                }
+                await catalog.TryCoalesceArtistMbidAsync(track.Artist, details.ArtistMbid, cancellationToken);
             }
 
             if (track.AlbumId is null && track.Artist is not null && !string.IsNullOrWhiteSpace(details.AlbumTitle))
@@ -228,7 +220,7 @@ public sealed class MetadataEnrichmentService(
                 .Concat(details.Tags.Select(t => (t.Name, Math.Max(1, t.Count))));
             await tags.ApplyTagsAsync(track.Id, EnrichmentSource.MusicBrainz, tagPairs, cancellationToken);
             track.UpdatedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
             progress.Log($"MB details: {track.Artist?.Name} – {track.Title}");
             return 1;
         }
@@ -276,6 +268,7 @@ public sealed class MetadataEnrichmentService(
             entry.State = EntityState.Detached;
         }
 
+        catalog.RevertUnsavedMbidAssignments();
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -350,7 +343,7 @@ public sealed class MetadataEnrichmentService(
             payload.FetchedAt = DateTimeOffset.UtcNow;
             payload.ErrorMessage = null;
             await ApplyLastFmAsync(track, info, cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
             progress.Log($"Last.fm info: {track.Artist.Name} – {track.Title}");
             return 1;
         }
@@ -359,6 +352,7 @@ public sealed class MetadataEnrichmentService(
             payload.Status = SourceFetchStatus.Error;
             payload.ErrorMessage = ex.Message;
             payload.FetchedAt = DateTimeOffset.UtcNow;
+            catalog.RevertUnsavedMbidAssignments();
             await db.SaveChangesAsync(cancellationToken);
             progress.Error($"Last.fm info failed: {ex.Message}");
             if (ex is JsonApiException api && api.StatusCode is 401 or 403)
@@ -370,16 +364,16 @@ public sealed class MetadataEnrichmentService(
         }
     }
 
-    private async Task ApplyLastFmAsync(Track track, LastFmTrackInfo info, CancellationToken cancellationToken)
+    internal async Task ApplyLastFmAsync(Track track, LastFmTrackInfo info, CancellationToken cancellationToken)
     {
         if (track.DurationMs is null && info.DurationMs is > 0)
         {
             track.DurationMs = info.DurationMs;
         }
 
-        track.Mbid = CatalogService.Coalesce(track.Mbid, info.Mbid);
+        await catalog.TryCoalesceTrackMbidAsync(track, info.Mbid, cancellationToken);
         track.Summary = CatalogService.Coalesce(track.Summary, StripWikiMarkup(info.WikiSummary));
-        track.Artist.Mbid = CatalogService.Coalesce(track.Artist.Mbid, info.ArtistMbid);
+        await catalog.TryCoalesceArtistMbidAsync(track.Artist, info.ArtistMbid, cancellationToken);
         track.Artist.LastFmUrl = CatalogService.Coalesce(track.Artist.LastFmUrl, info.ArtistUrl);
 
         if (track.AlbumId is null && !string.IsNullOrWhiteSpace(info.AlbumTitle))
@@ -481,7 +475,7 @@ public sealed class MetadataEnrichmentService(
             CatalogService.SetCoverIfEmpty(track.Album, cover);
             await tags.ApplyTagsAsync(track.Id, EnrichmentSource.Discogs, extraTags, cancellationToken);
             track.UpdatedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
             progress.Log($"Discogs: {track.Artist.Name} – {track.Title}");
             return 1;
         }
@@ -490,6 +484,7 @@ public sealed class MetadataEnrichmentService(
             payload.Status = SourceFetchStatus.Error;
             payload.ErrorMessage = ex.Message;
             payload.FetchedAt = DateTimeOffset.UtcNow;
+            catalog.RevertUnsavedMbidAssignments();
             await db.SaveChangesAsync(cancellationToken);
             progress.Error($"Discogs failed: {ex.Message}");
             if (ex is JsonApiException api && api.StatusCode is 401 or 403)
@@ -551,7 +546,7 @@ public sealed class MetadataEnrichmentService(
             payload.ErrorMessage = null;
 
             track.TheAudioDbTrackId = CatalogService.Coalesce(track.TheAudioDbTrackId, hit.Id);
-            track.Mbid = CatalogService.Coalesce(track.Mbid, hit.MusicBrainzId);
+            await catalog.TryCoalesceTrackMbidAsync(track, hit.MusicBrainzId, cancellationToken);
             track.Summary = CatalogService.Coalesce(track.Summary, hit.Description);
             track.MusicVideoUrl = CatalogService.Coalesce(track.MusicVideoUrl, hit.MusicVideoUrl);
             if (track.DurationMs is null && hit.DurationMs is > 0)
@@ -595,7 +590,7 @@ public sealed class MetadataEnrichmentService(
             }
 
             track.UpdatedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
             progress.Log($"TheAudioDB: {track.Artist.Name} – {track.Title}");
             return 1;
         }
@@ -604,6 +599,7 @@ public sealed class MetadataEnrichmentService(
             payload.Status = SourceFetchStatus.Error;
             payload.ErrorMessage = ex.Message;
             payload.FetchedAt = DateTimeOffset.UtcNow;
+            catalog.RevertUnsavedMbidAssignments();
             await db.SaveChangesAsync(cancellationToken);
             progress.Error($"TheAudioDB failed: {ex.Message}");
             if (ex is JsonApiException api && api.StatusCode is 401 or 403)

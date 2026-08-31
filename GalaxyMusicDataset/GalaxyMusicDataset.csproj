@@ -17,4 +17,7 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="GalaxyMusicDataset.Tests" />
+  </ItemGroup>
 </Project>

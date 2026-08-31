@@ -46,7 +46,6 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
             ?? throw new InvalidOperationException("Track not found.");
 
         var artist = await catalog.GetOrCreateArtistAsync(artistName, EmptyToNull(input.ArtistMbid), cancellationToken);
-        artist.Mbid = CatalogService.Coalesce(artist.Mbid, EmptyToNull(input.ArtistMbid));
         track.ArtistId = artist.Id;
         track.Artist = artist;
 
@@ -61,7 +60,6 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
             var album = await catalog.GetOrCreateAlbumAsync(artist, albumTitle, EmptyToNull(input.AlbumMbid), cancellationToken);
             if (album is not null)
             {
-                album.Mbid = CatalogService.Coalesce(album.Mbid, EmptyToNull(input.AlbumMbid));
                 CatalogService.SetCoverIfEmpty(album, EmptyToNull(input.CoverUrl));
                 if (!string.IsNullOrWhiteSpace(input.CoverUrl))
                 {

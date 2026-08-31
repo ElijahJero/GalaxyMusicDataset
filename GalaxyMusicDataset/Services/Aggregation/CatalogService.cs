@@ -11,19 +11,15 @@ public sealed class CatalogService(AppDbContext db)
         Artist? artist = null;
         if (!string.IsNullOrWhiteSpace(mbid))
         {
-            artist = await db.Artists.FirstOrDefaultAsync(a => a.Mbid == mbid, cancellationToken);
+            artist = db.Artists.Local.FirstOrDefault(a => a.Mbid == mbid)
+                     ?? await db.Artists.FirstOrDefaultAsync(a => a.Mbid == mbid, cancellationToken);
         }
 
         artist ??= db.Artists.Local.FirstOrDefault(a => a.Name == name)
                    ?? await db.Artists.FirstOrDefaultAsync(a => a.Name == name, cancellationToken);
         if (artist is not null)
         {
-            if (artist.Mbid is null && !string.IsNullOrWhiteSpace(mbid))
-            {
-                artist.Mbid = mbid;
-                artist.UpdatedAt = DateTimeOffset.UtcNow;
-            }
-
+            await TryCoalesceArtistMbidAsync(artist, mbid, cancellationToken);
             return artist;
         }
 
@@ -50,24 +46,21 @@ public sealed class CatalogService(AppDbContext db)
         Album? album = null;
         if (!string.IsNullOrWhiteSpace(mbid))
         {
-            album = await db.Albums.FirstOrDefaultAsync(a => a.Mbid == mbid, cancellationToken);
+            album = db.Albums.Local.FirstOrDefault(a => a.Mbid == mbid)
+                    ?? await db.Albums.FirstOrDefaultAsync(a => a.Mbid == mbid, cancellationToken);
         }
 
         if (album is null && !string.IsNullOrWhiteSpace(title))
         {
-            album = await db.Albums.FirstOrDefaultAsync(
-                a => a.ArtistId == artist.Id && a.Title == title,
-                cancellationToken);
+            album = db.Albums.Local.FirstOrDefault(a => a.ArtistId == artist.Id && a.Title == title)
+                    ?? await db.Albums.FirstOrDefaultAsync(
+                        a => a.ArtistId == artist.Id && a.Title == title,
+                        cancellationToken);
         }
 
         if (album is not null)
         {
-            if (album.Mbid is null && !string.IsNullOrWhiteSpace(mbid))
-            {
-                album.Mbid = mbid;
-                album.UpdatedAt = DateTimeOffset.UtcNow;
-            }
-
+            await TryCoalesceAlbumMbidAsync(album, mbid, cancellationToken);
             return album;
         }
 
@@ -139,24 +132,161 @@ public sealed class CatalogService(AppDbContext db)
         }
     }
 
-    public async Task SaveChangesIgnoringDuplicateAliasesAsync(CancellationToken cancellationToken)
+    public Task SaveChangesIgnoringDuplicateAliasesAsync(CancellationToken cancellationToken) =>
+        SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
+
+    public async Task SaveChangesIgnoringDuplicateCatalogKeysAsync(CancellationToken cancellationToken)
     {
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsArtistAliasUniqueViolation(ex))
-        {
-            DiscardUnsavedAliases();
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                return;
+            }
+            catch (DbUpdateException ex) when (attempt < 2 && IsDuplicateCatalogKey(ex))
+            {
+                if (IsUniqueViolation(ex, "ArtistAliases"))
+                {
+                    DiscardUnsavedAliases();
+                }
+
+                if (IsMbidUniqueViolation(ex))
+                {
+                    RevertUnsavedMbidAssignments();
+                }
+            }
         }
     }
 
-    private static bool IsArtistAliasUniqueViolation(DbUpdateException ex)
+    public async Task TryCoalesceArtistMbidAsync(Artist artist, string? mbid, CancellationToken cancellationToken)
+    {
+        var incoming = Coalesce(artist.Mbid, mbid);
+        if (incoming is null || string.Equals(artist.Mbid, incoming, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (await IsArtistMbidTakenAsync(artist.Id, incoming, cancellationToken))
+        {
+            return;
+        }
+
+        artist.Mbid = incoming;
+        artist.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public async Task TryCoalesceAlbumMbidAsync(Album album, string? mbid, CancellationToken cancellationToken)
+    {
+        var incoming = Coalesce(album.Mbid, mbid);
+        if (incoming is null || string.Equals(album.Mbid, incoming, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (await IsAlbumMbidTakenAsync(album.Id, incoming, cancellationToken))
+        {
+            return;
+        }
+
+        album.Mbid = incoming;
+        album.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public async Task TryCoalesceTrackMbidAsync(Track track, string? mbid, CancellationToken cancellationToken)
+    {
+        var incoming = Coalesce(track.Mbid, mbid);
+        if (incoming is null || string.Equals(track.Mbid, incoming, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (await IsTrackMbidTakenAsync(track.Id, incoming, cancellationToken))
+        {
+            return;
+        }
+
+        track.Mbid = incoming;
+    }
+
+    public void RevertUnsavedMbidAssignments()
+    {
+        foreach (var entry in db.ChangeTracker.Entries<Artist>().ToList())
+        {
+            RevertMbidProperty(entry);
+        }
+
+        foreach (var entry in db.ChangeTracker.Entries<Album>().ToList())
+        {
+            RevertMbidProperty(entry);
+        }
+
+        foreach (var entry in db.ChangeTracker.Entries<Track>().ToList())
+        {
+            RevertMbidProperty(entry);
+        }
+    }
+
+    private async Task<bool> IsArtistMbidTakenAsync(long exceptId, string mbid, CancellationToken cancellationToken)
+    {
+        if (db.Artists.Local.Any(a => a.Id != exceptId && a.Mbid == mbid))
+        {
+            return true;
+        }
+
+        return await db.Artists.AnyAsync(a => a.Id != exceptId && a.Mbid == mbid, cancellationToken);
+    }
+
+    private async Task<bool> IsAlbumMbidTakenAsync(long exceptId, string mbid, CancellationToken cancellationToken)
+    {
+        if (db.Albums.Local.Any(a => a.Id != exceptId && a.Mbid == mbid))
+        {
+            return true;
+        }
+
+        return await db.Albums.AnyAsync(a => a.Id != exceptId && a.Mbid == mbid, cancellationToken);
+    }
+
+    private async Task<bool> IsTrackMbidTakenAsync(long exceptId, string mbid, CancellationToken cancellationToken)
+    {
+        if (db.Tracks.Local.Any(t => t.Id != exceptId && t.Mbid == mbid))
+        {
+            return true;
+        }
+
+        return await db.Tracks.AnyAsync(t => t.Id != exceptId && t.Mbid == mbid, cancellationToken);
+    }
+
+    private static void RevertMbidProperty<T>(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<T> entry)
+        where T : class
+    {
+        if (entry.State is not (EntityState.Modified or EntityState.Added))
+        {
+            return;
+        }
+
+        var property = entry.Property("Mbid");
+        if (!property.IsModified)
+        {
+            return;
+        }
+
+        property.CurrentValue = entry.State == EntityState.Added ? null : property.OriginalValue;
+    }
+
+    private static bool IsDuplicateCatalogKey(DbUpdateException ex) =>
+        IsUniqueViolation(ex, "ArtistAliases") || IsMbidUniqueViolation(ex);
+
+    private static bool IsMbidUniqueViolation(DbUpdateException ex) =>
+        IsUniqueViolation(ex, "Artists.Mbid")
+        || IsUniqueViolation(ex, "Albums.Mbid")
+        || IsUniqueViolation(ex, "Tracks.Mbid");
+
+    private static bool IsUniqueViolation(DbUpdateException ex, string constraint)
     {
         for (Exception? inner = ex; inner is not null; inner = inner.InnerException)
         {
-            if (inner.Message.Contains("UNIQUE constraint failed: ArtistAliases", StringComparison.OrdinalIgnoreCase))
+            if (inner.Message.Contains($"UNIQUE constraint failed: {constraint}", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
