@@ -118,7 +118,7 @@ public sealed class MusicBrainzLookupService(
                     break;
             }
 
-            await db.SaveChangesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateAliasesAsync(cancellationToken);
             return 1;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -139,6 +139,9 @@ public sealed class MusicBrainzLookupService(
                 progress.Error($"MB lookup failed for {lookup.ArtistName} – {lookup.TrackName}: {ex.Message}");
             }
 
+            // Duplicate aliases left in the tracker would fail this save too
+            // and bubble into the enrichment loop, pausing progress.
+            catalog.DiscardUnsavedAliases();
             await db.SaveChangesAsync(cancellationToken);
             return 1;
         }
@@ -161,7 +164,7 @@ public sealed class MusicBrainzLookupService(
             lookup.TrackId = await ApplyMatchAsync(lookup.TrackId.Value, match, cancellationToken);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await catalog.SaveChangesIgnoringDuplicateAliasesAsync(cancellationToken);
     }
 
     public async Task MarkNotFoundAsync(long lookupId, CancellationToken cancellationToken)

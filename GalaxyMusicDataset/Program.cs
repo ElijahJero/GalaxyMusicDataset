@@ -2,16 +2,24 @@ using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services;
 using GalaxyMusicDataset.Services.Aggregation;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "App_Data"));
+var appData = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(appData);
 builder.Configuration.AddJsonFile(
-    Path.Combine(builder.Environment.ContentRootPath, "App_Data", "user-settings.json"),
+    Path.Combine(appData, "user-settings.json"),
     optional: true,
     reloadOnChange: true);
+
+var dataProtectionKeys = Path.Combine(appData, "keys");
+Directory.CreateDirectory(dataProtectionKeys);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeys))
+    .SetApplicationName("GalaxyMusicDataset");
 
 builder.Services.AddRazorPages();
 builder.Services.AddGalaxyAggregation(builder.Configuration, builder.Environment);
@@ -37,10 +45,22 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
-    app.UseHttpsRedirection();
+    // docker-compose exposes HTTP only. Skip redirect unless an HTTPS port is set
+    // (otherwise HttpsRedirectionMiddleware logs "Failed to determine the https port").
+    if (HttpsPortConfigured())
+    {
+        app.UseHttpsRedirection();
+    }
 }
 app.UseRouting();
 app.UseAuthorization();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 app.Run();
+
+static bool HttpsPortConfigured()
+{
+    return !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS"))
+           || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT"))
+           || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HTTPS_PORT"));
+}

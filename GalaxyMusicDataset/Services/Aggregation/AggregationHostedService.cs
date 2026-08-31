@@ -18,7 +18,7 @@ public sealed class AggregationHostedService(
         await using (var boot = scopes.CreateAsyncScope())
         {
             var db = boot.ServiceProvider.GetRequiredService<AppDbContext>();
-            var state = await db.SyncStates.FirstAsync(stoppingToken);
+            var state = await db.GetSyncStateAsync(stoppingToken);
             progress.SetEnrichmentPaused(state.EnrichmentPaused);
             var lookups = boot.ServiceProvider.GetRequiredService<MusicBrainzLookupService>();
             var requeued = await lookups.RequeueTransientFailuresAsync(stoppingToken);
@@ -60,7 +60,7 @@ public sealed class AggregationHostedService(
                 coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.SyncIncremental));
                 await using var scope = scopes.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var state = await db.SyncStates.FirstAsync(stoppingToken);
+                var state = await db.GetSyncStateAsync(stoppingToken);
                 if (!state.IsBackfillComplete)
                 {
                     coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.Backfill, 7));

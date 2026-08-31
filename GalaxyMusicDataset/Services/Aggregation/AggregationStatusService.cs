@@ -18,7 +18,7 @@ public sealed class AggregationStatusService(
 {
     public async Task<AggregationStatusDto> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var state = await db.SyncStates.AsNoTracking().FirstAsync(cancellationToken);
+        var state = await db.GetSyncStateAsync(cancellationToken, tracking: false);
         var scrobbles = await db.Scrobbles.CountAsync(cancellationToken);
         var tracks = await db.Tracks.CountAsync(cancellationToken);
         var artists = await db.Artists.CountAsync(cancellationToken);

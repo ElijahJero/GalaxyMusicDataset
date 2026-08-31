@@ -27,7 +27,7 @@ public sealed class AggregationCoordinator
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var progress = scope.ServiceProvider.GetRequiredService<AggregationProgress>();
-        var state = await db.SyncStates.FirstAsync(cancellationToken);
+        var state = await db.GetSyncStateAsync(cancellationToken);
         state.EnrichmentPaused = paused;
         await db.SaveChangesAsync(cancellationToken);
         progress.SetEnrichmentPaused(paused);

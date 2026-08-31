@@ -91,9 +91,24 @@ public sealed class CatalogService(AppDbContext db)
 
     public async Task AddAliasIfMissingAsync(Artist artist, string alias, string source, string? locale, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(alias) ||
+        alias = alias.Trim();
+        locale = string.IsNullOrWhiteSpace(locale) ? null : locale.Trim();
+        if (alias.Length == 0 ||
             string.Equals(alias, artist.Name, StringComparison.OrdinalIgnoreCase))
         {
+            return;
+        }
+
+        // MusicBrainz repeats the same alias name with different locales
+        // (e.g. "Ryūichi Sakamoto" for de/en/fr/nl). The unique index is
+        // (ArtistId, Name), so check the change tracker as well as the
+        // database — AnyAsync cannot see aliases queued in this SaveChanges.
+        var pending = db.ArtistAliases.Local.FirstOrDefault(a =>
+            a.ArtistId == artist.Id &&
+            string.Equals(a.Name, alias, StringComparison.OrdinalIgnoreCase));
+        if (pending is not null)
+        {
+            PreferLocale(pending, locale);
             return;
         }
 
@@ -112,6 +127,65 @@ public sealed class CatalogService(AppDbContext db)
             Source = source,
             Locale = locale
         });
+    }
+
+    public void DiscardUnsavedAliases()
+    {
+        foreach (var entry in db.ChangeTracker.Entries<ArtistAlias>()
+                     .Where(e => e.State == EntityState.Added)
+                     .ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
+    public async Task SaveChangesIgnoringDuplicateAliasesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsArtistAliasUniqueViolation(ex))
+        {
+            DiscardUnsavedAliases();
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static bool IsArtistAliasUniqueViolation(DbUpdateException ex)
+    {
+        for (Exception? inner = ex; inner is not null; inner = inner.InnerException)
+        {
+            if (inner.Message.Contains("UNIQUE constraint failed: ArtistAliases", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void PreferLocale(ArtistAlias existing, string? locale)
+    {
+        if (string.IsNullOrWhiteSpace(locale))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(existing.Locale) || LocaleRank(locale) > LocaleRank(existing.Locale))
+        {
+            existing.Locale = locale;
+        }
+    }
+
+    private static int LocaleRank(string? locale)
+    {
+        if (string.IsNullOrWhiteSpace(locale))
+        {
+            return 0;
+        }
+
+        return locale.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
     }
 
     public static string? Coalesce(string? current, string? incoming) =>
