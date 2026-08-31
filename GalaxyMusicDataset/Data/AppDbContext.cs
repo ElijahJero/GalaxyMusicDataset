@@ -18,6 +18,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AggregationJob> AggregationJobs => Set<AggregationJob>();
     public DbSet<ApiRequestLog> ApiRequestLogs => Set<ApiRequestLog>();
 
+    public Task<SyncState> GetSyncStateAsync(CancellationToken cancellationToken, bool tracking = true)
+    {
+        var query = tracking ? SyncStates.AsQueryable() : SyncStates.AsNoTracking();
+        return query.OrderBy(s => s.Id).FirstAsync(cancellationToken);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Artist>(e =>

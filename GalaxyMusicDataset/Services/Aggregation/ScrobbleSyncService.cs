@@ -255,7 +255,7 @@ public sealed class ScrobbleSyncService(
 
     private async Task<SyncState> GetStateAsync(CancellationToken cancellationToken)
     {
-        var state = await db.SyncStates.FirstAsync(cancellationToken);
+        var state = await db.GetSyncStateAsync(cancellationToken);
         return state;
     }
 
