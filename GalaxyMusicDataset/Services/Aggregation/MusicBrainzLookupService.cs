@@ -118,7 +118,7 @@ public sealed class MusicBrainzLookupService(
                     break;
             }
 
-            await catalog.SaveChangesIgnoringDuplicateAliasesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
             return 1;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -139,9 +139,10 @@ public sealed class MusicBrainzLookupService(
                 progress.Error($"MB lookup failed for {lookup.ArtistName} – {lookup.TrackName}: {ex.Message}");
             }
 
-            // Duplicate aliases left in the tracker would fail this save too
-            // and bubble into the enrichment loop, pausing progress.
+            // Duplicate aliases or a taken MBID left in the tracker would fail this
+            // save too and bubble into the enrichment loop, pausing progress.
             catalog.DiscardUnsavedAliases();
+            catalog.RevertUnsavedMbidAssignments();
             await db.SaveChangesAsync(cancellationToken);
             return 1;
         }
@@ -164,7 +165,7 @@ public sealed class MusicBrainzLookupService(
             lookup.TrackId = await ApplyMatchAsync(lookup.TrackId.Value, match, cancellationToken);
         }
 
-        await catalog.SaveChangesIgnoringDuplicateAliasesAsync(cancellationToken);
+        await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
     }
 
     public async Task MarkNotFoundAsync(long lookupId, CancellationToken cancellationToken)
@@ -305,17 +306,9 @@ public sealed class MusicBrainzLookupService(
             track.DurationMs = match.LengthMs;
         }
 
-        if (track.Artist is not null
-            && !string.IsNullOrWhiteSpace(match.ArtistMbid)
-            && string.IsNullOrWhiteSpace(track.Artist.Mbid))
+        if (track.Artist is not null)
         {
-            var artistMbidTaken = await db.Artists.AnyAsync(
-                a => a.Mbid == match.ArtistMbid && a.Id != track.Artist.Id,
-                cancellationToken);
-            if (!artistMbidTaken)
-            {
-                track.Artist.Mbid = match.ArtistMbid;
-            }
+            await catalog.TryCoalesceArtistMbidAsync(track.Artist, match.ArtistMbid, cancellationToken);
         }
 
         if (track.Artist is not null && !string.IsNullOrWhiteSpace(match.Album) && track.AlbumId is null)

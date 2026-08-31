@@ -104,6 +104,168 @@ public class CatalogServiceTests
         Assert.Equal(1, await harness.Db.ArtistAliases.CountAsync());
     }
 
+    [Fact]
+    public async Task SaveChangesIgnoringDuplicateAliases_still_keeps_a_new_artist_mbid()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var artist = await SeedArtistAsync(harness.Db, "Ryuichi Sakamoto");
+        var catalog = new CatalogService(harness.Db);
+
+        await catalog.AddAliasIfMissingAsync(artist, "R.S.", "MusicBrainz", null, CancellationToken.None);
+        await harness.Db.SaveChangesAsync();
+
+        artist.Mbid = "c053d1ea-d348-43a0-8bb2-658fd8c4810a";
+        harness.Db.ArtistAliases.Add(new ArtistAlias
+        {
+            ArtistId = artist.Id,
+            Name = "R.S.",
+            Source = "MusicBrainz",
+            Locale = "en"
+        });
+
+        await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(CancellationToken.None);
+
+        Assert.Equal(
+            "c053d1ea-d348-43a0-8bb2-658fd8c4810a",
+            await harness.Db.Artists.Select(a => a.Mbid).SingleAsync());
+        Assert.Equal(1, await harness.Db.ArtistAliases.CountAsync());
+    }
+
+    [Fact]
+    public async Task Duplicate_artist_mbid_throws_the_sqlite_unique_error_from_the_logs()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "c053d1ea-d348-43a0-8bb2-658fd8c4810a";
+        harness.Db.Artists.AddRange(
+            new Artist { Name = "Mori Calliope", Mbid = mbid, CreatedAt = now, UpdatedAt = now },
+            new Artist { Name = "Calliope Mori", CreatedAt = now, UpdatedAt = now });
+        await harness.Db.SaveChangesAsync();
+
+        var duplicate = await harness.Db.Artists.SingleAsync(a => a.Name == "Calliope Mori");
+        duplicate.Mbid = mbid;
+
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => harness.Db.SaveChangesAsync());
+        Assert.Contains(
+            "UNIQUE constraint failed: Artists.Mbid",
+            ex.GetBaseException().Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task TryCoalesceArtistMbid_skips_when_another_artist_already_has_it()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "c053d1ea-d348-43a0-8bb2-658fd8c4810a";
+        var keep = new Artist { Name = "Mori Calliope", Mbid = mbid, CreatedAt = now, UpdatedAt = now };
+        var other = new Artist { Name = "Calliope Mori", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.AddRange(keep, other);
+        await harness.Db.SaveChangesAsync();
+
+        var catalog = new CatalogService(harness.Db);
+        await catalog.TryCoalesceArtistMbidAsync(other, mbid, CancellationToken.None);
+        other.LastFmUrl = "https://www.last.fm/music/Calliope+Mori";
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Equal(mbid, await harness.Db.Artists.Where(a => a.Id == keep.Id).Select(a => a.Mbid).SingleAsync());
+        Assert.Null(await harness.Db.Artists.Where(a => a.Id == other.Id).Select(a => a.Mbid).SingleAsync());
+        Assert.Equal(
+            "https://www.last.fm/music/Calliope+Mori",
+            await harness.Db.Artists.Where(a => a.Id == other.Id).Select(a => a.LastFmUrl).SingleAsync());
+    }
+
+    [Fact]
+    public async Task GetOrCreateArtist_does_not_copy_a_taken_mbid_onto_a_name_match()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "c053d1ea-d348-43a0-8bb2-658fd8c4810a";
+        harness.Db.Artists.AddRange(
+            new Artist { Name = "Mori Calliope", Mbid = mbid, CreatedAt = now, UpdatedAt = now },
+            new Artist { Name = "Calliope Mori", CreatedAt = now, UpdatedAt = now });
+        await harness.Db.SaveChangesAsync();
+
+        var catalog = new CatalogService(harness.Db);
+        var byName = await catalog.GetOrCreateArtistAsync("Calliope Mori", mbid, CancellationToken.None);
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Equal("Mori Calliope", byName.Name);
+        Assert.Equal(mbid, byName.Mbid);
+        Assert.Null(await harness.Db.Artists.Where(a => a.Name == "Calliope Mori").Select(a => a.Mbid).SingleAsync());
+    }
+
+    [Fact]
+    public async Task SaveChangesIgnoringDuplicateCatalogKeys_reverts_artist_mbid_and_keeps_other_fields()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "c053d1ea-d348-43a0-8bb2-658fd8c4810a";
+        var keep = new Artist { Name = "Mori Calliope", Mbid = mbid, CreatedAt = now, UpdatedAt = now };
+        var other = new Artist { Name = "Calliope Mori", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.AddRange(keep, other);
+        await harness.Db.SaveChangesAsync();
+
+        other.Mbid = mbid;
+        other.LastFmUrl = "https://www.last.fm/music/Calliope+Mori";
+        var catalog = new CatalogService(harness.Db);
+        await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(CancellationToken.None);
+
+        Assert.Equal(mbid, await harness.Db.Artists.Where(a => a.Id == keep.Id).Select(a => a.Mbid).SingleAsync());
+        Assert.Null(await harness.Db.Artists.Where(a => a.Id == other.Id).Select(a => a.Mbid).SingleAsync());
+        Assert.Equal(
+            "https://www.last.fm/music/Calliope+Mori",
+            await harness.Db.Artists.Where(a => a.Id == other.Id).Select(a => a.LastFmUrl).SingleAsync());
+    }
+
+    [Fact]
+    public async Task RevertUnsavedMbidAssignments_lets_the_enrichment_error_row_save()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "c053d1ea-d348-43a0-8bb2-658fd8c4810a";
+        var keep = new Artist { Name = "Mori Calliope", Mbid = mbid, CreatedAt = now, UpdatedAt = now };
+        var other = new Artist { Name = "Calliope Mori", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.AddRange(keep, other);
+        await harness.Db.SaveChangesAsync();
+
+        var track = new Track
+        {
+            ArtistId = other.Id,
+            Title = "Lose-Lose Days",
+            Fingerprint = "fp-error-save",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        harness.Db.Tracks.Add(track);
+        await harness.Db.SaveChangesAsync();
+
+        var payload = new TrackSourcePayload
+        {
+            TrackId = track.Id,
+            Source = EnrichmentSource.LastFm,
+            Status = SourceFetchStatus.NotStarted
+        };
+        harness.Db.TrackSourcePayloads.Add(payload);
+        await harness.Db.SaveChangesAsync();
+
+        other.Mbid = mbid;
+        payload.Status = SourceFetchStatus.Error;
+        payload.ErrorMessage = "UNIQUE constraint failed: Artists.Mbid";
+        payload.FetchedAt = DateTimeOffset.UtcNow;
+
+        var catalog = new CatalogService(harness.Db);
+        await Assert.ThrowsAsync<DbUpdateException>(() => harness.Db.SaveChangesAsync());
+
+        catalog.RevertUnsavedMbidAssignments();
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Null(await harness.Db.Artists.Where(a => a.Id == other.Id).Select(a => a.Mbid).SingleAsync());
+        Assert.Equal(
+            SourceFetchStatus.Error,
+            await harness.Db.TrackSourcePayloads.Select(p => p.Status).SingleAsync());
+    }
+
     private static async Task<Artist> SeedArtistAsync(AppDbContext db, string name)
     {
         var now = DateTimeOffset.UtcNow;
