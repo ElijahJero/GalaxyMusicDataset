@@ -164,4 +164,59 @@ public class TrackEditTests
         Assert.Equal(LookupStatus.ManualMatched, lookup.Status);
         Assert.Equal(track.Mbid, lookup.MatchedMbid);
     }
+
+    [Fact]
+    public async Task Edit_does_not_copy_a_fingerprint_onto_an_existing_lookup()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var catalog = new CatalogService(harness.Db);
+        var artist = await catalog.GetOrCreateArtistAsync("A", null, CancellationToken.None);
+        var now = DateTimeOffset.UtcNow;
+        var track = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Old",
+            Fingerprint = TrackFingerprint.Compute("A", "Old"),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        harness.Db.Tracks.Add(track);
+        await harness.Db.SaveChangesAsync();
+
+        var destFingerprint = TrackFingerprint.Compute("A", "New");
+        harness.Db.TrackLookups.AddRange(
+            new TrackLookup
+            {
+                Fingerprint = track.Fingerprint,
+                TrackId = track.Id,
+                ArtistName = "A",
+                TrackName = "Old",
+                Status = LookupStatus.Pending,
+                CreatedAt = now
+            },
+            new TrackLookup
+            {
+                Fingerprint = destFingerprint,
+                TrackId = null,
+                ArtistName = "A",
+                TrackName = "New",
+                Status = LookupStatus.NotFound,
+                CreatedAt = now
+            });
+        await harness.Db.SaveChangesAsync();
+
+        var editor = new TrackEditService(harness.Db, catalog);
+        await editor.SaveAsync(new TrackEditInput
+        {
+            Id = track.Id,
+            ArtistName = "A",
+            Title = "New"
+        }, CancellationToken.None);
+
+        Assert.Equal(1, await harness.Db.TrackLookups.CountAsync());
+        var lookup = await harness.Db.TrackLookups.SingleAsync();
+        Assert.Equal(destFingerprint, lookup.Fingerprint);
+        Assert.Equal(track.Id, lookup.TrackId);
+        Assert.Equal("New", lookup.TrackName);
+    }
 }

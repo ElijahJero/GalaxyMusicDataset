@@ -66,7 +66,7 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
 
         if (result.Inserted > 0)
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
         }
 
         return result;
@@ -83,7 +83,8 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
         Track? track = null;
         if (!string.IsNullOrWhiteSpace(mbid))
         {
-            track = await db.Tracks.FirstOrDefaultAsync(t => t.Mbid == mbid, cancellationToken);
+            track = db.Tracks.Local.FirstOrDefault(t => t.Mbid == mbid)
+                    ?? await db.Tracks.FirstOrDefaultAsync(t => t.Mbid == mbid, cancellationToken);
         }
 
         track ??= db.Tracks.Local.FirstOrDefault(t => t.Fingerprint == fingerprint)
@@ -93,8 +94,18 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
             var dirty = false;
             if (track.Mbid is null && !string.IsNullOrWhiteSpace(mbid))
             {
-                track.Mbid = mbid;
-                dirty = true;
+                var mbidOwner = db.Tracks.Local.FirstOrDefault(t => t.Id != track.Id && t.Mbid == mbid)
+                                ?? await db.Tracks.FirstOrDefaultAsync(
+                                    t => t.Id != track.Id && t.Mbid == mbid,
+                                    cancellationToken);
+                if (mbidOwner is not null)
+                {
+                    await catalog.MergeTracksAsync(mbidOwner, track, cancellationToken);
+                    return mbidOwner;
+                }
+
+                await catalog.TryCoalesceTrackMbidAsync(track, mbid, cancellationToken);
+                dirty = !string.IsNullOrWhiteSpace(track.Mbid);
             }
 
             if (track.AlbumId is null && album is not null)
@@ -106,7 +117,7 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
             if (dirty)
             {
                 track.UpdatedAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(cancellationToken);
+                await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
             }
 
             return track;
@@ -123,8 +134,23 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
             UpdatedAt = DateTimeOffset.UtcNow
         };
         db.Tracks.Add(track);
-        await db.SaveChangesAsync(cancellationToken);
-        return track;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return track;
+        }
+        catch (DbUpdateException ex) when (!string.IsNullOrWhiteSpace(mbid) && CatalogService.IsSqliteUniqueConstraint(ex, "Tracks.Mbid"))
+        {
+            db.Entry(track).State = EntityState.Detached;
+            return db.Tracks.Local.FirstOrDefault(t => t.Mbid == mbid)
+                   ?? await db.Tracks.FirstAsync(t => t.Mbid == mbid, cancellationToken);
+        }
+        catch (DbUpdateException ex) when (CatalogService.IsSqliteUniqueConstraint(ex, "Tracks.Fingerprint"))
+        {
+            db.Entry(track).State = EntityState.Detached;
+            return db.Tracks.Local.FirstOrDefault(t => t.Fingerprint == fingerprint)
+                   ?? await db.Tracks.FirstAsync(t => t.Fingerprint == fingerprint, cancellationToken);
+        }
     }
 
     private async Task EnsureLookupAsync(

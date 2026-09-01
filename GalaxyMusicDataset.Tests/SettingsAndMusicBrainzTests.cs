@@ -152,6 +152,47 @@ public class MusicBrainzBackoffTests
             LookupStatus.NotFound,
             await harness.Db.TrackLookups.Where(l => l.Fingerprint == "missing").Select(l => l.Status).SingleAsync());
     }
+
+    [Fact]
+    public async Task PickNext_skips_recent_cooldown_rows_so_a_later_due_lookup_runs()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        for (var i = 0; i < 60; i++)
+        {
+            harness.Db.TrackLookups.Add(new TrackLookup
+            {
+                Fingerprint = $"busy-{i}",
+                ArtistName = "A",
+                TrackName = $"Busy {i}",
+                Status = LookupStatus.Pending,
+                ErrorMessage = "MusicBrainz busy (HTTP 503); will retry after cooldown.",
+                LastAttemptUtc = now,
+                CreatedAt = now
+            });
+        }
+
+        harness.Db.TrackLookups.Add(new TrackLookup
+        {
+            Fingerprint = "due",
+            ArtistName = "B",
+            TrackName = "Ready",
+            Status = LookupStatus.Pending,
+            CreatedAt = now
+        });
+        await harness.Db.SaveChangesAsync();
+
+        var service = new MusicBrainzLookupService(
+            harness.Db,
+            new CatalogService(harness.Db),
+            null!,
+            new AggregationProgress(),
+            new StaticMonitor<AggregationOptions>(new AggregationOptions()));
+
+        var next = await service.PickNextLookupAsync(CancellationToken.None);
+        Assert.NotNull(next);
+        Assert.Equal("due", next!.Fingerprint);
+    }
 }
 
 file sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
