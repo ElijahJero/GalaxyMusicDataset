@@ -85,6 +85,23 @@ public class TagServiceTests
         Assert.Equal(40, links.Single(l => l.Tag.NormalizedName == "anison").Weight);
     }
 
+    [Fact]
+    public async Task ApplyTags_reuses_an_existing_normalized_name()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var track = await SeedTrackAsync(harness.Db);
+        harness.Db.Tags.Add(new Tag { Name = "J-Pop", NormalizedName = "j-pop" });
+        await harness.Db.SaveChangesAsync();
+
+        var tags = new TagService(harness.Db);
+        await tags.ApplyTagsAsync(track.Id, EnrichmentSource.LastFm, [("j-pop", 12), ("J-Pop", 4)], CancellationToken.None);
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Equal(1, await harness.Db.Tags.CountAsync());
+        Assert.Equal(1, await harness.Db.TrackTags.CountAsync());
+        Assert.Equal(12, await harness.Db.TrackTags.Select(t => t.Weight).SingleAsync());
+    }
+
     private static async Task<Track> SeedTrackAsync(AppDbContext db)
     {
         var now = DateTimeOffset.UtcNow;

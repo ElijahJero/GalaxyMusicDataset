@@ -22,7 +22,16 @@ public sealed class TagService(AppDbContext db)
             {
                 tag = new Tag { Name = name, NormalizedName = normalized };
                 db.Tags.Add(tag);
-                await db.SaveChangesAsync(cancellationToken);
+                try
+                {
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (CatalogService.IsSqliteUniqueConstraint(ex, "Tags.NormalizedName"))
+                {
+                    db.Entry(tag).State = EntityState.Detached;
+                    tag = db.Tags.Local.FirstOrDefault(t => t.NormalizedName == normalized)
+                          ?? await db.Tags.FirstAsync(t => t.NormalizedName == normalized, cancellationToken);
+                }
             }
 
             var link = db.TrackTags.Local.FirstOrDefault(t =>
