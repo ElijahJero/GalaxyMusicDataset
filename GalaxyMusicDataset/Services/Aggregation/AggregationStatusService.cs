@@ -26,6 +26,7 @@ public sealed class AggregationStatusService(
         var tags = await db.Tags.CountAsync(cancellationToken);
         var withMbid = await db.Tracks.CountAsync(t => t.Mbid != null, cancellationToken);
         var withDuration = await db.Tracks.CountAsync(t => t.DurationMs != null, cancellationToken);
+        var withTags = await db.Tracks.CountAsync(t => t.Tags.Any(), cancellationToken);
 
         var lookups = await db.TrackLookups
             .AsNoTracking()
@@ -65,6 +66,10 @@ public sealed class AggregationStatusService(
 
         var coverage = tracks == 0 ? 0 : Math.Round(100.0 * withMbid / tracks, 1);
         var playcountGap = state.LastFmPlaycount is null ? null : state.LastFmPlaycount - scrobbles;
+        var payloadCounts = payloads
+            .Select(p => new SourcePayloadCount(p.Source.ToString(), p.Status.ToString(), p.Count))
+            .ToList();
+        var agg = aggregation.CurrentValue;
 
         return new AggregationStatusDto
         {
@@ -72,13 +77,16 @@ public sealed class AggregationStatusService(
             LastFmUsername = lastFm.CurrentValue.Username,
             DiscogsConfigured = discogs.CurrentValue.IsConfigured,
             TheAudioDbConfigured = audioDb.CurrentValue.IsConfigured,
-            EnableMusicBrainz = aggregation.CurrentValue.EnableMusicBrainz,
+            EnableMusicBrainz = agg.EnableMusicBrainz,
             MusicBrainzBaseUrl = musicBrainz.CurrentValue.ResolvedBaseUrl,
             MusicBrainzUsesPublicApi = musicBrainz.CurrentValue.UsesPublicWebService,
             MusicBrainzIntervalMs = (int)musicBrainz.CurrentValue.WebServiceMinInterval.TotalMilliseconds,
-            EnableLastFmTrackInfo = aggregation.CurrentValue.EnableLastFmTrackInfo,
-            EnableDiscogs = aggregation.CurrentValue.EnableDiscogs,
-            EnableTheAudioDb = aggregation.CurrentValue.EnableTheAudioDb,
+            EnableLastFmTrackInfo = agg.EnableLastFmTrackInfo,
+            EnableDiscogs = agg.EnableDiscogs,
+            EnableTheAudioDb = agg.EnableTheAudioDb,
+            EnableVocaDb = agg.EnableVocaDb,
+            EnableUtaiteDb = agg.EnableUtaiteDb,
+            EnableTouhouDb = agg.EnableTouhouDb,
             ScrobbleCount = scrobbles,
             TrackCount = tracks,
             ArtistCount = artists,
@@ -86,7 +94,18 @@ public sealed class AggregationStatusService(
             TagCount = tags,
             TracksWithMbid = withMbid,
             TracksWithDuration = withDuration,
+            TracksWithTags = withTags,
             MbidCoveragePercent = coverage,
+            Coverage = CatalogCoverage.Build(
+                tracks,
+                withMbid,
+                withDuration,
+                withTags,
+                payloadCounts,
+                agg,
+                lastFm.CurrentValue.IsConfigured,
+                discogs.CurrentValue.IsConfigured,
+                audioDb.CurrentValue.IsConfigured),
             LastFmPlaycount = state.LastFmPlaycount,
             PlaycountGap = playcountGap,
             NewestScrobble = newest,
@@ -101,9 +120,7 @@ public sealed class AggregationStatusService(
             IncrementalRuns = state.IncrementalRuns,
             EnrichmentPaused = state.EnrichmentPaused,
             Lookups = lookups.ToDictionary(x => x.Key.ToString(), x => x.Count),
-            SourcePayloads = payloads
-                .Select(p => new SourcePayloadCount(p.Source.ToString(), p.Status.ToString(), p.Count))
-                .ToList(),
+            SourcePayloads = payloadCounts,
             Jobs = jobs,
             RecentApiCalls = recentApi,
             LiveApiStats = recorder.Snapshot().Values.ToList(),
@@ -125,6 +142,9 @@ public sealed class AggregationStatusDto
     public bool EnableLastFmTrackInfo { get; set; }
     public bool EnableDiscogs { get; set; }
     public bool EnableTheAudioDb { get; set; }
+    public bool EnableVocaDb { get; set; }
+    public bool EnableUtaiteDb { get; set; }
+    public bool EnableTouhouDb { get; set; }
     public int ScrobbleCount { get; set; }
     public int TrackCount { get; set; }
     public int ArtistCount { get; set; }
@@ -132,7 +152,9 @@ public sealed class AggregationStatusDto
     public int TagCount { get; set; }
     public int TracksWithMbid { get; set; }
     public int TracksWithDuration { get; set; }
+    public int TracksWithTags { get; set; }
     public double MbidCoveragePercent { get; set; }
+    public IReadOnlyList<SourceCoverage> Coverage { get; set; } = [];
     public long? LastFmPlaycount { get; set; }
     public long? PlaycountGap { get; set; }
     public DateTimeOffset? NewestScrobble { get; set; }

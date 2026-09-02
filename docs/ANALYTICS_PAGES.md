@@ -9,11 +9,11 @@ Normalized tables (not one row of duplicated metadata per play):
 | Table | Role |
 | --- | --- |
 | `Scrobbles` | One row per listen (`UnixTimestamp` unique, `PlayedAt`, original Last.fm names) |
-| `Tracks` | Canonical song (`Fingerprint` = SHA-256 of normalized artist+title, optional `Mbid`, `DurationMs`) |
+| `Tracks` | Canonical song (`Fingerprint` = SHA-256 of normalized artist+title, optional `Mbid`, VocaDB-family song ids, `DurationMs`) |
 | `Artists` / `ArtistAliases` | Names plus MusicBrainz aliases (JP / romaji / English) |
 | `Albums` | Optional album attached when known |
 | `TrackLookups` | Identity-resolution cache so the same song is not searched four times |
-| `Tags` / `TrackTags` | Crowd tags with `Source` (`LastFm`, `MusicBrainz`, `Discogs`, `TheAudioDb`) |
+| `Tags` / `TrackTags` | Crowd tags with `Source` (`LastFm`, `MusicBrainz`, `Discogs`, `TheAudioDb`, `VocaDb`, `UtaiteDb`, `TouhouDb`) |
 | `TrackSourcePayloads` | Raw JSON from each API |
 
 ## Shared UI chrome
@@ -65,7 +65,7 @@ Tabs: Artists, Tracks, Albums. Same time range.
 
 Play-weighted rollup of `TrackTags` for the selected range. Duplicate names from multiple sources count a track’s plays once.
 
-- **Top genres** — MusicBrainz genres (weight ≥ 80), Discogs genres/styles, TheAudioDB genre/style
+- **Top genres** — MusicBrainz genres (weight ≥ 80), Discogs genres/styles, TheAudioDB genre/style, VocaDB-family genre tags (weight ≥ 80)
 - **Crowd tags** — all sources including Last.fm
 - Click a name for tracks and artists that carry it
 - Overview and Wrapped also surface the top genres

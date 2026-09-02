@@ -1,5 +1,7 @@
 @page "{id:long}"
 @model TracksModel
+@using GalaxyMusicDataset.Data
+@using GalaxyMusicDataset.Services.VocaDb
 @{
     ViewData["Title"] = Model.Detail.Title;
     var t = Model.Detail;
@@ -55,6 +57,21 @@
                     <text>—</text>
                 }
             </dd>
+            @if (!string.IsNullOrEmpty(t.VocaDbSongId))
+            {
+                <dt class="col-sm-3">VocaDB</dt>
+                <dd class="col-sm-9"><a href="@VocaDbFamily.SongPageUrl(EnrichmentSource.VocaDb, t.VocaDbSongId)" target="_blank" rel="noopener">@t.VocaDbSongId</a></dd>
+            }
+            @if (!string.IsNullOrEmpty(t.UtaiteDbSongId))
+            {
+                <dt class="col-sm-3">UtaiteDB</dt>
+                <dd class="col-sm-9"><a href="@VocaDbFamily.SongPageUrl(EnrichmentSource.UtaiteDb, t.UtaiteDbSongId)" target="_blank" rel="noopener">@t.UtaiteDbSongId</a></dd>
+            }
+            @if (!string.IsNullOrEmpty(t.TouhouDbSongId))
+            {
+                <dt class="col-sm-3">TouhouDB</dt>
+                <dd class="col-sm-9"><a href="@VocaDbFamily.SongPageUrl(EnrichmentSource.TouhouDb, t.TouhouDbSongId)" target="_blank" rel="noopener">@t.TouhouDbSongId</a></dd>
+            }
             <dt class="col-sm-3">Fingerprint</dt>
             <dd class="col-sm-9"><code>@t.Fingerprint</code></dd>
             <dt class="col-sm-3">Lookup</dt>

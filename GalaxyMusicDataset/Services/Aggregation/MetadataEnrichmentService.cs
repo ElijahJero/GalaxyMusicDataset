@@ -6,7 +6,9 @@ using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
+using GalaxyMusicDataset.Services.Normalization;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -36,6 +38,33 @@ public sealed class MetadataEnrichmentService(
         if (settings.EnableLastFmTrackInfo && clients.TryCreateLastFm() is not null)
         {
             var n = await EnrichLastFmAsync(cancellationToken);
+            if (n > 0)
+            {
+                return n;
+            }
+        }
+
+        if (settings.EnableVocaDb)
+        {
+            var n = await EnrichVocaDbFamilyAsync(EnrichmentSource.VocaDb, cancellationToken);
+            if (n > 0)
+            {
+                return n;
+            }
+        }
+
+        if (settings.EnableUtaiteDb)
+        {
+            var n = await EnrichVocaDbFamilyAsync(EnrichmentSource.UtaiteDb, cancellationToken);
+            if (n > 0)
+            {
+                return n;
+            }
+        }
+
+        if (settings.EnableTouhouDb)
+        {
+            var n = await EnrichVocaDbFamilyAsync(EnrichmentSource.TouhouDb, cancellationToken);
             if (n > 0)
             {
                 return n;
@@ -390,6 +419,134 @@ public sealed class MetadataEnrichmentService(
             EnrichmentSource.LastFm,
             info.Tags.Select(t => (t.Name, t.Weight)),
             cancellationToken);
+    }
+
+    private async Task<int> EnrichVocaDbFamilyAsync(EnrichmentSource source, CancellationToken cancellationToken)
+    {
+        var track = await NextTrackNeedingAsync(source, cancellationToken);
+        if (track is null)
+        {
+            return 0;
+        }
+
+        var client = clients.TryCreateVocaDbFamily(source);
+        if (client is null)
+        {
+            await SkipAsync(track.Id, source, $"{VocaDbFamily.DisplayName(source)} is not configured.", cancellationToken);
+            return 1;
+        }
+
+        var label = VocaDbFamily.DisplayName(source);
+        progress.SetPhase($"{label} search", $"{track.Artist.Name} – {track.Title}");
+        var payload = await EnsurePayloadAsync(track.Id, source, cancellationToken);
+        try
+        {
+            var result = await client.SearchSongsAsync(track.Artist.Name, track.Title, cancellationToken);
+            var hit = VocaDbSongMatcher.PickBest(track.Artist.Name, track.Title, result.Items);
+            if (hit is null)
+            {
+                payload.Status = SourceFetchStatus.NotFound;
+                payload.PayloadJson = result.RawJson;
+                payload.FetchedAt = DateTimeOffset.UtcNow;
+                payload.ErrorMessage = result.Items.Count == 0
+                    ? $"{label} returned no songs."
+                    : "No VocaDB-family match passed the auto-match threshold.";
+                await db.SaveChangesAsync(cancellationToken);
+                return 1;
+            }
+
+            payload.Status = SourceFetchStatus.Success;
+            payload.ExternalId = hit.Id;
+            payload.PayloadJson = hit.RawJson;
+            payload.FetchedAt = DateTimeOffset.UtcNow;
+            payload.ErrorMessage = null;
+            await ApplyVocaDbAsync(track, source, hit, cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
+            progress.Log($"{label}: {track.Artist.Name} – {track.Title}");
+            return 1;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            payload.Status = SourceFetchStatus.Error;
+            payload.ErrorMessage = ex.Message;
+            payload.FetchedAt = DateTimeOffset.UtcNow;
+            catalog.RevertUnsavedMbidAssignments();
+            catalog.DiscardUnsavedAliases();
+            await db.SaveChangesAsync(cancellationToken);
+            progress.Error($"{label} failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    internal async Task ApplyVocaDbAsync(
+        Track track,
+        EnrichmentSource source,
+        VocaDbSongHit hit,
+        CancellationToken cancellationToken)
+    {
+        VocaDbFamily.SetSongId(track, source, hit.Id);
+        await catalog.TryCoalesceTrackMbidAsync(track, hit.MusicBrainzId, cancellationToken);
+        track.MusicVideoUrl = CatalogService.Coalesce(track.MusicVideoUrl, hit.MusicVideoUrl);
+        if (track.DurationMs is null && hit.LengthSeconds is > 0)
+        {
+            track.DurationMs = hit.LengthSeconds.Value * 1000;
+        }
+
+        if (track.AlbumId is null && !string.IsNullOrWhiteSpace(hit.AlbumTitle) && track.Artist is not null)
+        {
+            var album = await catalog.GetOrCreateAlbumAsync(track.Artist, hit.AlbumTitle, null, cancellationToken);
+            track.AlbumId = album?.Id;
+            track.Album = album;
+        }
+
+        if (track.Album is not null && track.Album.ReleaseYear is null && hit.ReleaseYear is > 0)
+        {
+            track.Album.ReleaseYear = hit.ReleaseYear;
+        }
+
+        CatalogService.SetCoverIfEmpty(track.Album, hit.ThumbUrl);
+
+        if (track.Artist is not null)
+        {
+            var queryArtist = TextNormalizer.Normalize(track.Artist.Name);
+            VocaDbArtistCredit? matched = null;
+            var best = 0d;
+            foreach (var credit in hit.Artists)
+            {
+                var score = 0d;
+                foreach (var name in credit.AllNames)
+                {
+                    score = Math.Max(score, StringSimilarity.Ratio(queryArtist, TextNormalizer.Normalize(name)));
+                }
+
+                if (score > best)
+                {
+                    best = score;
+                    matched = credit;
+                }
+            }
+
+            if (matched is not null && best >= VocaDbSongMatcher.VocalistArtistThreshold)
+            {
+                foreach (var alias in matched.AllNames)
+                {
+                    await catalog.AddAliasIfMissingAsync(
+                        track.Artist,
+                        alias,
+                        VocaDbFamily.AliasSource(source),
+                        null,
+                        cancellationToken);
+                }
+            }
+        }
+
+        var extraTags = VocaDbClient.TagPairs(hit);
+        if (extraTags.Count > 0)
+        {
+            await tags.ApplyTagsAsync(track.Id, source, extraTags, cancellationToken);
+        }
+
+        track.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     private async Task<int> EnrichDiscogsAsync(CancellationToken cancellationToken)

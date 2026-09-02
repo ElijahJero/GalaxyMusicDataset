@@ -21,6 +21,9 @@ public sealed class TrackEditInput
     public string? CoverUrl { get; set; }
     public string? DiscogsReleaseId { get; set; }
     public string? TheAudioDbTrackId { get; set; }
+    public string? VocaDbSongId { get; set; }
+    public string? UtaiteDbSongId { get; set; }
+    public string? TouhouDbSongId { get; set; }
     public bool ResetEnrichment { get; set; }
     public bool LookupFromMbid { get; set; }
 }
@@ -79,6 +82,9 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
         track.MusicVideoUrl = EmptyToNull(input.MusicVideoUrl);
         track.DiscogsReleaseId = EmptyToNull(input.DiscogsReleaseId);
         track.TheAudioDbTrackId = EmptyToNull(input.TheAudioDbTrackId);
+        track.VocaDbSongId = EmptyToNull(input.VocaDbSongId);
+        track.UtaiteDbSongId = EmptyToNull(input.UtaiteDbSongId);
+        track.TouhouDbSongId = EmptyToNull(input.TouhouDbSongId);
         track.DurationMs = input.DurationSeconds is > 0
             ? (int)Math.Round(input.DurationSeconds.Value * 1000)
             : null;

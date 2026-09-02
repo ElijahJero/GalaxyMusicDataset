@@ -391,6 +391,9 @@ public sealed class AnalyticsQueries(AppDbContext db)
             track.Album?.Title,
             track.Album?.CoverUrl,
             track.Mbid,
+            track.VocaDbSongId,
+            track.UtaiteDbSongId,
+            track.TouhouDbSongId,
             track.DurationMs,
             track.Fingerprint,
             lookup?.Status.ToString(),
@@ -696,6 +699,7 @@ public sealed class AnalyticsQueries(AppDbContext db)
         EnrichmentSource.Discogs => true,
         EnrichmentSource.TheAudioDb => weight >= 40,
         EnrichmentSource.MusicBrainz => weight >= 80,
+        EnrichmentSource.VocaDb or EnrichmentSource.UtaiteDb or EnrichmentSource.TouhouDb => weight >= 80,
         _ => false
     };
 

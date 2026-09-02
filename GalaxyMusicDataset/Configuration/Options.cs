@@ -165,6 +165,39 @@ public sealed class TheAudioDbOptions
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 }
 
+public abstract class VocaDbSiteOptions
+{
+    public const int DefaultMinIntervalMs = 500;
+    public const string DefaultUserAgent = "GalaxyMusicDataset/0.1 (https://github.com/elijahjero/galaxymusicdataset)";
+
+    public string? BaseUrl { get; set; }
+    public string UserAgent { get; set; } = DefaultUserAgent;
+
+    public abstract string DefaultBaseUrl { get; }
+
+    public string ResolvedBaseUrl => MusicBrainzEndpoints.NormalizeBaseUrl(BaseUrl, DefaultBaseUrl);
+
+    public TimeSpan MinInterval => TimeSpan.FromMilliseconds(DefaultMinIntervalMs);
+}
+
+public sealed class VocaDbOptions : VocaDbSiteOptions
+{
+    public const string SectionName = "VocaDb";
+    public override string DefaultBaseUrl => "https://vocadb.net";
+}
+
+public sealed class UtaiteDbOptions : VocaDbSiteOptions
+{
+    public const string SectionName = "UtaiteDb";
+    public override string DefaultBaseUrl => "https://utaitedb.net";
+}
+
+public sealed class TouhouDbOptions : VocaDbSiteOptions
+{
+    public const string SectionName = "TouhouDb";
+    public override string DefaultBaseUrl => "https://touhoudb.com";
+}
+
 public sealed class AggregationOptions
 {
     public const string SectionName = "Aggregation";
@@ -177,6 +210,9 @@ public sealed class AggregationOptions
     public bool EnableLastFmTrackInfo { get; set; } = true;
     public bool EnableDiscogs { get; set; } = true;
     public bool EnableTheAudioDb { get; set; } = true;
+    public bool EnableVocaDb { get; set; } = true;
+    public bool EnableUtaiteDb { get; set; } = true;
+    public bool EnableTouhouDb { get; set; } = true;
     public double AutoMatchThreshold { get; set; } = 0.92;
     public double ReviewThreshold { get; set; } = 0.55;
     public int ApiLogRetention { get; set; } = 500;

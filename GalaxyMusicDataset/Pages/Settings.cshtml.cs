@@ -67,6 +67,9 @@ public class SettingsModel(
             EnableLastFmTrackInfo = agg.EnableLastFmTrackInfo,
             EnableDiscogs = agg.EnableDiscogs,
             EnableTheAudioDb = agg.EnableTheAudioDb,
+            EnableVocaDb = agg.EnableVocaDb,
+            EnableUtaiteDb = agg.EnableUtaiteDb,
+            EnableTouhouDb = agg.EnableTouhouDb,
             IncrementalIntervalMinutes = agg.IncrementalIntervalMinutes,
             SeedSampleData = agg.SeedSampleData
         };
