@@ -98,10 +98,23 @@
                 <label class="form-check-label" asp-for="Input.EnableTheAudioDb">TheAudioDB</label>
             </div>
             <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableVocaDb" />
+                <label class="form-check-label" asp-for="Input.EnableVocaDb">VocaDB</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableUtaiteDb" />
+                <label class="form-check-label" asp-for="Input.EnableUtaiteDb">UtaiteDB</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableTouhouDb" />
+                <label class="form-check-label" asp-for="Input.EnableTouhouDb">TouhouDB</label>
+            </div>
+            <div class="form-check">
                 <input class="form-check-input" asp-for="Input.SeedSampleData" />
                 <label class="form-check-label" asp-for="Input.SeedSampleData">Seed sample scrobbles when empty</label>
             </div>
         </div>
+        <div class="form-text">VocaDB, UtaiteDB, and TouhouDB use public APIs (no keys). They fill Japanese vocaloid, utaite, and Touhou metadata when MusicBrainz coverage is thin.</div>
     </div>
     <button class="btn btn-primary" type="submit">Save</button>
 </form>

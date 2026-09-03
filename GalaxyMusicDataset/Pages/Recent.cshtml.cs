@@ -33,6 +33,9 @@ public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnric
     public string? HasMbid { get; set; }
 
     [BindProperty(SupportsGet = true)]
+    public string? HasTags { get; set; }
+
+    [BindProperty(SupportsGet = true)]
     public string? Source { get; set; }
 
     [BindProperty(SupportsGet = true)]
@@ -58,52 +61,7 @@ public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnric
         }
 
         var query = db.Tracks.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(Q))
-        {
-            var term = Q.Trim();
-            query = query.Where(t =>
-                t.Title.Contains(term) ||
-                t.Artist.Name.Contains(term) ||
-                (t.Album != null && t.Album.Title.Contains(term)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Artist))
-        {
-            var term = Artist.Trim();
-            query = query.Where(t => t.Artist.Name.Contains(term) || t.Artist.Aliases.Any(a => a.Name.Contains(term)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Title))
-        {
-            var term = Title.Trim();
-            query = query.Where(t => t.Title.Contains(term));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Album))
-        {
-            var term = Album.Trim();
-            query = query.Where(t => t.Album != null && t.Album.Title.Contains(term));
-        }
-
-        if (string.Equals(HasMbid, "yes", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(t => t.Mbid != null && t.Mbid != "");
-        }
-        else if (string.Equals(HasMbid, "no", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(t => t.Mbid == null || t.Mbid == "");
-        }
-
-        if (!string.IsNullOrWhiteSpace(Source) && Enum.TryParse<EnrichmentSource>(Source, out var source))
-        {
-            query = query.Where(t => t.SourcePayloads.Any(p =>
-                p.Source == source && p.Status == SourceFetchStatus.Success));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Status) && Enum.TryParse<LookupStatus>(Status, out var lookupStatus))
-        {
-            query = query.Where(t => db.TrackLookups.Any(l => l.Fingerprint == t.Fingerprint && l.Status == lookupStatus));
-        }
+        query = LibraryFilters.Apply(query, db, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status);
 
         query = Sort switch
         {
@@ -176,6 +134,7 @@ public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnric
         Album,
         Status,
         HasMbid,
+        HasTags,
         Source,
         Sort,
         Edit = edit
@@ -183,3 +142,77 @@ public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnric
 }
 
 public sealed record LibraryRow(Track Track, TrackLookup? Lookup, int PlayCount, long? LastPlayedUnix);
+
+public static class LibraryFilters
+{
+    public static IQueryable<Track> Apply(
+        IQueryable<Track> query,
+        AppDbContext db,
+        string? q,
+        string? artist,
+        string? title,
+        string? album,
+        string? hasMbid,
+        string? hasTags,
+        string? source,
+        string? status)
+    {
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            query = query.Where(t =>
+                t.Title.Contains(term) ||
+                t.Artist.Name.Contains(term) ||
+                (t.Album != null && t.Album.Title.Contains(term)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(artist))
+        {
+            var term = artist.Trim();
+            query = query.Where(t => t.Artist.Name.Contains(term) || t.Artist.Aliases.Any(a => a.Name.Contains(term)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            var term = title.Trim();
+            query = query.Where(t => t.Title.Contains(term));
+        }
+
+        if (!string.IsNullOrWhiteSpace(album))
+        {
+            var term = album.Trim();
+            query = query.Where(t => t.Album != null && t.Album.Title.Contains(term));
+        }
+
+        if (string.Equals(hasMbid, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => t.Mbid != null && t.Mbid != "");
+        }
+        else if (string.Equals(hasMbid, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => t.Mbid == null || t.Mbid == "");
+        }
+
+        if (string.Equals(hasTags, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => t.Tags.Any());
+        }
+        else if (string.Equals(hasTags, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => !t.Tags.Any());
+        }
+
+        if (!string.IsNullOrWhiteSpace(source) && Enum.TryParse<EnrichmentSource>(source, out var parsedSource))
+        {
+            query = query.Where(t => t.SourcePayloads.Any(p =>
+                p.Source == parsedSource && p.Status == SourceFetchStatus.Success));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<LookupStatus>(status, out var lookupStatus))
+        {
+            query = query.Where(t => db.TrackLookups.Any(l => l.Fingerprint == t.Fingerprint && l.Status == lookupStatus));
+        }
+
+        return query;
+    }
+}

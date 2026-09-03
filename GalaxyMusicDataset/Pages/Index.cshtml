@@ -36,7 +36,7 @@
 }
 
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-muted small">Scrobbles</div>
@@ -48,7 +48,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-muted small">Catalog</div>
@@ -57,19 +57,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted small">MBID coverage</div>
-                <div class="fs-3">@s.MbidCoveragePercent%</div>
-                <div class="progress mt-2" style="height:6px;">
-                    <div class="progress-bar" style="width:@s.MbidCoveragePercent.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
-                </div>
-                <div class="small mt-1">@s.TracksWithMbid / @s.TrackCount tracks · @s.TracksWithDuration with duration</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-muted small">Worker</div>
@@ -80,6 +68,37 @@
                     Enrich @(s.Progress.EnrichmentPaused ? "paused" : s.Progress.EnrichmentRunning ? "running" : "idle")
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Catalog coverage</div>
+    <div class="card-body">
+        <div class="row g-3">
+            @foreach (var row in s.Coverage)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex justify-content-between align-items-baseline gap-2">
+                        <span class="fw-semibold">@row.Name</span>
+                        <span class="small">@row.HitPercent.ToString("0.0")%</span>
+                    </div>
+                    <div class="progress mt-1" style="height:6px;">
+                        <div class="progress-bar @(row.Enabled ? "" : "bg-secondary")" style="width:@row.HitPercent.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                    </div>
+                    <div class="small text-muted">
+                        @row.Hits / @row.Total
+                        @if (row.ShowAttempted)
+                        {
+                            <text> · @row.Attempted attempted</text>
+                        }
+                        @if (row.Note is not null)
+                        {
+                            <text> · @row.Note</text>
+                        }
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
@@ -171,6 +190,9 @@
                 · MusicBrainz @(s.EnableMusicBrainz ? "on" : "off") @(s.MusicBrainzUsesPublicApi ? "" : "(self-hosted)")
                 · Discogs @(s.EnableDiscogs ? "on" : "off")@(s.DiscogsConfigured ? "" : ", no token")
                 · TheAudioDB @(s.EnableTheAudioDb ? "on" : "off")@(s.TheAudioDbConfigured ? "" : ", no key")
+                · VocaDB @(s.EnableVocaDb ? "on" : "off")
+                · UtaiteDB @(s.EnableUtaiteDb ? "on" : "off")
+                · TouhouDB @(s.EnableTouhouDb ? "on" : "off")
             </div>
         </div>
     </div>

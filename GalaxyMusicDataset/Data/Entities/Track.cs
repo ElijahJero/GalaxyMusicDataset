@@ -13,6 +13,9 @@ public sealed class Track
     public string? MusicVideoUrl { get; set; }
     public string? DiscogsReleaseId { get; set; }
     public string? TheAudioDbTrackId { get; set; }
+    public string? VocaDbSongId { get; set; }
+    public string? UtaiteDbSongId { get; set; }
+    public string? TouhouDbSongId { get; set; }
     public string Fingerprint { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

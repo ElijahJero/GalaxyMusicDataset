@@ -66,6 +66,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.MusicVideoUrl).HasMaxLength(2048);
             e.Property(x => x.DiscogsReleaseId).HasMaxLength(32);
             e.Property(x => x.TheAudioDbTrackId).HasMaxLength(32);
+            e.Property(x => x.VocaDbSongId).HasMaxLength(32);
+            e.Property(x => x.UtaiteDbSongId).HasMaxLength(32);
+            e.Property(x => x.TouhouDbSongId).HasMaxLength(32);
             e.HasOne(x => x.Artist).WithMany(x => x.Tracks).HasForeignKey(x => x.ArtistId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Album).WithMany(x => x.Tracks).HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.SetNull);
         });

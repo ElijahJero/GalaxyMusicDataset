@@ -1,9 +1,11 @@
 using GalaxyMusicDataset.Configuration;
+using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.Extensions.Options;
 
 namespace GalaxyMusicDataset.Services;
@@ -14,7 +16,10 @@ public sealed class ExternalClientFactory(
     IOptionsMonitor<LastFmOptions> lastFmOptions,
     IOptionsMonitor<MusicBrainzOptions> musicBrainzOptions,
     IOptionsMonitor<DiscogsOptions> discogsOptions,
-    IOptionsMonitor<TheAudioDbOptions> audioDbOptions)
+    IOptionsMonitor<TheAudioDbOptions> audioDbOptions,
+    IOptionsMonitor<VocaDbOptions> vocaDbOptions,
+    IOptionsMonitor<UtaiteDbOptions> utaiteDbOptions,
+    IOptionsMonitor<TouhouDbOptions> touhouDbOptions)
 {
     public LastFmClient? TryCreateLastFm()
     {
@@ -73,6 +78,31 @@ public sealed class ExternalClientFactory(
         return new TheAudioDbClient(httpClientFactory.CreateClient(nameof(TheAudioDbClient)), recorder)
         {
             ApiKey = options.ApiKey!
+        };
+    }
+
+    public VocaDbClient? TryCreateVocaDbFamily(EnrichmentSource source)
+    {
+        VocaDbSiteOptions? options = source switch
+        {
+            EnrichmentSource.VocaDb => vocaDbOptions.CurrentValue,
+            EnrichmentSource.UtaiteDb => utaiteDbOptions.CurrentValue,
+            EnrichmentSource.TouhouDb => touhouDbOptions.CurrentValue,
+            _ => null
+        };
+        if (options is null)
+        {
+            return null;
+        }
+
+        var limiter = VocaDbClient.LimiterFor(source);
+        limiter.SetMinInterval(options.MinInterval);
+        return new VocaDbClient(httpClientFactory.CreateClient(nameof(VocaDbClient)), recorder)
+        {
+            BaseUrl = options.ResolvedBaseUrl,
+            SourceName = VocaDbFamily.DisplayName(source),
+            UserAgent = options.UserAgent,
+            RateLimiter = limiter
         };
     }
 }

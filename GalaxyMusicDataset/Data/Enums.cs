@@ -17,7 +17,10 @@ public enum EnrichmentSource
     LastFm = 0,
     MusicBrainz = 1,
     Discogs = 2,
-    TheAudioDb = 3
+    TheAudioDb = 3,
+    VocaDb = 4,
+    UtaiteDb = 5,
+    TouhouDb = 6
 }
 
 public enum SourceFetchStatus
@@ -37,7 +40,10 @@ public enum JobKind
     LastFmTrackInfo = 3,
     Discogs = 4,
     TheAudioDb = 5,
-    SeedSample = 6
+    SeedSample = 6,
+    VocaDb = 7,
+    UtaiteDb = 8,
+    TouhouDb = 9
 }
 
 public enum JobStatus

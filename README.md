@@ -32,9 +32,9 @@ docker compose up -d --build
 
 Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`).
 
-- **Progress** — ingest/enrichment status, job log, API stats
+- **Progress** — ingest/enrichment status, per-database coverage, job log, API stats
 - **Analytics** — overview, tops, **genres/tags**, discovery, time patterns, deep cuts, sessions, wrapped year, artist/track detail ([spec](docs/ANALYTICS_PAGES.md))
-- **Library** (`/Recent`) — all unique tracks, 50 per page, with filters and inline editing
+- **Library** (`/Recent`) — all unique tracks, 50 per page, with filters (including has/missing tags) and inline editing
 - **Lookups** — fingerprint cache (one MusicBrainz search per unique song)
 - **Review** — accept/reject low-confidence MusicBrainz matches
 - **Settings** — API keys (written to `App_Data/user-settings.json`, gitignored)
@@ -70,6 +70,6 @@ Cover art still uses `https://coverartarchive.org` unless you also host a Cover 
 3. Each play attaches to a **Track** keyed by fingerprint (`normalized artist + title`). Ten plays of one song are ten scrobbles and one track row.
 4. If Last.fm already sent an MBID, identity is done. Otherwise a **TrackLookup** row is queued once per fingerprint.
 5. MusicBrainz search auto-links high-confidence hits and caches the rest for Review. The public API is about 1 req/s; a self-hosted `MusicBrainz:BaseUrl` uses a much smaller gap (50ms by default, or `MinIntervalMs`). After an MBID exists, a second pass loads recording tags, ISRCs, genres, and Cover Art Archive front images.
-6. Then Last.fm `track.getInfo` (duration, crowd tags, wiki, album art, artist URL — by MBID when present), Discogs (search + release detail: year, cover, genres/styles), and TheAudioDB (duration, genre/mood, biography, thumb, music video) fill catalog fields, `TrackSourcePayloads`, and `TrackTags`.
+6. Then Last.fm `track.getInfo` (duration, crowd tags, wiki, album art, artist URL — by MBID when present), VocaDB / UtaiteDB / TouhouDB (song search: tags, duration, PVs, aliases, optional MBID), Discogs (search + release detail: year, cover, genres/styles), and TheAudioDB (duration, genre/mood, biography, thumb, music video) fill catalog fields, `TrackSourcePayloads`, and `TrackTags`.
 
 SQLite file: `GalaxyMusicDataset/App_Data/galaxy.db`.

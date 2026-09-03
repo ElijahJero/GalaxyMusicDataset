@@ -4,6 +4,7 @@ using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.VocaDb;
 
 namespace GalaxyMusicDataset.Services.Aggregation;
 
@@ -17,6 +18,9 @@ public static class CoverArtResolver
     public static readonly EnrichmentSource[] FallbackOrder =
     [
         EnrichmentSource.Discogs,
+        EnrichmentSource.VocaDb,
+        EnrichmentSource.UtaiteDb,
+        EnrichmentSource.TouhouDb,
         EnrichmentSource.TheAudioDb,
         EnrichmentSource.LastFm
     ];
@@ -68,6 +72,8 @@ public static class CoverArtResolver
                 EnrichmentSource.LastFm => LastFmClient.ParseTrackInfo(json)?.AlbumImageUrl,
                 EnrichmentSource.Discogs => CoverFromDiscogs(json),
                 EnrichmentSource.TheAudioDb => TheAudioDbClient.ParseSearch(json).Best?.ThumbUrl,
+                EnrichmentSource.VocaDb or EnrichmentSource.UtaiteDb or EnrichmentSource.TouhouDb
+                    => VocaDbClient.ParseSong(json)?.ThumbUrl,
                 _ => null
             };
             return UsableOrNull(raw);

@@ -35,6 +35,9 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
                 ["EnableLastFmTrackInfo"] = posted.EnableLastFmTrackInfo,
                 ["EnableDiscogs"] = posted.EnableDiscogs,
                 ["EnableTheAudioDb"] = posted.EnableTheAudioDb,
+                ["EnableVocaDb"] = posted.EnableVocaDb,
+                ["EnableUtaiteDb"] = posted.EnableUtaiteDb,
+                ["EnableTouhouDb"] = posted.EnableTouhouDb,
                 ["IncrementalIntervalMinutes"] = posted.IncrementalIntervalMinutes,
                 ["SeedSampleData"] = posted.SeedSampleData
             }
@@ -88,6 +91,9 @@ public sealed class UserSettingsModel
     public bool EnableLastFmTrackInfo { get; set; } = true;
     public bool EnableDiscogs { get; set; } = true;
     public bool EnableTheAudioDb { get; set; } = true;
+    public bool EnableVocaDb { get; set; } = true;
+    public bool EnableUtaiteDb { get; set; } = true;
+    public bool EnableTouhouDb { get; set; } = true;
     public int IncrementalIntervalMinutes { get; set; } = 60;
     public bool SeedSampleData { get; set; }
 }

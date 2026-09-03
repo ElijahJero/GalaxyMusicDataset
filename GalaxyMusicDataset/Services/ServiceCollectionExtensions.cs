@@ -7,6 +7,7 @@ using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Services;
@@ -19,6 +20,9 @@ public static class ServiceCollectionExtensions
         services.Configure<MusicBrainzOptions>(configuration.GetSection(MusicBrainzOptions.SectionName));
         services.Configure<DiscogsOptions>(configuration.GetSection(DiscogsOptions.SectionName));
         services.Configure<TheAudioDbOptions>(configuration.GetSection(TheAudioDbOptions.SectionName));
+        services.Configure<VocaDbOptions>(configuration.GetSection(VocaDbOptions.SectionName));
+        services.Configure<UtaiteDbOptions>(configuration.GetSection(UtaiteDbOptions.SectionName));
+        services.Configure<TouhouDbOptions>(configuration.GetSection(TouhouDbOptions.SectionName));
         services.Configure<AggregationOptions>(configuration.GetSection(AggregationOptions.SectionName));
 
         var dbPath = Path.Combine(environment.ContentRootPath, "App_Data", "galaxy.db");
@@ -32,6 +36,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient(nameof(MusicBrainzClient));
         services.AddHttpClient(nameof(DiscogsClient));
         services.AddHttpClient(nameof(TheAudioDbClient));
+        services.AddHttpClient(nameof(VocaDbClient));
         services.AddSingleton<ExternalClientFactory>();
         services.AddScoped<CatalogService>();
         services.AddScoped<ScrobbleIngestService>();

@@ -479,6 +479,9 @@ public sealed class CatalogService(AppDbContext db)
         keep.MusicVideoUrl ??= drop.MusicVideoUrl;
         keep.DiscogsReleaseId ??= drop.DiscogsReleaseId;
         keep.TheAudioDbTrackId ??= drop.TheAudioDbTrackId;
+        keep.VocaDbSongId ??= drop.VocaDbSongId;
+        keep.UtaiteDbSongId ??= drop.UtaiteDbSongId;
+        keep.TouhouDbSongId ??= drop.TouhouDbSongId;
         keep.UpdatedAt = DateTimeOffset.UtcNow;
 
         foreach (var entry in db.ChangeTracker.Entries<Scrobble>()
