@@ -10,6 +10,7 @@ namespace GalaxyMusicDataset.Services.Aggregation;
 public sealed class ScrobbleSyncService(
     AppDbContext db,
     ScrobbleIngestService ingest,
+    CatalogService catalog,
     ExternalClientFactory clients,
     AggregationProgress progress,
     IOptionsMonitor<AggregationOptions> aggregationOptions,
@@ -50,6 +51,7 @@ public sealed class ScrobbleSyncService(
             progress.Error(ex.Message);
             job.Status = JobStatus.Failed;
             job.Message = ex.Message;
+            catalog.DiscardConflictingCatalogInserts();
             var state = await GetStateAsync(cancellationToken);
             state.LastAttemptUtc = DateTimeOffset.UtcNow;
             state.LastSyncError = ex.Message;
@@ -153,6 +155,7 @@ public sealed class ScrobbleSyncService(
             progress.Error(ex.Message);
             job.Status = JobStatus.Failed;
             job.Message = ex.Message;
+            catalog.DiscardConflictingCatalogInserts();
             var state = await GetStateAsync(cancellationToken);
             state.LastAttemptUtc = DateTimeOffset.UtcNow;
             state.LastSyncError = ex.Message;

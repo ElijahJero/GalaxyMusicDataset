@@ -1,4 +1,5 @@
 using GalaxyMusicDataset.Data;
+using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.Normalization;
@@ -52,6 +53,60 @@ public class ScrobbleIngestTests
         ], CancellationToken.None);
         Assert.Equal(1, result.Skipped);
         Assert.Equal(0, await harness.Db.Scrobbles.CountAsync());
+    }
+
+    [Fact]
+    public async Task Fingerprint_match_does_not_copy_a_taken_track_mbid()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "81730195-b0f4-45e6-9974-5f198b356194";
+        var artist = new Artist { Name = "Mori Calliope", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.Add(artist);
+        await harness.Db.SaveChangesAsync();
+
+        var owner = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Lose-Lose Days",
+            Fingerprint = TrackFingerprint.Compute("Mori Calliope", "Lose-Lose Days"),
+            Mbid = mbid,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var variant = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Lose Lose Days",
+            Fingerprint = TrackFingerprint.Compute("Calliope Mori", "Lose Lose Days"),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        harness.Db.Tracks.AddRange(owner, variant);
+        await harness.Db.SaveChangesAsync();
+
+        var ingest = new ScrobbleIngestService(harness.Db, new CatalogService(harness.Db));
+        var result = await ingest.IngestAsync(
+        [
+            new LastFmRecentTrack(
+                "Calliope Mori",
+                "Lose Lose Days",
+                "UnAlive",
+                1_700_000_123,
+                mbid,
+                null,
+                null,
+                false,
+                "{}")
+        ], CancellationToken.None);
+
+        Assert.Equal(1, result.Inserted);
+        Assert.Equal(1, await harness.Db.Tracks.CountAsync(t => t.Mbid == mbid));
+        Assert.Equal(
+            mbid,
+            await harness.Db.Tracks.Where(t => t.Id == owner.Id).Select(t => t.Mbid).SingleAsync());
+        Assert.Equal(owner.Id, await harness.Db.Scrobbles.Select(s => s.TrackId).SingleAsync());
+        Assert.Null(await harness.Db.Tracks.Where(t => t.Id == variant.Id).Select(t => t.Mbid).SingleAsync());
     }
 }
 
