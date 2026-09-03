@@ -30,13 +30,15 @@ public static class ServiceCollectionExtensions
 
         services.AddDbContext<AppDbContext>(options => options.UseSqlite($"Data Source={dbPath}"));
         services.AddSingleton<ApiCallRecorder>();
+        services.AddSingleton<EnrichmentSourceHealth>();
         services.AddSingleton<AggregationProgress>();
         services.AddSingleton<AggregationCoordinator>();
         services.AddHttpClient(nameof(LastFmClient));
         services.AddHttpClient(nameof(MusicBrainzClient));
         services.AddHttpClient(nameof(DiscogsClient));
         services.AddHttpClient(nameof(TheAudioDbClient));
-        services.AddHttpClient(nameof(VocaDbClient));
+        services.AddHttpClient(nameof(VocaDbClient))
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(25));
         services.AddSingleton<ExternalClientFactory>();
         services.AddScoped<CatalogService>();
         services.AddScoped<ScrobbleIngestService>();

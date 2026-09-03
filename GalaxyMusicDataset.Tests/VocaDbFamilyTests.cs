@@ -127,6 +127,7 @@ public class VocaDbFamilyTests
             new TagService(harness.Db),
             catalog,
             new AggregationProgress(),
+            new EnrichmentSourceHealth(),
             new StaticMonitor<AggregationOptions>(new AggregationOptions()));
 
         var hit = VocaDbClient.ParseSearch(WorldIsMineJson).Items[0];

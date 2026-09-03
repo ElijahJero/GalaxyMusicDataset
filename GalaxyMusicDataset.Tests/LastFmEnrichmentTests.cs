@@ -49,6 +49,7 @@ public class LastFmEnrichmentTests
             new TagService(harness.Db),
             catalog,
             new AggregationProgress(),
+            new EnrichmentSourceHealth(),
             new StaticMonitor<AggregationOptions>(new AggregationOptions { EnableMusicBrainz = false }));
 
         var info = new LastFmTrackInfo(
@@ -121,6 +122,7 @@ public class LastFmEnrichmentTests
             new TagService(harness.Db),
             catalog,
             new AggregationProgress(),
+            new EnrichmentSourceHealth(),
             new StaticMonitor<AggregationOptions>(new AggregationOptions()));
 
         await service.ApplyLastFmAsync(
@@ -243,6 +245,7 @@ public class LastFmEnrichmentTests
             new TagService(harness.Db),
             new CatalogService(harness.Db),
             new AggregationProgress(),
+            new EnrichmentSourceHealth(),
             new StaticMonitor<AggregationOptions>(new AggregationOptions { EnableMusicBrainz = false }));
 
         var next = await service.NextTrackNeedingAsync(EnrichmentSource.LastFm, CancellationToken.None);

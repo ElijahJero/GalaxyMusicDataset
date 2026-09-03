@@ -20,6 +20,7 @@ public sealed class MetadataEnrichmentService(
     TagService tags,
     CatalogService catalog,
     AggregationProgress progress,
+    EnrichmentSourceHealth sourceHealth,
     IOptionsMonitor<AggregationOptions> options)
 {
     public async Task<int> EnrichNextAsync(CancellationToken cancellationToken)
@@ -413,6 +414,11 @@ public sealed class MetadataEnrichmentService(
 
     private async Task<int> EnrichVocaDbFamilyAsync(EnrichmentSource source, CancellationToken cancellationToken)
     {
+        if (sourceHealth.IsPaused(source))
+        {
+            return 0;
+        }
+
         var track = await NextTrackNeedingAsync(source, cancellationToken);
         if (track is null)
         {
@@ -442,6 +448,7 @@ public sealed class MetadataEnrichmentService(
                     ? $"{label} returned no songs."
                     : "No VocaDB-family match passed the auto-match threshold.";
                 await db.SaveChangesAsync(cancellationToken);
+                sourceHealth.RecordSuccess(source);
                 return 1;
             }
 
@@ -452,18 +459,38 @@ public sealed class MetadataEnrichmentService(
             payload.ErrorMessage = null;
             await ApplyVocaDbAsync(track, source, hit, cancellationToken);
             await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
+            sourceHealth.RecordSuccess(source);
             progress.Log($"{label}: {track.Artist.Name} – {track.Title}");
             return 1;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             payload.Status = SourceFetchStatus.Error;
-            payload.ErrorMessage = ex.Message;
             payload.FetchedAt = DateTimeOffset.UtcNow;
             catalog.RevertUnsavedMbidAssignments();
             catalog.DiscardUnsavedAliases();
+            if (EnrichmentRetryHelpers.IsTransientFailure(ex))
+            {
+                var api = (JsonApiException)ex;
+                payload.ErrorMessage = EnrichmentRetryHelpers.BusyMessage(label, api.StatusCode);
+                var opened = sourceHealth.RecordTransientFailure(source, client.RateLimiter);
+                if (opened)
+                {
+                    progress.Log(
+                        $"{label} paused for {EnrichmentSourceHealth.PauseDuration.TotalMinutes:0} minutes after repeated API errors.");
+                }
+                else
+                {
+                    progress.Log($"{label} busy for {track.Artist.Name} – {track.Title}; backing off.");
+                }
+            }
+            else
+            {
+                payload.ErrorMessage = ex.Message;
+                progress.Error($"{label} failed: {ex.Message}");
+            }
+
             await db.SaveChangesAsync(cancellationToken);
-            progress.Error($"{label} failed: {ex.Message}");
             return 1;
         }
     }
@@ -823,7 +850,8 @@ public sealed class MetadataEnrichmentService(
             return false;
         }
 
-        return payload.FetchedAt is null || now - payload.FetchedAt.Value >= TimeSpan.FromMinutes(5);
+        return payload.FetchedAt is null
+               || now - payload.FetchedAt.Value >= EnrichmentRetryHelpers.ErrorRetryCooldown(payload.ErrorMessage);
     }
 
     private async Task<TrackSourcePayload> EnsurePayloadAsync(long trackId, EnrichmentSource source, CancellationToken cancellationToken)
