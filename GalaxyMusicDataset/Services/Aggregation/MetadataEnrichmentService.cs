@@ -141,6 +141,7 @@ public sealed class MetadataEnrichmentService(
 
     private async Task<int> EnrichMusicBrainzDetailsAsync(CancellationToken cancellationToken)
     {
+        var now = DateTimeOffset.UtcNow;
         var batch = await db.Tracks
             .Include(t => t.Artist)
             .Include(t => t.Album)
@@ -154,9 +155,8 @@ public sealed class MetadataEnrichmentService(
                              p.Status == SourceFetchStatus.NotFound ||
                              p.Status == SourceFetchStatus.Skipped)))
             .OrderBy(t => t.Id)
-            .Take(25)
+            .Take(200)
             .ToListAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
         var track = batch.FirstOrDefault(t =>
         {
             var payload = t.SourcePayloads.FirstOrDefault(p => p.Source == EnrichmentSource.MusicBrainz);
@@ -293,12 +293,7 @@ public sealed class MetadataEnrichmentService(
         payload.Status = status;
         payload.ErrorMessage = error;
         payload.FetchedAt = DateTimeOffset.UtcNow;
-        foreach (var entry in db.ChangeTracker.Entries<TrackTag>().Where(e => e.State == EntityState.Added).ToList())
-        {
-            entry.State = EntityState.Detached;
-        }
-
-        catalog.RevertUnsavedMbidAssignments();
+        catalog.DiscardConflictingCatalogInserts();
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -379,17 +374,12 @@ public sealed class MetadataEnrichmentService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            payload.Status = SourceFetchStatus.Error;
-            payload.ErrorMessage = ex.Message;
-            payload.FetchedAt = DateTimeOffset.UtcNow;
-            catalog.RevertUnsavedMbidAssignments();
-            await db.SaveChangesAsync(cancellationToken);
+            await PersistSourceFailureAsync(
+                payload,
+                ex,
+                "Last.fm rejected the API key.",
+                cancellationToken);
             progress.Error($"Last.fm info failed: {ex.Message}");
-            if (ex is JsonApiException api && api.StatusCode is 401 or 403)
-            {
-                payload.Status = SourceFetchStatus.Skipped;
-                payload.ErrorMessage = "Last.fm rejected the API key.";
-            }
             return 1;
         }
     }
@@ -665,17 +655,12 @@ public sealed class MetadataEnrichmentService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            payload.Status = SourceFetchStatus.Error;
-            payload.ErrorMessage = ex.Message;
-            payload.FetchedAt = DateTimeOffset.UtcNow;
-            catalog.RevertUnsavedMbidAssignments();
-            await db.SaveChangesAsync(cancellationToken);
+            await PersistSourceFailureAsync(
+                payload,
+                ex,
+                "Discogs rejected the token.",
+                cancellationToken);
             progress.Error($"Discogs failed: {ex.Message}");
-            if (ex is JsonApiException api && api.StatusCode is 401 or 403)
-            {
-                payload.Status = SourceFetchStatus.Skipped;
-                payload.ErrorMessage = "Discogs rejected the token.";
-            }
             return 1;
         }
     }
@@ -780,17 +765,12 @@ public sealed class MetadataEnrichmentService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            payload.Status = SourceFetchStatus.Error;
-            payload.ErrorMessage = ex.Message;
-            payload.FetchedAt = DateTimeOffset.UtcNow;
-            catalog.RevertUnsavedMbidAssignments();
-            await db.SaveChangesAsync(cancellationToken);
+            await PersistSourceFailureAsync(
+                payload,
+                ex,
+                "TheAudioDB rejected the API key.",
+                cancellationToken);
             progress.Error($"TheAudioDB failed: {ex.Message}");
-            if (ex is JsonApiException api && api.StatusCode is 401 or 403)
-            {
-                payload.Status = SourceFetchStatus.Skipped;
-                payload.ErrorMessage = "TheAudioDB rejected the API key.";
-            }
             return 1;
         }
     }
@@ -818,8 +798,31 @@ public sealed class MetadataEnrichmentService(
         return string.IsNullOrWhiteSpace(text) ? wiki.Trim() : text.Trim();
     }
 
-    private async Task<Track?> NextTrackNeedingAsync(EnrichmentSource source, CancellationToken cancellationToken)
+    private async Task PersistSourceFailureAsync(
+        TrackSourcePayload payload,
+        Exception ex,
+        string rejectedKeyMessage,
+        CancellationToken cancellationToken)
     {
+        if (ex is JsonApiException api && api.StatusCode is 401 or 403)
+        {
+            payload.Status = SourceFetchStatus.Skipped;
+            payload.ErrorMessage = rejectedKeyMessage;
+        }
+        else
+        {
+            payload.Status = SourceFetchStatus.Error;
+            payload.ErrorMessage = ex.Message;
+        }
+
+        payload.FetchedAt = DateTimeOffset.UtcNow;
+        catalog.DiscardConflictingCatalogInserts();
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    internal async Task<Track?> NextTrackNeedingAsync(EnrichmentSource source, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
         var batch = await db.Tracks
             .Include(t => t.Artist)
             .Include(t => t.Album)
@@ -830,31 +833,33 @@ public sealed class MetadataEnrichmentService(
                  p.Status == SourceFetchStatus.NotFound ||
                  p.Status == SourceFetchStatus.Skipped)))
             .OrderBy(t => t.Id)
-            .Take(25)
+            .Take(200)
             .ToListAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
-        return batch.FirstOrDefault(t =>
+        return batch.FirstOrDefault(t => IsEnrichmentDue(t.SourcePayloads.FirstOrDefault(p => p.Source == source), now));
+    }
+
+    internal static bool IsEnrichmentDue(TrackSourcePayload? payload, DateTimeOffset now)
+    {
+        if (payload is null || payload.Status == SourceFetchStatus.NotStarted)
         {
-            var payload = t.SourcePayloads.FirstOrDefault(p => p.Source == source);
-            if (payload is null || payload.Status == SourceFetchStatus.NotStarted)
-            {
-                return true;
-            }
+            return true;
+        }
 
-            if (payload.Status != SourceFetchStatus.Error)
-            {
-                return false;
-            }
+        if (payload.Status != SourceFetchStatus.Error)
+        {
+            return false;
+        }
 
-            return payload.FetchedAt is null
-                   || now - payload.FetchedAt.Value >= EnrichmentRetryHelpers.ErrorRetryCooldown(payload.ErrorMessage);
-        });
+        return payload.FetchedAt is null
+               || now - payload.FetchedAt.Value >= EnrichmentRetryHelpers.ErrorRetryCooldown(payload.ErrorMessage);
     }
 
     private async Task<TrackSourcePayload> EnsurePayloadAsync(long trackId, EnrichmentSource source, CancellationToken cancellationToken)
     {
-        var payload = await db.TrackSourcePayloads
-            .FirstOrDefaultAsync(p => p.TrackId == trackId && p.Source == source, cancellationToken);
+        var payload = db.TrackSourcePayloads.Local.FirstOrDefault(p => p.TrackId == trackId && p.Source == source)
+                      ?? await db.TrackSourcePayloads.FirstOrDefaultAsync(
+                          p => p.TrackId == trackId && p.Source == source,
+                          cancellationToken);
         if (payload is not null)
         {
             return payload;
@@ -867,8 +872,19 @@ public sealed class MetadataEnrichmentService(
             Status = SourceFetchStatus.NotStarted
         };
         db.TrackSourcePayloads.Add(payload);
-        await db.SaveChangesAsync(cancellationToken);
-        return payload;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return payload;
+        }
+        catch (DbUpdateException ex) when (CatalogService.IsSqliteUniqueConstraint(ex, "TrackSourcePayloads"))
+        {
+            db.Entry(payload).State = EntityState.Detached;
+            return db.TrackSourcePayloads.Local.FirstOrDefault(p => p.TrackId == trackId && p.Source == source)
+                   ?? await db.TrackSourcePayloads.FirstAsync(
+                       p => p.TrackId == trackId && p.Source == source,
+                       cancellationToken);
+        }
     }
 
     private async Task SkipAsync(long trackId, EnrichmentSource source, string reason, CancellationToken cancellationToken)

@@ -266,6 +266,45 @@ public class CatalogServiceTests
             await harness.Db.TrackSourcePayloads.Select(p => p.Status).SingleAsync());
     }
 
+    [Fact]
+    public async Task TryCoalesceTrackMbid_skips_when_another_track_already_has_it()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        const string mbid = "81730195-b0f4-45e6-9974-5f198b356194";
+        var artist = new Artist { Name = "Mori Calliope", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.Add(artist);
+        await harness.Db.SaveChangesAsync();
+        var keep = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Lose-Lose Days",
+            Fingerprint = "fp-keep",
+            Mbid = mbid,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var other = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Lose Lose Days",
+            Fingerprint = "fp-other",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        harness.Db.Tracks.AddRange(keep, other);
+        await harness.Db.SaveChangesAsync();
+
+        var catalog = new CatalogService(harness.Db);
+        await catalog.TryCoalesceTrackMbidAsync(other, mbid, CancellationToken.None);
+        other.Summary = "kept";
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Equal(mbid, await harness.Db.Tracks.Where(t => t.Id == keep.Id).Select(t => t.Mbid).SingleAsync());
+        Assert.Null(await harness.Db.Tracks.Where(t => t.Id == other.Id).Select(t => t.Mbid).SingleAsync());
+        Assert.Equal("kept", await harness.Db.Tracks.Where(t => t.Id == other.Id).Select(t => t.Summary).SingleAsync());
+    }
+
     private static async Task<Artist> SeedArtistAsync(AppDbContext db, string name)
     {
         var now = DateTimeOffset.UtcNow;

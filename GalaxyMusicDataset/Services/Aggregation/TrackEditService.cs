@@ -121,8 +121,24 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
             }
 
             var lookup = await db.TrackLookups.FirstOrDefaultAsync(l => l.Fingerprint == track.Fingerprint, cancellationToken);
+            var destLookup = await db.TrackLookups.FirstOrDefaultAsync(l => l.Fingerprint == fingerprint, cancellationToken);
             track.Fingerprint = fingerprint;
-            if (lookup is not null)
+            if (destLookup is not null && lookup is not null && destLookup.Id != lookup.Id)
+            {
+                destLookup.ArtistName = artistName;
+                destLookup.TrackName = title;
+                destLookup.AlbumName = albumTitle;
+                destLookup.TrackId = track.Id;
+                db.TrackLookups.Remove(lookup);
+            }
+            else if (destLookup is not null)
+            {
+                destLookup.ArtistName = artistName;
+                destLookup.TrackName = title;
+                destLookup.AlbumName = albumTitle;
+                destLookup.TrackId = track.Id;
+            }
+            else if (lookup is not null)
             {
                 lookup.Fingerprint = fingerprint;
                 lookup.ArtistName = artistName;

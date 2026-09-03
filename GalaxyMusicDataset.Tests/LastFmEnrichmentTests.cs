@@ -196,6 +196,62 @@ public class LastFmEnrichmentTests
 
         Assert.Equal(["Other"], stillPending);
     }
+
+    [Fact]
+    public async Task Next_track_skips_recent_errors_so_later_tracks_keep_moving()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var artist = new Artist { Name = "Kyasu", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.Add(artist);
+        await harness.Db.SaveChangesAsync();
+
+        for (var i = 0; i < 30; i++)
+        {
+            var track = new Track
+            {
+                ArtistId = artist.Id,
+                Title = $"Err {i}",
+                Fingerprint = $"fp-err-{i}",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            harness.Db.Tracks.Add(track);
+            await harness.Db.SaveChangesAsync();
+            harness.Db.TrackSourcePayloads.Add(new TrackSourcePayload
+            {
+                TrackId = track.Id,
+                Source = EnrichmentSource.LastFm,
+                Status = SourceFetchStatus.Error,
+                ErrorMessage = "UNIQUE constraint failed: Artists.Mbid",
+                FetchedAt = now
+            });
+        }
+
+        var pending = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Still pending",
+            Fingerprint = "fp-pending",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        harness.Db.Tracks.Add(pending);
+        await harness.Db.SaveChangesAsync();
+
+        var service = new MetadataEnrichmentService(
+            harness.Db,
+            null!,
+            new TagService(harness.Db),
+            new CatalogService(harness.Db),
+            new AggregationProgress(),
+            new EnrichmentSourceHealth(),
+            new StaticMonitor<AggregationOptions>(new AggregationOptions { EnableMusicBrainz = false }));
+
+        var next = await service.NextTrackNeedingAsync(EnrichmentSource.LastFm, CancellationToken.None);
+        Assert.NotNull(next);
+        Assert.Equal("Still pending", next!.Title);
+    }
 }
 
 file sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>

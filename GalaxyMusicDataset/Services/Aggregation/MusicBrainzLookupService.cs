@@ -141,8 +141,7 @@ public sealed class MusicBrainzLookupService(
 
             // Duplicate aliases or a taken MBID left in the tracker would fail this
             // save too and bubble into the enrichment loop, pausing progress.
-            catalog.DiscardUnsavedAliases();
-            catalog.RevertUnsavedMbidAssignments();
+            catalog.DiscardConflictingCatalogInserts();
             await db.SaveChangesAsync(cancellationToken);
             return 1;
         }
@@ -272,15 +271,15 @@ public sealed class MusicBrainzLookupService(
         return now - lookup.LastAttemptUtc.Value >= cooldown;
     }
 
-    private async Task<TrackLookup?> PickNextLookupAsync(CancellationToken cancellationToken)
+    internal async Task<TrackLookup?> PickNextLookupAsync(CancellationToken cancellationToken)
     {
+        var now = DateTimeOffset.UtcNow;
         var batch = await db.TrackLookups
             .Include(l => l.Track)
             .Where(l => l.Status == LookupStatus.Pending || l.Status == LookupStatus.Failed)
             .OrderBy(l => l.Id)
-            .Take(50)
+            .Take(200)
             .ToListAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
         return batch.FirstOrDefault(l => IsLookupDue(l, now));
     }
 
@@ -289,7 +288,7 @@ public sealed class MusicBrainzLookupService(
         var track = await LoadTrackForMatchAsync(trackId, cancellationToken);
 
         var duplicateId = await db.Tracks
-            .Where(t => t.Mbid == match.Mbid && t.Id != track.Id)
+            .Where(t => t.Mbid != null && t.Mbid.ToLower() == match.Mbid.ToLower() && t.Id != track.Id)
             .Select(t => (long?)t.Id)
             .FirstOrDefaultAsync(cancellationToken);
         if (duplicateId is not null)

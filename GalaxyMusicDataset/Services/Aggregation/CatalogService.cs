@@ -32,8 +32,17 @@ public sealed class CatalogService(AppDbContext db)
             UpdatedAt = DateTimeOffset.UtcNow
         };
         db.Artists.Add(artist);
-        await db.SaveChangesAsync(cancellationToken);
-        return artist;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return artist;
+        }
+        catch (DbUpdateException ex) when (!string.IsNullOrWhiteSpace(mbid) && IsSqliteUniqueConstraint(ex, "Artists.Mbid"))
+        {
+            db.Entry(artist).State = EntityState.Detached;
+            return db.Artists.Local.FirstOrDefault(a => a.Mbid == mbid)
+                   ?? await db.Artists.FirstAsync(a => a.Mbid == mbid, cancellationToken);
+        }
     }
 
     public async Task<Album?> GetOrCreateAlbumAsync(Artist artist, string? title, string? mbid, CancellationToken cancellationToken)
@@ -78,8 +87,17 @@ public sealed class CatalogService(AppDbContext db)
             UpdatedAt = DateTimeOffset.UtcNow
         };
         db.Albums.Add(album);
-        await db.SaveChangesAsync(cancellationToken);
-        return album;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return album;
+        }
+        catch (DbUpdateException ex) when (!string.IsNullOrWhiteSpace(mbid) && IsSqliteUniqueConstraint(ex, "Albums.Mbid"))
+        {
+            db.Entry(album).State = EntityState.Detached;
+            return db.Albums.Local.FirstOrDefault(a => a.Mbid == mbid)
+                   ?? await db.Albums.FirstAsync(a => a.Mbid == mbid, cancellationToken);
+        }
     }
 
     public async Task AddAliasIfMissingAsync(Artist artist, string alias, string source, string? locale, CancellationToken cancellationToken)
@@ -124,7 +142,43 @@ public sealed class CatalogService(AppDbContext db)
 
     public void DiscardUnsavedAliases()
     {
-        foreach (var entry in db.ChangeTracker.Entries<ArtistAlias>()
+        DetachAdded<ArtistAlias>();
+    }
+
+    public void DiscardUnsavedTrackTags()
+    {
+        DetachAdded<TrackTag>();
+    }
+
+    public void DiscardUnsavedTags()
+    {
+        DetachAdded<Tag>();
+    }
+
+    public void DiscardUnsavedPayloads()
+    {
+        DetachAdded<TrackSourcePayload>();
+    }
+
+    public void DiscardUnsavedLookups()
+    {
+        DetachAdded<TrackLookup>();
+    }
+
+    public void DiscardConflictingCatalogInserts()
+    {
+        DiscardUnsavedAliases();
+        DiscardUnsavedTrackTags();
+        DiscardUnsavedTags();
+        DiscardUnsavedPayloads();
+        DiscardUnsavedLookups();
+        RevertUnsavedMbidAssignments();
+    }
+
+    private void DetachAdded<T>()
+        where T : class
+    {
+        foreach (var entry in db.ChangeTracker.Entries<T>()
                      .Where(e => e.State == EntityState.Added)
                      .ToList())
         {
@@ -144,11 +198,31 @@ public sealed class CatalogService(AppDbContext db)
                 await db.SaveChangesAsync(cancellationToken);
                 return;
             }
-            catch (DbUpdateException ex) when (attempt < 2 && IsDuplicateCatalogKey(ex))
+            catch (DbUpdateException ex) when (attempt < 3 && IsDuplicateCatalogKey(ex))
             {
                 if (IsUniqueViolation(ex, "ArtistAliases"))
                 {
                     DiscardUnsavedAliases();
+                }
+
+                if (IsUniqueViolation(ex, "TrackTags"))
+                {
+                    DiscardUnsavedTrackTags();
+                }
+
+                if (IsUniqueViolation(ex, "Tags.NormalizedName"))
+                {
+                    DiscardUnsavedTags();
+                }
+
+                if (IsUniqueViolation(ex, "TrackSourcePayloads"))
+                {
+                    DiscardUnsavedPayloads();
+                }
+
+                if (IsUniqueViolation(ex, "TrackLookups.Fingerprint"))
+                {
+                    DiscardUnsavedLookups();
                 }
 
                 if (IsMbidUniqueViolation(ex))
@@ -275,14 +349,14 @@ public sealed class CatalogService(AppDbContext db)
     }
 
     private static bool IsDuplicateCatalogKey(DbUpdateException ex) =>
-        IsUniqueViolation(ex, "ArtistAliases") || IsMbidUniqueViolation(ex);
+        IsUniqueViolation(ex, "ArtistAliases")
+        || IsUniqueViolation(ex, "TrackTags")
+        || IsUniqueViolation(ex, "Tags.NormalizedName")
+        || IsUniqueViolation(ex, "TrackSourcePayloads")
+        || IsUniqueViolation(ex, "TrackLookups.Fingerprint")
+        || IsMbidUniqueViolation(ex);
 
-    private static bool IsMbidUniqueViolation(DbUpdateException ex) =>
-        IsUniqueViolation(ex, "Artists.Mbid")
-        || IsUniqueViolation(ex, "Albums.Mbid")
-        || IsUniqueViolation(ex, "Tracks.Mbid");
-
-    private static bool IsUniqueViolation(DbUpdateException ex, string constraint)
+    internal static bool IsSqliteUniqueConstraint(Exception ex, string constraint)
     {
         for (Exception? inner = ex; inner is not null; inner = inner.InnerException)
         {
@@ -294,6 +368,14 @@ public sealed class CatalogService(AppDbContext db)
 
         return false;
     }
+
+    private static bool IsMbidUniqueViolation(DbUpdateException ex) =>
+        IsUniqueViolation(ex, "Artists.Mbid")
+        || IsUniqueViolation(ex, "Albums.Mbid")
+        || IsUniqueViolation(ex, "Tracks.Mbid");
+
+    private static bool IsUniqueViolation(DbUpdateException ex, string constraint) =>
+        IsSqliteUniqueConstraint(ex, constraint);
 
     private static void PreferLocale(ArtistAlias existing, string? locale)
     {
