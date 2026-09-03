@@ -68,7 +68,8 @@ public sealed class VocaDbClient(HttpClient http, ApiCallRecorder recorder)
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        var json = await recorder.SendAsync(http, request, SourceName, RateLimiter, cancellationToken);
+        // Fail fast when VocaDB is overloaded; enrichment backs off per-track and per-source.
+        var json = await recorder.SendAsync(http, request, SourceName, RateLimiter, cancellationToken, maxAttempts: 2);
         return ParseSearch(json);
     }
 
