@@ -59,10 +59,18 @@ public sealed class VocaDbClient(HttpClient http, ApiCallRecorder recorder)
         string title,
         CancellationToken cancellationToken)
     {
-        _ = artist;
+        var safeTitle = SanitizeSearchTerm(title);
+        var safeArtist = SanitizeSearchTerm(artist);
+        if (safeTitle is null)
+        {
+            return ([], """{"items":[]}""");
+        }
+
+        // Prefer "title artist" so common/short titles do not scan the whole catalog.
+        var query = safeArtist is null ? safeTitle : $"{safeTitle} {safeArtist}";
         var root = BaseUrl.TrimEnd('/');
         var url =
-            $"{root}/api/songs?query={Uri.EscapeDataString(title)}" +
+            $"{root}/api/songs?query={Uri.EscapeDataString(query)}" +
             $"&fields={SearchFields}" +
             "&nameMatchMode=Auto&preferAccurateMatches=true&maxResults=10&lang=Default";
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -71,6 +79,31 @@ public sealed class VocaDbClient(HttpClient http, ApiCallRecorder recorder)
         // Fail fast when VocaDB is overloaded; enrichment backs off per-track and per-source.
         var json = await recorder.SendAsync(http, request, SourceName, RateLimiter, cancellationToken, maxAttempts: 2);
         return ParseSearch(json);
+    }
+
+    /// <summary>
+    /// Control characters (especially NUL) can make VocaDB's search hang until the
+    /// client times out. Strip them before building the query.
+    /// </summary>
+    public static string? SanitizeSearchTerm(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var buffer = new char[value.Length];
+        var n = 0;
+        foreach (var ch in value)
+        {
+            if (!char.IsControl(ch))
+            {
+                buffer[n++] = ch;
+            }
+        }
+
+        var cleaned = new string(buffer, 0, n).Trim();
+        return string.IsNullOrWhiteSpace(cleaned) ? null : cleaned;
     }
 
     public static (IReadOnlyList<VocaDbSongHit> Items, string RawJson) ParseSearch(string json)

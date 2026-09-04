@@ -59,12 +59,34 @@ public sealed class ApiCallRecorder(IServiceScopeFactory scopeFactory)
             {
                 throw;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (
+                ex is not OperationCanceledException
+                || HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken))
             {
                 last = ex;
                 var duration = Stopwatch.GetElapsedTime(started);
-                Record(source, response is null ? null : (int)response.StatusCode, false, (int)duration.TotalMilliseconds, ex.Message);
-                await PersistLogAsync(source, request.Method.Method, request.RequestUri?.ToString() ?? "", response is null ? null : (int)response.StatusCode, false, (int)duration.TotalMilliseconds, ex.Message, cancellationToken);
+                var timedOut = HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken);
+                var message = timedOut
+                    ? $"request timed out after {(int)duration.TotalMilliseconds}ms"
+                    : ex.Message;
+                Record(source, response is null ? null : (int)response.StatusCode, false, (int)duration.TotalMilliseconds, message);
+                await PersistLogAsync(
+                    source,
+                    request.Method.Method,
+                    request.RequestUri?.ToString() ?? "",
+                    response is null ? null : (int)response.StatusCode,
+                    false,
+                    (int)duration.TotalMilliseconds,
+                    message,
+                    cancellationToken);
+
+                // Retrying the same hanging query just burns another full timeout window.
+                if (timedOut)
+                {
+                    limiter.Postpone(TimeSpan.FromSeconds(15));
+                    throw new JsonApiException(source, $"{source} {message}.", statusCode: null);
+                }
+
                 if (attempt == maxAttempts)
                 {
                     throw;
