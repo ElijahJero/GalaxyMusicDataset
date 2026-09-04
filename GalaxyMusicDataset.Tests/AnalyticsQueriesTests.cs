@@ -171,6 +171,69 @@ public class AnalyticsQueriesTests
     }
 
     [Fact]
+    public async Task Wrapped_html_export_includes_covers_and_top_fives()
+    {
+        await using var harness = await SeedAsync();
+        var album = await harness.Db.Albums.SingleAsync(a => a.Title == "UnAlive");
+        album.CoverUrl = "https://example.test/unalive.jpg";
+        var artist = await harness.Db.Artists.SingleAsync(a => a.Name == "Mori Calliope");
+        artist.ImageUrl = "https://example.test/calliope.jpg";
+        var sync = await harness.Db.GetSyncStateAsync(CancellationToken.None);
+        sync.LastFmUsername = "galaxy_listener";
+        await harness.Db.SaveChangesAsync();
+
+        var queries = new AnalyticsQueries(harness.Db);
+        var export = await queries.GetWrappedHtmlExport(2024, null, CancellationToken.None);
+
+        Assert.Equal("galaxy_listener", export.ListenerName);
+        Assert.True(export.TopArtists.Count <= 5);
+        Assert.True(export.TopTracks.Count <= 5);
+        Assert.True(export.TopAlbums.Count <= 5);
+        Assert.Equal("https://example.test/calliope.jpg", export.TopArtists.Single(a => a.Name == "Mori Calliope").ImageUrl);
+        Assert.Equal("https://example.test/unalive.jpg", export.TopAlbums.Single(a => a.Name == "UnAlive").ImageUrl);
+        Assert.Equal("https://example.test/unalive.jpg", export.TopTracks.Single(t => t.Name == "Lose-Lose Days").ImageUrl);
+        Assert.NotNull(export.MostReplayed);
+        Assert.Equal("https://example.test/unalive.jpg", export.MostReplayed.ImageUrl);
+
+        var html = WrappedHtmlGenerator.Generate(export);
+        Assert.Contains("galaxy_listener", html, StringComparison.Ordinal);
+        Assert.Contains("Your top 5 artists", html, StringComparison.Ordinal);
+        Assert.Contains("https://example.test/unalive.jpg", html, StringComparison.Ordinal);
+        Assert.Contains("Lose-Lose Days", html, StringComparison.Ordinal);
+        Assert.Contains("hip hop", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"slide", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script>alert", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wrapped_html_escapes_user_controlled_text()
+    {
+        var overview = new OverviewStats(
+            1, 1, 1, 1, 60_000, 1, 0, 0, 1, 1, 1, 1, 1,
+            new StreakInfo(1, 1, null, null), null, [], null);
+        var export = new WrappedHtmlExport(
+            2024,
+            "<script>x</script>",
+            overview,
+            [new WrappedMediaItem(1, "A & B <C>", null, 3, null, 1, null)],
+            [],
+            [],
+            [new TagStat("rock & roll", 3, 1, 0, ["LastFm"])],
+            null,
+            1,
+            12,
+            1,
+            [],
+            []);
+
+        var html = WrappedHtmlGenerator.Generate(export);
+        Assert.DoesNotContain("<script>x</script>", html, StringComparison.Ordinal);
+        Assert.Contains("&lt;script&gt;x&lt;/script&gt;", html, StringComparison.Ordinal);
+        Assert.Contains("A &amp; B &lt;C&gt;", html, StringComparison.Ordinal);
+        Assert.Contains("rock &amp; roll", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Tag_cloud_ranks_genres_by_plays_and_dedupes_sources()
     {
         await using var harness = await SeedAsync();

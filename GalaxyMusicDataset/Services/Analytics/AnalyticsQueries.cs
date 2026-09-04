@@ -579,6 +579,82 @@ public sealed class AnalyticsQueries(AppDbContext db)
             tags.Genres);
     }
 
+    public async Task<WrappedHtmlExport> GetWrappedHtmlExport(int year, string? search, CancellationToken cancellationToken)
+    {
+        var wrapped = await GetWrapped(year, search, cancellationToken);
+        const int take = 5;
+        var topArtists = wrapped.TopArtists.Take(take).ToList();
+        var topTracks = wrapped.TopTracks.Take(take).ToList();
+        var topAlbums = wrapped.TopAlbums.Take(take).ToList();
+        var newArtists = wrapped.NewArtists.Take(take).ToList();
+
+        var artistIds = topArtists.Select(x => x.Id).Concat(newArtists.Select(x => x.Id)).Distinct().ToList();
+        var trackIds = topTracks.Select(x => x.Id).ToList();
+        if (wrapped.MostReplayed is not null)
+        {
+            trackIds.Add(wrapped.MostReplayed.Id);
+        }
+
+        trackIds = trackIds.Distinct().ToList();
+        var albumIds = topAlbums.Select(x => x.Id).ToList();
+
+        var artistImages = artistIds.Count == 0
+            ? new Dictionary<long, string?>()
+            : await db.Artists.AsNoTracking()
+                .Where(a => artistIds.Contains(a.Id))
+                .ToDictionaryAsync(a => a.Id, a => a.ImageUrl, cancellationToken);
+
+        var trackCovers = trackIds.Count == 0
+            ? new Dictionary<long, string?>()
+            : await db.Tracks.AsNoTracking()
+                .Where(t => trackIds.Contains(t.Id))
+                .Select(t => new { t.Id, Cover = t.Album != null ? t.Album.CoverUrl : null })
+                .ToDictionaryAsync(x => x.Id, x => x.Cover, cancellationToken);
+
+        var albumCovers = albumIds.Count == 0
+            ? new Dictionary<long, string?>()
+            : await db.Albums.AsNoTracking()
+                .Where(a => albumIds.Contains(a.Id))
+                .ToDictionaryAsync(a => a.Id, a => a.CoverUrl, cancellationToken);
+
+        string? listener = null;
+        if (await db.SyncStates.AsNoTracking().AnyAsync(cancellationToken))
+        {
+            listener = await db.SyncStates.AsNoTracking()
+                .OrderBy(s => s.Id)
+                .Select(s => s.LastFmUsername)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        static WrappedMediaItem ToMedia(RankedItem item, string? image) =>
+            new(item.Id, item.Name, item.Subtitle, item.Plays, item.DurationMs, item.Rank, BlankToNull(image));
+
+        WrappedMediaItem? mostReplayed = null;
+        if (wrapped.MostReplayed is not null)
+        {
+            trackCovers.TryGetValue(wrapped.MostReplayed.Id, out var cover);
+            mostReplayed = ToMedia(wrapped.MostReplayed, cover);
+        }
+
+        return new WrappedHtmlExport(
+            wrapped.Year,
+            BlankToNull(listener),
+            wrapped.Overview,
+            topArtists.Select(a => ToMedia(a, artistImages.GetValueOrDefault(a.Id))).ToList(),
+            topTracks.Select(t => ToMedia(t, trackCovers.GetValueOrDefault(t.Id))).ToList(),
+            topAlbums.Select(a => ToMedia(a, albumCovers.GetValueOrDefault(a.Id))).ToList(),
+            wrapped.TopGenres.Take(take).ToList(),
+            mostReplayed,
+            wrapped.LongestStreak,
+            wrapped.BusiestHourUtc,
+            wrapped.BusiestHourCount,
+            newArtists.Select(a => ToMedia(a, artistImages.GetValueOrDefault(a.Id))).ToList(),
+            wrapped.Discoveries.Take(take).ToList());
+    }
+
+    private static string? BlankToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     public async Task<IReadOnlyList<int>> GetYears(CancellationToken cancellationToken)
     {
         if (!await db.Scrobbles.AsNoTracking().AnyAsync(cancellationToken))
