@@ -463,16 +463,19 @@ public sealed class MetadataEnrichmentService(
             progress.Log($"{label}: {track.Artist.Name} – {track.Title}");
             return 1;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException
+            || HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken))
         {
             payload.Status = SourceFetchStatus.Error;
             payload.FetchedAt = DateTimeOffset.UtcNow;
             catalog.RevertUnsavedMbidAssignments();
             catalog.DiscardUnsavedAliases();
-            if (EnrichmentRetryHelpers.IsTransientFailure(ex))
+            if (EnrichmentRetryHelpers.IsTransientFailure(ex)
+                || HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken))
             {
-                var api = (JsonApiException)ex;
-                payload.ErrorMessage = EnrichmentRetryHelpers.BusyMessage(label, api.StatusCode);
+                var status = ex is JsonApiException api ? api.StatusCode : null;
+                payload.ErrorMessage = EnrichmentRetryHelpers.BusyMessage(label, status);
                 var opened = sourceHealth.RecordTransientFailure(source, client.RateLimiter);
                 if (opened)
                 {

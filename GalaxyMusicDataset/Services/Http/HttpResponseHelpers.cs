@@ -76,4 +76,37 @@ public static class HttpResponseHelpers
 
     public static bool IsTransientStatus(int? statusCode) =>
         statusCode is 429 or 500 or 502 or 503;
+
+    /// <summary>
+    /// HttpClient.Timeout cancels via TaskCanceledException. That must not be
+    /// treated as host shutdown cancellation, or enrichment never records the
+    /// failure and retries the same track forever.
+    /// </summary>
+    public static bool IsHttpClientTimeout(Exception ex, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is TimeoutException)
+            {
+                return true;
+            }
+
+            if (current is TaskCanceledException)
+            {
+                return true;
+            }
+
+            if (current.Message.Contains("HttpClient.Timeout", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

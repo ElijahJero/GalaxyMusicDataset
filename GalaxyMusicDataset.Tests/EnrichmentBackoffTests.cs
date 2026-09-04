@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Http;
+using GalaxyMusicDataset.Services.VocaDb;
 
 namespace GalaxyMusicDataset.Tests;
 
@@ -28,6 +29,27 @@ public class EnrichmentBackoffTests
     }
 
     [Fact]
+    public void Timeout_messages_are_transient_with_long_cooldown()
+    {
+        var message = EnrichmentRetryHelpers.BusyMessage("VocaDB", null);
+        Assert.Contains("timed out", message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(EnrichmentRetryHelpers.IsTransientFailureMessage(message));
+        Assert.Equal(TimeSpan.FromMinutes(30), EnrichmentRetryHelpers.ErrorRetryCooldown(message));
+        Assert.True(EnrichmentRetryHelpers.IsTransientFailure(
+            new JsonApiException("VocaDB", "VocaDB request timed out after 25000ms.", null)));
+    }
+
+    [Fact]
+    public void HttpClient_timeout_is_not_treated_as_shutdown_cancel()
+    {
+        using var unused = new CancellationTokenSource();
+        var ex = new TaskCanceledException(
+            "The request was canceled due to the configured HttpClient.Timeout of 25 seconds elapsing.");
+        Assert.True(HttpResponseHelpers.IsHttpClientTimeout(ex, CancellationToken.None));
+        Assert.False(HttpResponseHelpers.IsHttpClientTimeout(ex, new CancellationToken(canceled: true)));
+    }
+
+    [Fact]
     public void Source_health_opens_circuit_after_repeated_failures()
     {
         var health = new EnrichmentSourceHealth();
@@ -48,5 +70,14 @@ public class EnrichmentBackoffTests
         Assert.True(health.IsPaused(EnrichmentSource.VocaDb));
         health.RecordSuccess(EnrichmentSource.VocaDb);
         Assert.False(health.IsPaused(EnrichmentSource.VocaDb));
+    }
+
+    [Fact]
+    public void Sanitize_strips_nul_and_control_chars()
+    {
+        Assert.Equal("World is Mine", VocaDbClient.SanitizeSearchTerm("World is Mine"));
+        Assert.Equal("bad title", VocaDbClient.SanitizeSearchTerm("bad\0 title"));
+        Assert.Null(VocaDbClient.SanitizeSearchTerm(" \0\t "));
+        Assert.Null(VocaDbClient.SanitizeSearchTerm(null));
     }
 }

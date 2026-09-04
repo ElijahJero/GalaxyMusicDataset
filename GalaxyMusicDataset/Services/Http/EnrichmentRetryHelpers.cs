@@ -5,8 +5,16 @@ public static class EnrichmentRetryHelpers
     public static readonly TimeSpan DefaultErrorCooldown = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan TransientErrorCooldown = TimeSpan.FromMinutes(30);
 
-    public static bool IsTransientFailure(Exception ex) =>
-        ex is JsonApiException api && HttpResponseHelpers.IsTransientStatus(api.StatusCode);
+    public static bool IsTransientFailure(Exception ex)
+    {
+        if (ex is not JsonApiException api)
+        {
+            return false;
+        }
+
+        return HttpResponseHelpers.IsTransientStatus(api.StatusCode)
+               || IsTransientFailureMessage(api.Message);
+    }
 
     public static bool IsTransientFailureMessage(string? message)
     {
@@ -16,6 +24,8 @@ public static class EnrichmentRetryHelpers
         }
 
         return message.Contains("busy", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("timed out", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("HttpClient.Timeout", StringComparison.OrdinalIgnoreCase)
                || message.Contains("Gave up after", StringComparison.OrdinalIgnoreCase)
                || message.Contains("HTTP 503", StringComparison.OrdinalIgnoreCase)
                || message.Contains("HTTP 429", StringComparison.OrdinalIgnoreCase)
@@ -28,5 +38,7 @@ public static class EnrichmentRetryHelpers
         IsTransientFailureMessage(errorMessage) ? TransientErrorCooldown : DefaultErrorCooldown;
 
     public static string BusyMessage(string source, int? statusCode) =>
-        $"{source} busy (HTTP {statusCode}); will retry after cooldown.";
+        statusCode is null
+            ? $"{source} busy (request timed out); will retry after cooldown."
+            : $"{source} busy (HTTP {statusCode}); will retry after cooldown.";
 }
