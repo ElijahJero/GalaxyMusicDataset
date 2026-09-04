@@ -1,3 +1,7 @@
+# AI Usage Disclosure 
+
+This project was made with AI for experimentation purposes. It is not intended to be a production capable application. Use at your own risk.
+
 # GalaxyMusicDataset
 
 Personal Last.fm history warehouse: pull scrobbles, resolve MusicBrainz IDs, attach tags and metadata, inspect progress, and browse listening analytics.
