@@ -159,6 +159,32 @@ public sealed record WrappedResult(
     int BusiestHourCount,
     IReadOnlyList<TagStat> TopGenres);
 
+/// <summary>Top item with optional cover/artist image for the downloadable HTML Wrapped.</summary>
+public sealed record WrappedMediaItem(
+    long Id,
+    string Name,
+    string? Subtitle,
+    int Plays,
+    long? DurationMs,
+    int Rank,
+    string? ImageUrl);
+
+/// <summary>Self-contained click-through Wrapped export payload (top 5s + media).</summary>
+public sealed record WrappedHtmlExport(
+    int Year,
+    string? ListenerName,
+    OverviewStats Overview,
+    IReadOnlyList<WrappedMediaItem> TopArtists,
+    IReadOnlyList<WrappedMediaItem> TopTracks,
+    IReadOnlyList<WrappedMediaItem> TopAlbums,
+    IReadOnlyList<TagStat> TopGenres,
+    WrappedMediaItem? MostReplayed,
+    int LongestStreak,
+    int BusiestHourUtc,
+    int BusiestHourCount,
+    IReadOnlyList<WrappedMediaItem> NewArtists,
+    IReadOnlyList<DiscoveryItem> Discoveries);
+
 public sealed record TagStat(
     string Name,
     int Plays,

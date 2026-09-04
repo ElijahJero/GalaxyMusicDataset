@@ -88,6 +88,8 @@ Play-weighted rollup of `TrackTags` for the selected range. Duplicate names from
 
 **Year in review (`/Wrapped/{year}`)** — overview + tops + genres + discovery + heatmap for that calendar year, plus new artists, most replayed track, longest streak, busiest hour.
 
+**Click-through Wrapped download** — `GET /Wrapped/{year}?handler=Download` returns a self-contained HTML file (`wrapped-{year}.html`) with full-screen slides (top 5 artists/tracks/albums with cover art when known, genres, most replayed, habits, discoveries). The dashboard on `/Wrapped` stays as-is; the download is a shareable, Spotify-style click-through experience.
+
 ### 6. Artist detail (`/Artists/{id}`)
 
 Name, aliases, MBID, tags rolled up from tracks. Plays, unique tracks, first/last, timeline, top tracks. MusicBrainz link when MBID exists.

@@ -8,8 +8,18 @@
     var albumTable = result is null ? null : new TopTableModel(result.TopAlbums, Model.FilterQuery(), "Album", null, true);
 }
 
-<h1 class="h3 mb-1">Year in review @(Model.Year)</h1>
-<p class="text-muted">Overview, tops, first-heards, and the heatmap for this calendar year.</p>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-1">
+    <div>
+        <h1 class="h3 mb-1">Year in review @(Model.Year)</h1>
+        <p class="text-muted mb-0">Overview, tops, first-heards, and the heatmap for this calendar year.</p>
+    </div>
+    @if (Model.Year is not null && Model.Result is not null)
+    {
+        <a class="btn btn-outline-primary" asp-page="/Wrapped" asp-page-handler="Download" asp-route-year="@Model.Year" asp-route-q="@Model.Q">
+            Download click-through Wrapped
+        </a>
+    }
+</div>
 
 <partial name="_AnalyticsNav" model='"wrapped"' />
 
