@@ -11,7 +11,8 @@ public static class WrappedHtmlGenerator
     {
         var sb = new StringBuilder(48_000);
         var year = data.Year.ToString(CultureInfo.InvariantCulture);
-        var who = string.IsNullOrWhiteSpace(data.ListenerName) ? "Your" : Escape(data.ListenerName) + "'s";
+        var whoRaw = string.IsNullOrWhiteSpace(data.ListenerName) ? "Your" : data.ListenerName.Trim() + "'s";
+        var who = Escape(whoRaw);
         var minutes = (data.Overview.ListeningTimeMs / 60_000L).ToString("N0", CultureInfo.InvariantCulture);
         var hours = (data.Overview.ListeningTimeMs / 3_600_000.0).ToString("0.#", CultureInfo.InvariantCulture);
         var scrobbles = AnalyticsDisplay.Count(data.Overview.ScrobbleCount);
@@ -20,7 +21,7 @@ public static class WrappedHtmlGenerator
 
         sb.Append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n");
         sb.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
-        sb.Append("<title>").Append(Escape(who)).Append(' ').Append(year).Append(" Wrapped</title>\n");
+        sb.Append("<title>").Append(who).Append(' ').Append(year).Append(" Wrapped</title>\n");
         sb.Append("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
