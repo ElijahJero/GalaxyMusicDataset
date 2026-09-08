@@ -1,9 +1,11 @@
 using GalaxyMusicDataset.Services.Aggregation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace GalaxyMusicDataset.Pages;
 
+[Authorize]
 public class IndexModel(
     AggregationStatusService statusService,
     AggregationCoordinator coordinator,

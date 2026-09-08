@@ -28,6 +28,12 @@ public class TracksModel(AnalyticsQueries analytics, MetadataEnrichmentService e
 
     public async Task<IActionResult> OnPostLookupMbidAsync(long id, CancellationToken cancellationToken)
     {
+        // AnalyticsPageModel is [AllowAnonymous], which skips endpoint authorization for every handler.
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return Challenge();
+        }
+
         TempData["TrackFlash"] = await enrichment.EnrichTrackFromMbidAsync(id, cancellationToken);
         return RedirectToPage(DetailRoute(id));
     }

@@ -1,11 +1,13 @@
 using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Services.Aggregation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
 
 namespace GalaxyMusicDataset.Pages;
 
+[Authorize]
 public class SettingsModel(
     IOptionsMonitor<LastFmOptions> lastFm,
     IOptionsMonitor<DiscogsOptions> discogs,

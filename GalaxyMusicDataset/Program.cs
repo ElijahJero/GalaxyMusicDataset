@@ -2,6 +2,9 @@ using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Auth;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -23,6 +26,25 @@ builder.Services.AddDataProtection()
 
 builder.Services.AddRazorPages();
 builder.Services.AddGalaxyAggregation(builder.Configuration, builder.Environment);
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Login";
+        options.LogoutPath = "/Logout";
+        options.AccessDeniedPath = "/Login";
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromDays(14);
+        options.Cookie.Name = "galaxy.auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var app = builder.Build();
 
@@ -53,8 +75,23 @@ if (!app.Environment.IsDevelopment())
     }
 }
 app.UseRouting();
+app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (AnonymousHomeRedirect.ShouldRedirectToDashboard(
+            context.Request.Method,
+            context.Request.Path.Value,
+            context.User.Identity?.IsAuthenticated == true))
+    {
+        context.Response.Redirect("/Dashboard");
+        return;
+    }
+
+    await next();
+});
 app.UseAuthorization();
-app.MapStaticAssets();
+// MapStaticAssets are endpoints; without this, FallbackPolicy sends CSS/JS to /Login.
+app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages().WithStaticAssets();
 app.Run();
 

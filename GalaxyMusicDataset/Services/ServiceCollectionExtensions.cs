@@ -2,6 +2,7 @@ using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
+using GalaxyMusicDataset.Services.Auth;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
@@ -24,6 +25,8 @@ public static class ServiceCollectionExtensions
         services.Configure<UtaiteDbOptions>(configuration.GetSection(UtaiteDbOptions.SectionName));
         services.Configure<TouhouDbOptions>(configuration.GetSection(TouhouDbOptions.SectionName));
         services.Configure<AggregationOptions>(configuration.GetSection(AggregationOptions.SectionName));
+        services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+        services.AddSingleton<AdminSignIn>();
 
         var dbPath = Path.Combine(environment.ContentRootPath, "App_Data", "galaxy.db");
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);

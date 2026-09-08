@@ -1,10 +1,12 @@
 using GalaxyMusicDataset.Services.Analytics;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
 
 namespace GalaxyMusicDataset.Pages;
 
+[AllowAnonymous]
 public abstract class AnalyticsPageModel : PageModel
 {
     [BindProperty(SupportsGet = true)]

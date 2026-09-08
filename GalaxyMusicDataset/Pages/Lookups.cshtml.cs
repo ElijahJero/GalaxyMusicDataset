@@ -1,12 +1,14 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Pages;
 
+[Authorize]
 public class LookupsModel(AppDbContext db, MusicBrainzLookupService lookups) : PageModel
 {
     [BindProperty(SupportsGet = true)]
