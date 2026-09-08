@@ -3,6 +3,7 @@ using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Auth;
+using GalaxyMusicDataset.Services.Search;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -61,6 +62,9 @@ using (var scope = app.Services.CreateScope())
         var seeder = scope.ServiceProvider.GetRequiredService<SampleDataSeeder>();
         await seeder.SeedIfEmptyAsync(SampleDataSeeder.DefaultSample(), CancellationToken.None);
     }
+
+    var librarySearch = scope.ServiceProvider.GetRequiredService<LibrarySearchService>();
+    await librarySearch.EnsureCurrentAsync(db, CancellationToken.None);
 }
 
 if (!app.Environment.IsDevelopment())

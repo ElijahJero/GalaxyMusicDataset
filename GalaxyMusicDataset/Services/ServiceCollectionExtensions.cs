@@ -7,6 +7,7 @@ using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
+using GalaxyMusicDataset.Services.Search;
 using GalaxyMusicDataset.Services.TheAudioDb;
 using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AggregationStatusService>();
         services.AddScoped<AnalyticsQueries>();
         services.AddSingleton<UserSettingsStore>();
+        services.AddSingleton<LibrarySearchService>();
         services.AddHostedService<AggregationHostedService>();
         return services;
     }
