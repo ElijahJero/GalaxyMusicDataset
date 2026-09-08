@@ -90,7 +90,8 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseAuthorization();
-app.MapStaticAssets();
+// MapStaticAssets are endpoints; without this, FallbackPolicy sends CSS/JS to /Login.
+app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages().WithStaticAssets();
 app.Run();
 
