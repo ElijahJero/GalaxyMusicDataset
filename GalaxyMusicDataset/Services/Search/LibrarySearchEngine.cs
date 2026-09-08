@@ -144,11 +144,11 @@ public sealed class LibrarySearchEngine : IDisposable
             query.Add(new PrefixQuery(term) { Boost = 2f }, Occur.SHOULD);
         }
 
-        if (token.Length >= 5)
+        if (token.Length >= 6)
         {
             query.Add(new FuzzyQuery(term, 2) { Boost = 0.6f }, Occur.SHOULD);
         }
-        else if (token.Length >= 3)
+        else if (token.Length >= 4)
         {
             query.Add(new FuzzyQuery(term, 1) { Boost = 0.6f }, Occur.SHOULD);
         }

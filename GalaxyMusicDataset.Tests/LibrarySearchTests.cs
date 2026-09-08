@@ -16,6 +16,7 @@ public class LibrarySearchTests
         Assert.Equal([1], Ids(engine.Search("mori", null, null, null)));
         Assert.Equal([1], Ids(engine.Search("CALLI", null, null, null)));
         Assert.Equal([2], Ids(engine.Search("loading", null, null, null)));
+        Assert.DoesNotContain(5L, engine.Search("calli", null, null, null));
         Assert.Equal([3], Ids(engine.Search("stay house", null, null, null)));
     }
 
@@ -94,6 +95,7 @@ public class LibrarySearchTests
         new(1, "INSOMNIAC BLACK", "Mori Calliope", "DISASTERPIECE", ["Calliope Mori"]),
         new(2, "Now Loading!!!!", "fourfolium", "JUMPin' JUMP UP!!!!", []),
         new(3, "I Really Want to Stay at Your House", "Samuel Kim", "I Really Want to Stay at Your House", []),
-        new(4, "ススメRunner!!(instrumental)", "fourfolium", "TVアニメ「NEW GAME!!」オープニングテーマ", [])
+        new(4, "ススメRunner!!(instrumental)", "fourfolium", "TVアニメ「NEW GAME!!」オープニングテーマ", []),
+        new(5, "Shopping Malls", "nihmune", "Neutral Front", [])
     ];
 }
