@@ -2,12 +2,14 @@ using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.MusicBrainz;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Pages;
 
+[Authorize]
 public class ReviewModel(AppDbContext db, MusicBrainzLookupService lookups) : PageModel
 {
     public IReadOnlyList<ReviewRow> Rows { get; private set; } = [];

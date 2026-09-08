@@ -1,12 +1,14 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Pages;
 
+[Authorize]
 public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnrichmentService enrichment) : PageModel
 {
     public const int PageSize = 50;

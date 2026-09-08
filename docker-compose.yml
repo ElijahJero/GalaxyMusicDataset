@@ -16,6 +16,8 @@ services:
       Discogs__Token: ${DISCOGS_TOKEN:-}
       TheAudioDb__ApiKey: ${THEAUDIODB_API_KEY:-}
       MusicBrainz__BaseUrl: ${MUSICBRAINZ_BASE_URL:-https://musicbrainz.org}
+      Auth__Username: ${AUTH_USERNAME:-admin}
+      Auth__Password: ${AUTH_PASSWORD:-}
     restart: unless-stopped
 
 volumes:

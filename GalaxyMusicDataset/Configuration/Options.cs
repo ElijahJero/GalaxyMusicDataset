@@ -1,5 +1,13 @@
 namespace GalaxyMusicDataset.Configuration;
 
+public sealed class AuthOptions
+{
+    public const string SectionName = "Auth";
+
+    public string Username { get; set; } = "admin";
+    public string? Password { get; set; }
+}
+
 public sealed class LastFmOptions
 {
     public const string SectionName = "LastFm";

@@ -47,10 +47,13 @@
                 @if (!string.IsNullOrEmpty(t.Mbid))
                 {
                     <a href="https://musicbrainz.org/recording/@t.Mbid" target="_blank" rel="noopener">@t.Mbid</a>
-                    <form method="post" asp-page-handler="LookupMbid" class="d-inline ms-2">
-                        <input type="hidden" name="id" value="@t.Id" />
-                        <button class="btn btn-sm btn-outline-secondary" type="submit">Fetch MusicBrainz details</button>
-                    </form>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <form method="post" asp-page-handler="LookupMbid" class="d-inline ms-2">
+                            <input type="hidden" name="id" value="@t.Id" />
+                            <button class="btn btn-sm btn-outline-secondary" type="submit">Fetch MusicBrainz details</button>
+                        </form>
+                    }
                 }
                 else
                 {

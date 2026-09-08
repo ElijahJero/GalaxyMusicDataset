@@ -21,16 +21,19 @@
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm bg-body-tertiary border-bottom box-shadow mb-3">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">GalaxyMusicDataset</a>
+                <a class="navbar-brand" asp-area="" asp-page="@(User.Identity?.IsAuthenticated == true ? "/Index" : "/Dashboard")">GalaxyMusicDataset</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-page="/Index">Progress</a>
-                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Index">Progress</a>
+                            </li>
+                        }
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Analytics</a>
                             <ul class="dropdown-menu">
@@ -43,20 +46,35 @@
                                 <li><a class="dropdown-item" asp-page="/Sessions">Sessions</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-page="/Recent">Library</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-page="/Lookups">Lookups</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-page="/Review">Review</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-page="/Settings">Settings</a>
-                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Recent">Library</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Lookups">Lookups</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Review">Review</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Settings">Settings</a>
+                            </li>
+                        }
                     </ul>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-theme-toggle aria-pressed="true" title="Toggle color theme">Light</button>
+                    <div class="d-flex align-items-center gap-2">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <form method="post" asp-page="/Logout" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Logout</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <a class="btn btn-sm btn-outline-secondary" asp-page="/Login">Login</a>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-theme-toggle aria-pressed="true" title="Toggle color theme">Light</button>
+                    </div>
                 </div>
             </div>
         </nav>
