@@ -101,6 +101,65 @@ public class VocaDbFamilyTests
     }
 
     [Fact]
+    public void Song_search_query_is_title_only()
+    {
+        Assert.Equal("World is Mine", VocaDbClient.SongSearchQuery("World is Mine"));
+        Assert.Null(VocaDbClient.SongSearchQuery(" \0\t "));
+        var url = VocaDbClient.BuildSongSearchUrl("https://vocadb.net", "World is Mine");
+        Assert.Contains("query=World%20is%20Mine", url, StringComparison.Ordinal);
+        Assert.Contains("sort=RatingScore", url, StringComparison.Ordinal);
+        Assert.DoesNotContain("preferAccurateMatches=true", url, StringComparison.Ordinal);
+        Assert.DoesNotContain("Hatsune", url, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Miku", url, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("https://vocadb.net/api/songs?", url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Combined_title_artist_query_is_not_used_for_search()
+    {
+        // Regression: stuffing the artist into query makes Auto/Words require those
+        // tokens in the song name, so "World is Mine Hatsune Miku" misses id 1326.
+        var query = VocaDbClient.SongSearchQuery("World is Mine");
+        Assert.Equal("World is Mine", query);
+        Assert.DoesNotContain("Hatsune Miku", query, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PickBest_selects_canonical_song_when_newer_unrelated_hits_come_first()
+    {
+        var junk = VocaDbClient.ParseSearch("""
+            {
+              "items": [
+                {
+                  "id": 885335,
+                  "name": "/ ワールドイズマイン",
+                  "additionalNames": "",
+                  "artistString": "WONKAloid feat. Big Jack Horner (UTAU)",
+                  "songType": "Cover",
+                  "artists": [{ "name": "WONKAloid", "categories": "Producer" }]
+                }
+              ]
+            }
+            """).Items[0];
+        var canonical = VocaDbClient.ParseSearch(WorldIsMineJson).Items[0];
+        var picked = VocaDbSongMatcher.PickBest("Hatsune Miku", "World is Mine", [junk, canonical]);
+        Assert.NotNull(picked);
+        Assert.Equal("48", picked!.Id);
+    }
+
+    [Fact]
+    public void Legacy_not_found_messages_are_false_negatives()
+    {
+        Assert.True(VocaDbFamily.IsLegacyFalseNegative("VocaDB returned no songs."));
+        Assert.True(VocaDbFamily.IsLegacyFalseNegative("UtaiteDB returned no songs."));
+        Assert.True(VocaDbFamily.IsLegacyFalseNegative("TouhouDB returned no songs."));
+        Assert.True(VocaDbFamily.IsLegacyFalseNegative("No VocaDB-family match passed the auto-match threshold."));
+        Assert.False(VocaDbFamily.IsLegacyFalseNegative(VocaDbFamily.NoSongsMessage(EnrichmentSource.VocaDb)));
+        Assert.False(VocaDbFamily.IsLegacyFalseNegative(VocaDbFamily.WeakMatchMessage));
+        Assert.False(VocaDbFamily.IsLegacyFalseNegative(null));
+    }
+
+    [Fact]
     public async Task ApplyVocaDb_sets_id_duration_tags_and_aliases()
     {
         await using var harness = await TestDb.CreateAsync();
@@ -145,6 +204,85 @@ public class VocaDbFamilyTests
         Assert.Contains(saved.Artist.Aliases, a => a.Name == "初音ミク");
         Assert.True(AnalyticsQueries.IsGenreLike(EnrichmentSource.VocaDb, 80));
         Assert.False(AnalyticsQueries.IsGenreLike(EnrichmentSource.VocaDb, 10));
+    }
+
+    [Fact]
+    public async Task Requeue_resets_legacy_not_found_but_keeps_new_not_found()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var artist = new Artist { Name = "Hatsune Miku", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.Add(artist);
+        await harness.Db.SaveChangesAsync();
+        var tracks = Enumerable.Range(0, 4).Select(i => new Track
+        {
+            ArtistId = artist.Id,
+            Title = $"Song {i}",
+            Fingerprint = $"fp-voca-{i}",
+            CreatedAt = now,
+            UpdatedAt = now
+        }).ToList();
+        harness.Db.Tracks.AddRange(tracks);
+        await harness.Db.SaveChangesAsync();
+
+        harness.Db.TrackSourcePayloads.AddRange(
+            new TrackSourcePayload
+            {
+                TrackId = tracks[0].Id,
+                Source = EnrichmentSource.VocaDb,
+                Status = SourceFetchStatus.NotFound,
+                ErrorMessage = "VocaDB returned no songs.",
+                FetchedAt = now,
+                PayloadJson = """{"items":[]}"""
+            },
+            new TrackSourcePayload
+            {
+                TrackId = tracks[1].Id,
+                Source = EnrichmentSource.UtaiteDb,
+                Status = SourceFetchStatus.NotFound,
+                ErrorMessage = "No VocaDB-family match passed the auto-match threshold.",
+                FetchedAt = now
+            },
+            new TrackSourcePayload
+            {
+                TrackId = tracks[2].Id,
+                Source = EnrichmentSource.TouhouDb,
+                Status = SourceFetchStatus.NotFound,
+                ErrorMessage = VocaDbFamily.NoSongsMessage(EnrichmentSource.TouhouDb),
+                FetchedAt = now
+            },
+            new TrackSourcePayload
+            {
+                TrackId = tracks[3].Id,
+                Source = EnrichmentSource.VocaDb,
+                Status = SourceFetchStatus.Success,
+                ExternalId = "1326",
+                FetchedAt = now
+            });
+        await harness.Db.SaveChangesAsync();
+
+        var catalog = new CatalogService(harness.Db);
+        var service = new MetadataEnrichmentService(
+            harness.Db,
+            null!,
+            new TagService(harness.Db),
+            catalog,
+            new AggregationProgress(),
+            new EnrichmentSourceHealth(),
+            new StaticMonitor<AggregationOptions>(new AggregationOptions()));
+
+        var n = await service.RequeueVocaDbFamilyFalseNegativesAsync(CancellationToken.None);
+        Assert.Equal(2, n);
+
+        harness.Db.ChangeTracker.Clear();
+        var rows = await harness.Db.TrackSourcePayloads.OrderBy(p => p.TrackId).ToListAsync();
+        Assert.Equal(SourceFetchStatus.NotStarted, rows[0].Status);
+        Assert.Null(rows[0].ErrorMessage);
+        Assert.Null(rows[0].PayloadJson);
+        Assert.Equal(SourceFetchStatus.NotStarted, rows[1].Status);
+        Assert.Equal(SourceFetchStatus.NotFound, rows[2].Status);
+        Assert.Equal(SourceFetchStatus.Success, rows[3].Status);
+        Assert.Equal("1326", rows[3].ExternalId);
     }
 
     [Fact]

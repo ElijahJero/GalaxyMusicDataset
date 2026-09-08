@@ -54,31 +54,48 @@ public sealed class VocaDbClient(HttpClient http, ApiCallRecorder recorder)
         _ => throw new ArgumentOutOfRangeException(nameof(source), source, "Not a VocaDB-family source.")
     };
 
+    public const string SongSort = "RatingScore";
+
     public async Task<(IReadOnlyList<VocaDbSongHit> Items, string RawJson)> SearchSongsAsync(
         string artist,
         string title,
         CancellationToken cancellationToken)
     {
-        var safeTitle = SanitizeSearchTerm(title);
-        var safeArtist = SanitizeSearchTerm(artist);
-        if (safeTitle is null)
+        _ = artist;
+        var query = SongSearchQuery(title);
+        if (query is null)
         {
             return ([], """{"items":[]}""");
         }
 
-        // Prefer "title artist" so common/short titles do not scan the whole catalog.
-        var query = safeArtist is null ? safeTitle : $"{safeTitle} {safeArtist}";
-        var root = BaseUrl.TrimEnd('/');
-        var url =
-            $"{root}/api/songs?query={Uri.EscapeDataString(query)}" +
-            $"&fields={SearchFields}" +
-            "&nameMatchMode=Auto&preferAccurateMatches=true&maxResults=10&lang=Default";
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        using var request = new HttpRequestMessage(HttpMethod.Get, BuildSongSearchUrl(BaseUrl, query));
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         // Fail fast when VocaDB is overloaded; enrichment backs off per-track and per-source.
         var json = await recorder.SendAsync(http, request, SourceName, RateLimiter, cancellationToken, maxAttempts: 2);
         return ParseSearch(json);
+    }
+
+    /// <summary>
+    /// Song <c>query</c> is the title only. Auto/Words matching requires every token to
+    /// appear in the song name, so appending the artist ("World is Mine Hatsune Miku")
+    /// misses the canonical entry. Artist matching happens later in
+    /// <see cref="VocaDbSongMatcher.PickBest"/>.
+    /// </summary>
+    public static string? SongSearchQuery(string? title) => SanitizeSearchTerm(title);
+
+    /// <summary>
+    /// Default VocaDB sort is AdditionDate (newest first), which buries well-known
+    /// songs under recent remixes and covers. RatingScore puts the canonical hit first.
+    /// preferAccurateMatches is left off: it forces exact name matching and hides
+    /// well-known songs like TouhouDB's "Bad Apple!!" when Last.fm stored "Bad Apple".
+    /// </summary>
+    public static string BuildSongSearchUrl(string baseUrl, string title)
+    {
+        var root = baseUrl.TrimEnd('/');
+        return $"{root}/api/songs?query={Uri.EscapeDataString(title)}" +
+               $"&fields={SearchFields}" +
+               $"&nameMatchMode=Auto&sort={SongSort}&maxResults=10&lang=Default";
     }
 
     /// <summary>
