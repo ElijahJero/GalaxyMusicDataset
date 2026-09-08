@@ -26,6 +26,13 @@ public sealed class AggregationHostedService(
             {
                 progress.Log($"Requeued {requeued} MusicBrainz lookup(s) that failed because the server was busy.");
             }
+
+            var metadata = boot.ServiceProvider.GetRequiredService<MetadataEnrichmentService>();
+            var vocaRequeued = await metadata.RequeueVocaDbFamilyFalseNegativesAsync(stoppingToken);
+            if (vocaRequeued > 0)
+            {
+                progress.Log($"Requeued {vocaRequeued} VocaDB-family search(es) that were marked not-found by the broken title+artist query.");
+            }
         }
 
         progress.Log("Aggregation worker started.");

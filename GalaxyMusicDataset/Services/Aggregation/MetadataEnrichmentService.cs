@@ -93,6 +93,28 @@ public sealed class MetadataEnrichmentService(
         return await FillMissingCoversAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Retry VocaDB-family NotFound rows written by the broken title+artist search.
+    /// New NotFound messages use different wording so this is one-shot.
+    /// </summary>
+    public async Task<int> RequeueVocaDbFamilyFalseNegativesAsync(CancellationToken cancellationToken)
+    {
+        var family = new[] { EnrichmentSource.VocaDb, EnrichmentSource.UtaiteDb, EnrichmentSource.TouhouDb };
+        const string weakMatch = "No VocaDB-family match passed the auto-match threshold.";
+        return await db.TrackSourcePayloads
+            .Where(p => family.Contains(p.Source) && p.Status == SourceFetchStatus.NotFound)
+            .Where(p => p.ErrorMessage != null
+                        && (p.ErrorMessage.EndsWith("returned no songs.")
+                            || p.ErrorMessage == weakMatch))
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(p => p.Status, SourceFetchStatus.NotStarted)
+                    .SetProperty(p => p.ErrorMessage, (string?)null)
+                    .SetProperty(p => p.PayloadJson, (string?)null)
+                    .SetProperty(p => p.ExternalId, (string?)null)
+                    .SetProperty(p => p.FetchedAt, (DateTimeOffset?)null),
+                cancellationToken);
+    }
+
     public async Task<string> EnrichTrackFromMbidAsync(long trackId, CancellationToken cancellationToken)
     {
         var track = await db.Tracks
@@ -445,8 +467,8 @@ public sealed class MetadataEnrichmentService(
                 payload.PayloadJson = result.RawJson;
                 payload.FetchedAt = DateTimeOffset.UtcNow;
                 payload.ErrorMessage = result.Items.Count == 0
-                    ? $"{label} returned no songs."
-                    : "No VocaDB-family match passed the auto-match threshold.";
+                    ? VocaDbFamily.NoSongsMessage(source)
+                    : VocaDbFamily.WeakMatchMessage;
                 await db.SaveChangesAsync(cancellationToken);
                 sourceHealth.RecordSuccess(source);
                 return 1;

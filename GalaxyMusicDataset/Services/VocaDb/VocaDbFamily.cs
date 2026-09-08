@@ -55,4 +55,26 @@ public static class VocaDbFamily
     }
 
     public static string AliasSource(EnrichmentSource source) => DisplayName(source);
+
+    public const string WeakMatchMessage = "No VocaDB-family result passed the auto-match threshold.";
+
+    public static string NoSongsMessage(EnrichmentSource source) =>
+        $"{DisplayName(source)} returned no matching songs.";
+
+    /// <summary>
+    /// NotFound rows written while song search stuffed the artist into <c>query</c>
+    /// and used newest-first sort. Those are false negatives and should be retried.
+    /// </summary>
+    public static bool IsLegacyFalseNegative(string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return false;
+        }
+
+        return errorMessage.EndsWith("returned no songs.", StringComparison.Ordinal)
+               || errorMessage.Equals(
+                   "No VocaDB-family match passed the auto-match threshold.",
+                   StringComparison.Ordinal);
+    }
 }
