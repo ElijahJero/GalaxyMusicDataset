@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Search;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -9,7 +10,11 @@ using Microsoft.EntityFrameworkCore;
 namespace GalaxyMusicDataset.Pages;
 
 [Authorize]
-public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnrichmentService enrichment) : PageModel
+public class RecentModel(
+    AppDbContext db,
+    TrackEditService editor,
+    MetadataEnrichmentService enrichment,
+    LibrarySearchService search) : PageModel
 {
     public const int PageSize = 50;
 
@@ -63,7 +68,12 @@ public class RecentModel(AppDbContext db, TrackEditService editor, MetadataEnric
         }
 
         var query = db.Tracks.AsNoTracking().AsQueryable();
-        query = LibraryFilters.Apply(query, db, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status);
+        if (LibraryFilters.HasTextFilter(Q, Artist, Title, Album))
+        {
+            await search.EnsureCurrentAsync(db, cancellationToken);
+        }
+
+        query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status);
 
         query = Sort switch
         {
@@ -147,9 +157,16 @@ public sealed record LibraryRow(Track Track, TrackLookup? Lookup, int PlayCount,
 
 public static class LibraryFilters
 {
+    public static bool HasTextFilter(string? q, string? artist, string? title, string? album) =>
+        !string.IsNullOrWhiteSpace(q)
+        || !string.IsNullOrWhiteSpace(artist)
+        || !string.IsNullOrWhiteSpace(title)
+        || !string.IsNullOrWhiteSpace(album);
+
     public static IQueryable<Track> Apply(
         IQueryable<Track> query,
         AppDbContext db,
+        LibrarySearchService? search,
         string? q,
         string? artist,
         string? title,
@@ -159,31 +176,10 @@ public static class LibraryFilters
         string? source,
         string? status)
     {
-        if (!string.IsNullOrWhiteSpace(q))
+        if (HasTextFilter(q, artist, title, album))
         {
-            var term = q.Trim();
-            query = query.Where(t =>
-                t.Title.Contains(term) ||
-                t.Artist.Name.Contains(term) ||
-                (t.Album != null && t.Album.Title.Contains(term)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(artist))
-        {
-            var term = artist.Trim();
-            query = query.Where(t => t.Artist.Name.Contains(term) || t.Artist.Aliases.Any(a => a.Name.Contains(term)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            var term = title.Trim();
-            query = query.Where(t => t.Title.Contains(term));
-        }
-
-        if (!string.IsNullOrWhiteSpace(album))
-        {
-            var term = album.Trim();
-            query = query.Where(t => t.Album != null && t.Album.Title.Contains(term));
+            var ids = search?.Search(q, artist, title, album) ?? [];
+            query = query.Where(t => ids.Contains(t.Id));
         }
 
         if (string.Equals(hasMbid, "yes", StringComparison.OrdinalIgnoreCase))

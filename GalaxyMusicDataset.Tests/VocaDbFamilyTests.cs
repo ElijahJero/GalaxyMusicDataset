@@ -363,10 +363,10 @@ public class VocaDbFamilyTests
         });
         await harness.Db.SaveChangesAsync();
 
-        var yes = await LibraryFilters.Apply(harness.Db.Tracks, harness.Db, null, null, null, null, null, "yes", null, null)
+        var yes = await LibraryFilters.Apply(harness.Db.Tracks, harness.Db, null, null, null, null, null, null, "yes", null, null)
             .Select(t => t.Title)
             .ToListAsync();
-        var no = await LibraryFilters.Apply(harness.Db.Tracks, harness.Db, null, null, null, null, null, "no", null, null)
+        var no = await LibraryFilters.Apply(harness.Db.Tracks, harness.Db, null, null, null, null, null, null, "no", null, null)
             .Select(t => t.Title)
             .ToListAsync();
         Assert.Equal(["Tagged"], yes);
