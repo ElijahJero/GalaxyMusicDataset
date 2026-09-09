@@ -328,6 +328,35 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             topTracks);
     }
 
+    public async Task<PagedResult<RecentPlay>> GetRecentPlays(
+        TimeRange range,
+        string? search,
+        int take,
+        int page,
+        CancellationToken cancellationToken)
+    {
+        take = ClampTake(take);
+        page = Math.Max(1, page);
+        var query = Filter(range, search).OrderByDescending(s => s.UnixTimestamp);
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query
+            .Skip((page - 1) * take)
+            .Take(take)
+            .Select(s => new RecentPlay(
+                s.Id,
+                s.TrackId,
+                s.Track.Title,
+                s.Track.ArtistId,
+                s.Track.Artist.Name,
+                s.Track.AlbumId,
+                s.Track.Album == null ? null : s.Track.Album.Title,
+                s.Track.Album == null ? null : s.Track.Album.CoverUrl,
+                s.PlayedAt))
+            .ToListAsync(cancellationToken);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)take));
+        return new PagedResult<RecentPlay>(rows, total, page, take, totalPages, page < totalPages);
+    }
+
     public async Task<TrackDetail?> GetTrackDetail(long id, CancellationToken cancellationToken)
     {
         var track = await db.Tracks.AsNoTracking()

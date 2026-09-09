@@ -75,6 +75,10 @@ public class AnalyticsQueriesTests
         Assert.Equal(7, aliasHit.ScrobbleCount);
         Assert.Equal(1, aliasHit.UniqueArtists);
 
+        var recent = await queries.GetRecentPlays(range, null, 10, 1, CancellationToken.None);
+        Assert.Equal(8, recent.Total);
+        Assert.Equal("INSOMNIAC BLACK", recent.Items[0].Title);
+
         var heatmap = await queries.GetHeatmap(range, null, CancellationToken.None);
         var mondayMorning = heatmap.Cells.Single(c => c.WeekdayMonday0 == 0 && c.HourUtc == 10);
         Assert.Equal(2, mondayMorning.Count);

@@ -1,9 +1,13 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Api;
 using GalaxyMusicDataset.Services.Auth;
 using GalaxyMusicDataset.Services.Search;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -26,6 +30,19 @@ builder.Services.AddDataProtection()
     .SetApplicationName("GalaxyMusicDataset");
 
 builder.Services.AddRazorPages();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 builder.Services.AddGalaxyAggregation(builder.Configuration, builder.Environment);
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -39,12 +56,29 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-    });
+        options.Events.OnRedirectToLogin = context => JsonIfApi(context, StatusCodes.Status401Unauthorized);
+        options.Events.OnRedirectToAccessDenied = context => JsonIfApi(context, StatusCodes.Status403Forbidden);
+    })
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationHandler.SchemeName,
+        _ => { });
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+    options.AddPolicy(ApiPolicies.Read, policy =>
+    {
+        policy.AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName);
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(ApiKeyScopes.ClaimType, ApiKeyScopes.Read);
+    });
+    options.AddPolicy(ApiPolicies.Write, policy =>
+    {
+        policy.AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName);
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(ApiKeyScopes.ClaimType, ApiKeyScopes.Write);
+    });
 });
 
 var app = builder.Build();
@@ -96,8 +130,21 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 // MapStaticAssets are endpoints; without this, FallbackPolicy sends CSS/JS to /Login.
 app.MapStaticAssets().AllowAnonymous();
+app.MapControllers();
 app.MapRazorPages().WithStaticAssets();
 app.Run();
+
+static Task JsonIfApi(RedirectContext<CookieAuthenticationOptions> context, int statusCode)
+{
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        context.Response.StatusCode = statusCode;
+        return Task.CompletedTask;
+    }
+
+    context.Response.Redirect(context.RedirectUri);
+    return Task.CompletedTask;
+}
 
 static bool HttpsPortConfigured()
 {
@@ -105,3 +152,5 @@ static bool HttpsPortConfigured()
            || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT"))
            || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HTTPS_PORT"));
 }
+
+public partial class Program;
