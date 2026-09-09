@@ -261,6 +261,18 @@ a:hover {
   border-bottom-color: var(--galaxy-accent);
 }
 
+.hud-scroll-panel {
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.hud-scroll-panel thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--galaxy-panel);
+}
+
 .log-box {
   font-family: var(--galaxy-mono);
   font-size: 0.75rem;
