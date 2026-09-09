@@ -3,6 +3,7 @@ using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Pages;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
+using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Api;
 using GalaxyMusicDataset.Services.Search;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +35,7 @@ public sealed class LibraryApiController(
         [FromQuery] string? status = null,
         [FromQuery] string? hasMbid = null,
         [FromQuery] string? hasTags = null,
+        [FromQuery] string? hasAudio = null,
         [FromQuery] string? source = null,
         [FromQuery] string sort = "recent",
         CancellationToken cancellationToken = default)
@@ -51,7 +53,7 @@ public sealed class LibraryApiController(
             await search.EnsureCurrentAsync(db, cancellationToken);
         }
 
-        query = LibraryFilters.Apply(query, db, search, q, artist, title, album, hasMbid, hasTags, source, status);
+        query = LibraryFilters.Apply(query, db, search, q, artist, title, album, hasMbid, hasTags, source, status, hasAudio);
         query = sort switch
         {
             "title" => query.OrderBy(t => t.Title).ThenBy(t => t.Artist.Name),
@@ -74,6 +76,8 @@ public sealed class LibraryApiController(
             .Include(t => t.Album)
             .Include(t => t.Tags).ThenInclude(t => t.Tag)
             .Include(t => t.SourcePayloads)
+            .Include(t => t.AudioProfile)
+                .ThenInclude(p => p!.Labels)
             .ToListAsync(cancellationToken);
 
         var ids = tracks.Select(t => t.Id).ToList();
@@ -155,5 +159,6 @@ public sealed class LibraryApiController(
                 p.Status.ToString(),
                 p.ExternalId,
                 p.ErrorMessage,
-                p.PayloadJson)).ToList());
+                p.PayloadJson)).ToList(),
+            track.AudioProfile is null ? null : AudioProfileService.ToView(track.AudioProfile));
 }

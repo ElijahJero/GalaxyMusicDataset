@@ -102,6 +102,11 @@
     <partial name="_TagPills" model="t.Tags" />
 }
 
+@if (t.Audio is not null)
+{
+    <partial name="_AudioProfile" model="@(t.Audio)" />
+}
+
 <div class="card mb-4">
     <div class="card-header">Play timestamps</div>
     <div class="card-body">

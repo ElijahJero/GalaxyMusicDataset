@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GalaxyMusicDataset.Services.Analytics;
+using GalaxyMusicDataset.Services.Audio;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GalaxyMusicDataset.Pages;
@@ -13,6 +14,7 @@ public class TagsModel(AnalyticsQueries analytics) : AnalyticsPageModel
     public int Take { get; set; } = AnalyticsQueries.DefaultTake;
 
     public TagCloudResult Cloud { get; private set; } = new([], [], 0, 0);
+    public AudioAnalyticsResult Audio { get; private set; } = null!;
     public TagDetailResult? Detail { get; private set; }
     public string GenreJson { get; private set; } = "[]";
     public IReadOnlyList<int> Years { get; private set; } = [];
@@ -22,6 +24,7 @@ public class TagsModel(AnalyticsQueries analytics) : AnalyticsPageModel
         ResolveFilter();
         Years = await analytics.GetYears(cancellationToken);
         Cloud = await analytics.GetTagCloud(TimeRange, Q, Take, cancellationToken);
+        Audio = await analytics.GetAudioAnalytics(TimeRange, Q, Take, cancellationToken);
         GenreJson = JsonSerializer.Serialize(Cloud.Genres.Select(t => new { label = t.Name, count = t.Plays }));
         if (!string.IsNullOrWhiteSpace(Name))
         {

@@ -23,12 +23,14 @@ public sealed class AnalyticsApiController(AnalyticsQueries analytics, AppTimeZo
         var window = ApiTimeRange.Resolve(zone, range, from, to);
         var overview = await analytics.GetOverview(window, q, cancellationToken);
         var tags = await analytics.GetTagCloud(window, q, 8, cancellationToken);
+        var audio = await analytics.GetAudioAnalytics(window, q, 8, cancellationToken);
         var years = await analytics.GetYears(cancellationToken);
         return Ok(new
         {
             range = ApiMapping.Window(window, q),
             overview,
             tags,
+            audio,
             years
         });
     }
@@ -79,6 +81,20 @@ public sealed class AnalyticsApiController(AnalyticsQueries analytics, AppTimeZo
         var window = ApiTimeRange.Resolve(zone, range, from, to);
         var cloud = await analytics.GetTagCloud(window, q, take, cancellationToken);
         return Ok(new { range = ApiMapping.Window(window, q), take, cloud });
+    }
+
+    [HttpGet("audio")]
+    public async Task<IActionResult> Audio(
+        [FromQuery] string? range,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
+        [FromQuery] string? q,
+        [FromQuery] int take = AnalyticsQueries.DefaultTake,
+        CancellationToken cancellationToken = default)
+    {
+        var window = ApiTimeRange.Resolve(zone, range, from, to);
+        var audio = await analytics.GetAudioAnalytics(window, q, take, cancellationToken);
+        return Ok(new { range = ApiMapping.Window(window, q), take, audio });
     }
 
     [HttpGet("tags/{name}")]

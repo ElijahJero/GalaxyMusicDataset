@@ -366,6 +366,10 @@ GalaxyMusicDataset/App_Data/*
 *.db-shm
 *.db-wal
 user-settings.json
+api-keys.json
+tools/essentia-client/galaxy.json
+tools/essentia-client/downloads/
+tools/essentia-client/models/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd

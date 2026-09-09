@@ -110,7 +110,43 @@ Artist detail for the selected window: aliases, tags, plays, timeline, top track
 
 ### `GET /api/v1/tracks/{id}`
 
-Track detail: album, MBIDs, duration, tags by source, source payloads, play timestamps.
+Track detail: album, MBIDs, duration, tags by source, source payloads, play timestamps, Essentia `audio` profile when uploaded.
+
+### `GET /api/v1/tracks/pending-audio`
+
+Tracks with no Essentia profile, most-played first. Query: `take` (default 25, max 100). Used by `tools/essentia-client`.
+
+### `PUT /api/v1/tracks/{id}/audio-profile` (write)
+
+Upsert an Essentia `analyze()` payload. Genres/themes/instruments are stored as audio labels, **not** `TrackTags`.
+
+```json
+{
+  "bpm": 85,
+  "key": "G major",
+  "danceability": 0.93,
+  "voice": 0.95,
+  "acoustic": 0.02,
+  "electronic": 0.27,
+  "timbre": "dark",
+  "approachability": 0.72,
+  "engagement": 0.84,
+  "moods": { "party": 0.95, "happy": 0.78, "aggressive": 0.70, "relaxed": 0.22, "sad": 0.05 },
+  "genres": ["Pop/J-pop", "Rock/Pop Rock"],
+  "themes": [["energetic", 0.88]],
+  "instruments": [{ "name": "drums", "score": 0.91 }]
+}
+```
+
+`tools/essentia-client` sends camelCase. Raw `analyze()` JSON is also accepted (`key_strength`, `timbre_bright`, `genre_scores`).
+
+### `PUT /api/v1/audio-profiles` (write)
+
+Same body plus `artist` and `title`; matches the library fingerprint.
+
+### `GET /api/v1/audio`
+
+Play-weighted Essentia analytics for the selected range (BPM, key, moods, classifier genres/themes/instruments).
 
 ### `GET /api/v1/scrobbles`
 
@@ -129,7 +165,7 @@ Paged unique tracks. Query:
 | `page`, `pageSize` | Default page size 50, max 200 |
 | `q`, `artist`, `title`, `album` | Lucene search (same as the site) |
 | `status` | Lookup status enum (`Pending`, `NeedsReview`, …) |
-| `hasMbid`, `hasTags` | `yes` / `no` |
+| `hasMbid`, `hasTags`, `hasAudio` | `yes` / `no` |
 | `source` | Enrichment source that succeeded (`LastFm`, `MusicBrainz`, …) |
 | `sort` | `recent` (default), `plays`, `artist`, `title` |
 

@@ -1,3 +1,5 @@
+using GalaxyMusicDataset.Services.Audio;
+
 namespace GalaxyMusicDataset.Services.Analytics;
 
 public sealed record OverviewStats(
@@ -123,7 +125,8 @@ public sealed record TrackDetail(
     DateTimeOffset? LastPlayed,
     IReadOnlyList<DateTimeOffset> PlayedAt,
     IReadOnlyList<TagRollup> Tags,
-    IReadOnlyList<SourcePayloadInfo> Sources);
+    IReadOnlyList<SourcePayloadInfo> Sources,
+    AudioProfileView? Audio);
 
 public sealed record DeepCutsResult(
     IReadOnlyList<RankedItem> OneOffs,

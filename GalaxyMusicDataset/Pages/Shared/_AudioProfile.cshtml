@@ -1,0 +1,106 @@
+@model global::GalaxyMusicDataset.Services.Audio.AudioProfileView
+@{
+    var audio = Model;
+    string Bar(double? value)
+    {
+        var pct = Math.Clamp((value ?? 0) * 100, 0, 100);
+        return pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    var meters = new List<KeyValuePair<string, double?>>
+    {
+        new("Danceability", audio.Danceability),
+        new("Voice", audio.Voice),
+        new("Acoustic", audio.Acoustic),
+        new("Electronic", audio.Electronic),
+        new("Approachability", audio.Approachability),
+        new("Engagement", audio.Engagement),
+        new("Party", audio.MoodParty),
+        new("Happy", audio.MoodHappy),
+        new("Aggressive", audio.MoodAggressive),
+        new("Relaxed", audio.MoodRelaxed),
+        new("Sad", audio.MoodSad)
+    };
+}
+
+<div class="card mb-4">
+    <div class="card-header">Audio profile (Essentia)</div>
+    <div class="card-body">
+        <p class="small text-muted">Classifier output from a local Essentia client. These are not crowd or database tags.</p>
+        <dl class="row small mb-3">
+            <dt class="col-sm-3">BPM / key</dt>
+            <dd class="col-sm-9">
+                @(audio.Bpm?.ToString("0.##") ?? "—")
+                · @(audio.KeyDisplay ?? "—")
+                @if (audio.KeyStrength is double ks)
+                {
+                    <span> (strength @ks.ToString("0.00"))</span>
+                }
+            </dd>
+            <dt class="col-sm-3">Timbre</dt>
+            <dd class="col-sm-9">@(audio.Timbre ?? "—")</dd>
+            @if (audio.Loudness is not null)
+            {
+                <dt class="col-sm-3">Loudness</dt>
+                <dd class="col-sm-9">@audio.Loudness.Value.ToString("0.###")</dd>
+            }
+            <dt class="col-sm-3">Analyzed</dt>
+            <dd class="col-sm-9">@AnalyticsDisplay.Timestamp(audio.AnalyzedAt)</dd>
+        </dl>
+
+        <div class="row g-2 mb-3">
+            @foreach (var meter in meters)
+            {
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between small">
+                        <span>@meter.Key</span>
+                        <span>@(meter.Value?.ToString("0.00") ?? "—")</span>
+                    </div>
+                    <div class="progress" style="height:6px;">
+                        <div class="progress-bar" style="width:@Bar(meter.Value)%"></div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="small mb-1 text-muted">Genres</div>
+        <div class="mb-2">
+            @foreach (var genre in audio.Genres)
+            {
+                <span class="badge rounded-pill audio-chip me-1 mb-1">
+                    @genre.Name
+                    @if (genre.Score is double score)
+                    {
+                        <span class="text-muted">@score.ToString("0.00")</span>
+                    }
+                </span>
+            }
+        </div>
+        <div class="small mb-1 text-muted">Themes</div>
+        <div class="mb-2">
+            @foreach (var theme in audio.Themes)
+            {
+                <span class="badge rounded-pill audio-chip-theme me-1 mb-1">
+                    @theme.Name
+                    @if (theme.Score is double score)
+                    {
+                        <span class="text-muted">@score.ToString("0.00")</span>
+                    }
+                </span>
+            }
+        </div>
+        <div class="small mb-1 text-muted">Instruments</div>
+        <div>
+            @foreach (var inst in audio.Instruments)
+            {
+                <span class="badge rounded-pill audio-chip-instrument me-1 mb-1">
+                    @inst.Name
+                    @if (inst.Score is double score)
+                    {
+                        <span class="text-muted">@score.ToString("0.00")</span>
+                    }
+                </span>
+            }
+        </div>
+    </div>
+</div>

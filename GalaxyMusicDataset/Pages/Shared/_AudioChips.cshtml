@@ -1,0 +1,27 @@
+@model global::GalaxyMusicDataset.Services.Audio.AudioProfileView
+@{
+    var audio = Model;
+    var summaryLine = (audio.Summary ?? "").Split('\n')[0];
+}
+
+<div class="audio-profile">
+    <div class="small text-muted mb-1">Essentia (client)</div>
+    @if (!string.IsNullOrWhiteSpace(summaryLine))
+    {
+        <div class="small">@summaryLine</div>
+    }
+    <div class="mt-1">
+        @foreach (var genre in audio.Genres)
+        {
+            <span class="badge rounded-pill audio-chip me-1 mb-1">@genre.Name</span>
+        }
+        @foreach (var theme in audio.Themes.Take(5))
+        {
+            <span class="badge rounded-pill audio-chip-theme me-1 mb-1">@theme.Name</span>
+        }
+        @foreach (var inst in audio.Instruments.Take(5))
+        {
+            <span class="badge rounded-pill audio-chip-instrument me-1 mb-1">@inst.Name</span>
+        }
+    </div>
+</div>

@@ -14,6 +14,7 @@ Normalized tables (not one row of duplicated metadata per play):
 | `Albums` | Optional album attached when known |
 | `TrackLookups` | Identity-resolution cache so the same song is not searched four times |
 | `Tags` / `TrackTags` | Crowd tags with `Source` (`LastFm`, `MusicBrainz`, `Discogs`, `TheAudioDb`, `VocaDb`, `UtaiteDb`, `TouhouDb`) |
+| `TrackAudioProfiles` / `TrackAudioLabels` | Client-side Essentia features (BPM, key, moods, danceability, …) and classifier genres/themes/instruments. **Not** stored as `TrackTags`. |
 | `TrackSourcePayloads` | Raw JSON from each API |
 
 ## Shared UI chrome
@@ -69,6 +70,15 @@ Play-weighted rollup of `TrackTags` for the selected range. Duplicate names from
 - **Crowd tags** — all sources including Last.fm
 - Click a name for tracks and artists that carry it
 - Overview and Wrapped also surface the top genres
+- A separate **Audio profile** block lists Essentia classifier genres/themes/instruments (not crowd tags)
+
+### 3b. Audio (`/Audio`)
+
+Play-weighted rollup of `TrackAudioProfiles` uploaded by the local Essentia client (`tools/essentia-client`). The server does not run Essentia.
+
+- Coverage (% of plays with a profile), mean BPM / danceability / voice
+- BPM histogram, key pie, mood averages
+- Top Essentia genres, themes, and instruments
 
 ### 4. Discovery (`/Discovery`)
 
@@ -96,7 +106,7 @@ Name, aliases, MBID, tags rolled up from tracks. Plays, unique tracks, first/las
 
 ### 7. Track detail (`/Tracks/{id}`)
 
-Artist, album, MBID, duration, fingerprint, lookup status. Play count, first/last, timestamp strip, tags by source, collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
+Artist, album, MBID, duration, fingerprint, lookup status. Play count, first/last, timestamp strip, tags by source, **Essentia audio profile** (when uploaded), collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
 
 ### 8. Deep cuts (`/DeepCuts`)
 
@@ -119,6 +129,7 @@ Shows session list, average length, median tracks/session, **repeat rate** (cons
 - `GetOverview(TimeRange)`
 - `GetTopArtists/Tracks/Albums(TimeRange, previousRange)`
 - `GetTagCloud(TimeRange)` / `GetTagDetail(name, TimeRange)`
+- `GetAudioAnalytics(TimeRange)` — play-weighted Essentia features and labels
 - `GetDiscoveries(TimeRange)`
 - `GetHeatmap(TimeRange)`
 - `GetStreak()`
@@ -137,6 +148,6 @@ Search and labels prefer:
 2. Alias list for matching typed romaji or English
 3. Identity stays on MBID / fingerprint — names are not merged just because they look similar
 
-## Out of scope until audio extraction
+## Audio extraction (Essentia, client-side)
 
-Skip detection beyond timestamp gaps, “true” listening time for untimed tracks, AcousticBrainz features. Duration still comes from Last.fm / MusicBrainz / TheAudioDB when those enrichers have run.
+The server does not run Essentia. A local client uploads `TrackAudioProfiles`. Skip detection beyond timestamp gaps and “true” listening time for untimed tracks remain out of scope. Duration still comes from Last.fm / MusicBrainz / TheAudioDB when those enrichers have run.

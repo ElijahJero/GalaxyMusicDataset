@@ -49,6 +49,7 @@ public static class CatalogCoverage
         int withMbid,
         int withDuration,
         int withTags,
+        int withAudio,
         IReadOnlyList<SourcePayloadCount> payloads,
         AggregationOptions aggregation,
         bool lastFmConfigured,
@@ -78,7 +79,8 @@ public static class CatalogCoverage
             FromPayloads("TouhouDB", EnrichmentSource.TouhouDb, payloads, tracks,
                 aggregation.EnableTouhouDb, aggregation.EnableTouhouDb ? null : "off"),
             Field("Tags", withTags, tracks, true, null),
-            Field("Duration", withDuration, tracks, true, null)
+            Field("Duration", withDuration, tracks, true, null),
+            Field("Essentia (client)", withAudio, tracks, true, "client-side")
         ];
     }
 }

@@ -136,6 +136,72 @@ public class RestApiTests
     }
 
     [Fact]
+    public async Task Audio_profile_put_requires_write_and_does_not_create_tags()
+    {
+        var store = _factory.Services.GetRequiredService<ApiKeyStore>();
+        var read = Authenticated(store.Create("audio-read", true, false).Token);
+        var write = Authenticated(store.Create("audio-write", true, true).Token);
+
+        var pending = await write.GetAsync("/api/v1/tracks/pending-audio?take=5");
+        pending.EnsureSuccessStatusCode();
+        var pendingJson = await pending.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.True(pendingJson.GetProperty("items").GetArrayLength() > 0);
+        var trackId = pendingJson.GetProperty("items")[0].GetProperty("id").GetInt64();
+
+        var denied = await read.PutAsJsonAsync($"/api/v1/tracks/{trackId}/audio-profile", SampleAudioBody());
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        var put = await write.PutAsJsonAsync($"/api/v1/tracks/{trackId}/audio-profile", SampleAudioBody());
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+
+        var detail = await write.GetAsync($"/api/v1/tracks/{trackId}");
+        detail.EnsureSuccessStatusCode();
+        var json = await detail.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal(85, json.GetProperty("audio").GetProperty("bpm").GetDouble());
+        Assert.Equal("G", json.GetProperty("audio").GetProperty("key").GetString());
+        Assert.DoesNotContain(json.GetProperty("tags").EnumerateArray(), t => t.GetProperty("name").GetString() == "Pop/J-pop");
+        Assert.True(json.GetProperty("audio").GetProperty("genres").GetArrayLength() > 0);
+
+        var library = await write.GetAsync("/api/v1/library?hasAudio=yes");
+        library.EnsureSuccessStatusCode();
+        var libraryJson = await library.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Contains(
+            libraryJson.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("id").GetInt64() == trackId && t.GetProperty("hasAudio").GetBoolean());
+
+        var leftover = await write.GetAsync("/api/v1/tracks/pending-audio?take=50");
+        leftover.EnsureSuccessStatusCode();
+        var leftoverJson = await leftover.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.DoesNotContain(
+            leftoverJson.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("id").GetInt64() == trackId);
+    }
+
+    private static object SampleAudioBody() => new
+    {
+        bpm = 85,
+        key = "G major",
+        danceability = 0.93,
+        voice = 0.95,
+        acoustic = 0.02,
+        electronic = 0.27,
+        timbre = "dark",
+        approachability = 0.72,
+        engagement = 0.84,
+        moods = new
+        {
+            party = 0.95,
+            happy = 0.78,
+            aggressive = 0.70,
+            relaxed = 0.22,
+            sad = 0.05
+        },
+        genres = new[] { "Pop/J-pop", "Rock/Pop Rock" },
+        themes = new object[] { new[] { "energetic", (object)0.88 } },
+        instruments = new[] { new { name = "drums", score = 0.91 } }
+    };
+
+    [Fact]
     public async Task X_Api_Key_header_works()
     {
         var created = _factory.Services.GetRequiredService<ApiKeyStore>().Create("header-key", true, false);

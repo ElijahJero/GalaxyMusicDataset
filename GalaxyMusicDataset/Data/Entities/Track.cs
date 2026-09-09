@@ -25,4 +25,5 @@ public sealed class Track
     public ICollection<Scrobble> Scrobbles { get; set; } = new List<Scrobble>();
     public ICollection<TrackTag> Tags { get; set; } = new List<TrackTag>();
     public ICollection<TrackSourcePayload> SourcePayloads { get; set; } = new List<TrackSourcePayload>();
+    public TrackAudioProfile? AudioProfile { get; set; }
 }

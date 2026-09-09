@@ -299,6 +299,7 @@ public class VocaDbFamilyTests
             withMbid: 5,
             withDuration: 7,
             withTags: 3,
+            withAudio: 1,
             payloads,
             new AggregationOptions(),
             lastFmConfigured: true,

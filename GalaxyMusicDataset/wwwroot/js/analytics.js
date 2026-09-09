@@ -100,6 +100,23 @@
           }
         }
       });
+    } else if (kind === "audio-bars") {
+      new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: payload.map((p) => p.label),
+          datasets: [{
+            data: payload.map((p) => p.count),
+            backgroundColor: accentStrong
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
     }
   }
 })();

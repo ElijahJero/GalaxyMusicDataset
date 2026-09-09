@@ -27,6 +27,7 @@ public sealed class AggregationStatusService(
         var withMbid = await db.Tracks.CountAsync(t => t.Mbid != null, cancellationToken);
         var withDuration = await db.Tracks.CountAsync(t => t.DurationMs != null, cancellationToken);
         var withTags = await db.Tracks.CountAsync(t => t.Tags.Any(), cancellationToken);
+        var withAudio = await db.Tracks.CountAsync(t => t.AudioProfile != null, cancellationToken);
 
         var lookups = await db.TrackLookups
             .AsNoTracking()
@@ -95,12 +96,14 @@ public sealed class AggregationStatusService(
             TracksWithMbid = withMbid,
             TracksWithDuration = withDuration,
             TracksWithTags = withTags,
+            TracksWithAudio = withAudio,
             MbidCoveragePercent = coverage,
             Coverage = CatalogCoverage.Build(
                 tracks,
                 withMbid,
                 withDuration,
                 withTags,
+                withAudio,
                 payloadCounts,
                 agg,
                 lastFm.CurrentValue.IsConfigured,
@@ -153,6 +156,7 @@ public sealed class AggregationStatusDto
     public int TracksWithMbid { get; set; }
     public int TracksWithDuration { get; set; }
     public int TracksWithTags { get; set; }
+    public int TracksWithAudio { get; set; }
     public double MbidCoveragePercent { get; set; }
     public IReadOnlyList<SourceCoverage> Coverage { get; set; } = [];
     public long? LastFmPlaycount { get; set; }

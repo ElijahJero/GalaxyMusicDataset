@@ -379,6 +379,32 @@ a:hover {
   border-color: var(--galaxy-accent);
 }
 
+.audio-chip,
+.audio-chip-theme,
+.audio-chip-instrument {
+  border-radius: 0;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.audio-chip {
+  background: color-mix(in srgb, var(--galaxy-accent) 14%, var(--bs-tertiary-bg));
+  border: 1px solid var(--galaxy-accent);
+  color: var(--bs-body-color);
+}
+
+.audio-chip-theme {
+  background: color-mix(in srgb, #c084fc 16%, var(--bs-tertiary-bg));
+  border: 1px solid color-mix(in srgb, #c084fc 55%, var(--galaxy-line));
+  color: var(--bs-body-color);
+}
+
+.audio-chip-instrument {
+  background: color-mix(in srgb, #34d399 14%, var(--bs-tertiary-bg));
+  border: 1px solid color-mix(in srgb, #34d399 55%, var(--galaxy-line));
+  color: var(--bs-body-color);
+}
+
 [data-bs-theme="dark"] {
   --galaxy-accent: #5ce1ff;
   --galaxy-accent-strong: #2ec8f0;

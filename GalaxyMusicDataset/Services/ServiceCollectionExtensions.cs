@@ -60,6 +60,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<TagService>();
         services.AddScoped<MetadataEnrichmentService>();
         services.AddScoped<TrackEditService>();
+        services.AddScoped<Audio.AudioProfileService>();
         services.AddScoped<SampleDataSeeder>();
         services.AddScoped<AggregationStatusService>();
         services.AddScoped<AnalyticsQueries>();
