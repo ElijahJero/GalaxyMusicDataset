@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Services.Analytics;
 
-public sealed class AnalyticsQueries(AppDbContext db)
+public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = null)
 {
+    private readonly AppTimeZone _tz = timeZone ?? AppTimeZone.Utc;
+
     public const int DefaultTake = 50;
     public const int DefaultHeavyThreshold = 10;
     public const int DefaultSessionGapMinutes = 30;
@@ -24,7 +26,7 @@ public sealed class AnalyticsQueries(AppDbContext db)
     {
         var now = utcNow ?? DateTimeOffset.UtcNow;
         var streak = await GetStreak(now, cancellationToken);
-        var daysTracked = await DistinctUtcDays(db.Scrobbles.AsNoTracking(), cancellationToken);
+        var daysTracked = await DistinctLocalDays(db.Scrobbles.AsNoTracking(), cancellationToken);
         var stats = await ComputeOverview(Filter(range, search), range, streak, daysTracked, cancellationToken);
         if (!includeAllTime || range.Preset == "all")
         {
@@ -38,16 +40,15 @@ public sealed class AnalyticsQueries(AppDbContext db)
 
     public async Task<StreakInfo> GetStreak(DateTimeOffset utcNow, CancellationToken cancellationToken)
     {
-        var dayNumbers = await db.Scrobbles.AsNoTracking()
-            .Select(s => s.UnixTimestamp / 86400)
-            .Distinct()
+        var stamps = await db.Scrobbles.AsNoTracking()
+            .Select(s => s.UnixTimestamp)
             .ToListAsync(cancellationToken);
-        var days = dayNumbers
-            .Select(AnalyticsDisplay.UtcDay)
+        var days = stamps
+            .Select(_tz.LocalDate)
             .Distinct()
             .OrderBy(d => d)
             .ToList();
-        return ComputeStreak(days, DateOnly.FromDateTime(utcNow.UtcDateTime));
+        return ComputeStreak(days, _tz.LocalDate(utcNow));
     }
 
     public async Task<TopListResult> GetTopArtists(
@@ -205,18 +206,13 @@ public sealed class AnalyticsQueries(AppDbContext db)
 
     public async Task<HeatmapResult> GetHeatmap(TimeRange range, string? search, CancellationToken cancellationToken)
     {
-        var rows = await Filter(range, search)
-            .GroupBy(s => new
-            {
-                Weekday = (s.UnixTimestamp / 86400 + 3) % 7,
-                Hour = s.UnixTimestamp % 86400 / 3600
-            })
-            .Select(g => new HeatmapCell(
-                (int)g.Key.Weekday,
-                (int)g.Key.Hour,
-                g.Count(),
-                g.Sum(s => (long?)s.Track.DurationMs) ?? 0))
+        var plays = await Filter(range, search)
+            .Select(s => new { s.UnixTimestamp, Duration = (long?)s.Track.DurationMs ?? 0L })
             .ToListAsync(cancellationToken);
+        var rows = plays
+            .GroupBy(s => (_tz.WeekdayMonday0(s.UnixTimestamp), _tz.LocalHour(s.UnixTimestamp)))
+            .Select(g => new HeatmapCell(g.Key.Item1, g.Key.Item2, g.Count(), g.Sum(s => s.Duration)))
+            .ToList();
 
         return new HeatmapResult(rows, rows.Count == 0 ? 0 : rows.Max(c => c.Count));
     }
@@ -243,24 +239,12 @@ public sealed class AnalyticsQueries(AppDbContext db)
         string? search,
         CancellationToken cancellationToken)
     {
-        var days = await Filter(range, search)
-            .GroupBy(s => s.UnixTimestamp / 86400)
-            .Select(g => new
-            {
-                Day = g.Key,
-                Count = g.Count(),
-                Duration = g.Sum(s => (long?)s.Track.DurationMs) ?? 0L
-            })
-            .ToListAsync(cancellationToken);
+        var days = await LoadDaily(Filter(range, search), cancellationToken);
 
         return days
-            .GroupBy(d =>
-            {
-                var date = DateTimeOffset.FromUnixTimeSeconds(d.Day * 86400).UtcDateTime;
-                return (date.Year, date.Month);
-            })
+            .GroupBy(d => (d.Day.Year, d.Day.Month))
             .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
-            .Select(g => new MonthlyVolume(g.Key.Year, g.Key.Month, g.Sum(x => x.Count), g.Sum(x => x.Duration)))
+            .Select(g => new MonthlyVolume(g.Key.Year, g.Key.Month, g.Sum(x => x.Count), g.Sum(x => x.DurationMs)))
             .ToList();
     }
 
@@ -291,14 +275,7 @@ public sealed class AnalyticsQueries(AppDbContext db)
             last = await plays.MaxAsync(s => s.UnixTimestamp, cancellationToken);
         }
 
-        var timelineRows = await plays
-            .GroupBy(s => s.UnixTimestamp / 86400)
-            .Select(g => new { Day = g.Key, Count = g.Count(), Duration = g.Sum(s => (long?)s.Track.DurationMs) ?? 0L })
-            .OrderBy(x => x.Day)
-            .ToListAsync(cancellationToken);
-        var timeline = timelineRows
-            .Select(x => new DailyCount(AnalyticsDisplay.UtcDay(x.Day * 86400), x.Count, x.Duration))
-            .ToList();
+        var timeline = await LoadDaily(plays, cancellationToken);
 
         var topRows = await plays
             .GroupBy(s => new { s.TrackId, s.Track.Title })
@@ -544,7 +521,7 @@ public sealed class AnalyticsQueries(AppDbContext db)
 
     public async Task<WrappedResult> GetWrapped(int year, string? search, CancellationToken cancellationToken)
     {
-        var range = TimeRangeParser.ForCalendarYear(year);
+        var range = TimeRangeParser.ForCalendarYear(year, _tz.Zone);
         var overview = await GetOverview(range, search, cancellationToken, includeAllTime: false);
         var previous = TimeRangeParser.PreviousWindow(range);
         var artists = await GetTopArtists(range, previous, search, 10, cancellationToken);
@@ -664,8 +641,8 @@ public sealed class AnalyticsQueries(AppDbContext db)
 
         var min = await db.Scrobbles.AsNoTracking().MinAsync(s => s.UnixTimestamp, cancellationToken);
         var max = await db.Scrobbles.AsNoTracking().MaxAsync(s => s.UnixTimestamp, cancellationToken);
-        var y0 = DateTimeOffset.FromUnixTimeSeconds(min).UtcDateTime.Year;
-        var y1 = DateTimeOffset.FromUnixTimeSeconds(max).UtcDateTime.Year;
+        var y0 = _tz.LocalYear(min);
+        var y1 = _tz.LocalYear(max);
         return Enumerable.Range(y0, y1 - y0 + 1).Reverse().ToList();
     }
 
@@ -823,14 +800,7 @@ public sealed class AnalyticsQueries(AppDbContext db)
         var missing = scrobbleCount - playsWithDuration;
         var missingPct = scrobbleCount == 0 ? 0 : missing * 100.0 / scrobbleCount;
 
-        var dailyRows = await query
-            .GroupBy(s => s.UnixTimestamp / 86400)
-            .Select(g => new { Day = g.Key, Count = g.Count(), Duration = g.Sum(s => (long?)s.Track.DurationMs) ?? 0L })
-            .OrderBy(x => x.Day)
-            .ToListAsync(cancellationToken);
-        var daily = dailyRows
-            .Select(x => new DailyCount(AnalyticsDisplay.UtcDay(x.Day * 86400), x.Count, x.Duration))
-            .ToList();
+        var daily = await LoadDaily(query, cancellationToken);
 
         var calendarDays = range.Preset == "all" ? Math.Max(1, daysTrackedAllTime) : TimeRangeParser.CalendarDays(range);
         var distinctDays = daily.Count;
@@ -935,8 +905,23 @@ public sealed class AnalyticsQueries(AppDbContext db)
     private static List<RankedItem> ToRanked(IReadOnlyList<IdNameCount> rows) =>
         rows.Select((x, i) => new RankedItem(x.Id, x.Name, x.Subtitle, x.Plays, x.DurationMs, i + 1, 0, x.Plays, null, false)).ToList();
 
-    private static async Task<int> DistinctUtcDays(IQueryable<Scrobble> scrobbles, CancellationToken cancellationToken) =>
-        await scrobbles.Select(s => s.UnixTimestamp / 86400).Distinct().CountAsync(cancellationToken);
+    private async Task<List<DailyCount>> LoadDaily(IQueryable<Scrobble> query, CancellationToken cancellationToken)
+    {
+        var rows = await query
+            .Select(s => new { s.UnixTimestamp, Duration = (long?)s.Track.DurationMs ?? 0L })
+            .ToListAsync(cancellationToken);
+        return rows
+            .GroupBy(s => _tz.LocalDate(s.UnixTimestamp))
+            .OrderBy(g => g.Key)
+            .Select(g => new DailyCount(g.Key, g.Count(), g.Sum(s => s.Duration)))
+            .ToList();
+    }
+
+    private async Task<int> DistinctLocalDays(IQueryable<Scrobble> scrobbles, CancellationToken cancellationToken)
+    {
+        var stamps = await scrobbles.Select(s => s.UnixTimestamp).ToListAsync(cancellationToken);
+        return stamps.Select(_tz.LocalDate).Distinct().Count();
+    }
 
     public static StreakInfo ComputeStreak(IReadOnlyList<DateOnly> sortedDays, DateOnly today)
     {

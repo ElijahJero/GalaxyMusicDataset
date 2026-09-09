@@ -18,6 +18,8 @@ services:
       MusicBrainz__BaseUrl: ${MUSICBRAINZ_BASE_URL:-https://musicbrainz.org}
       Auth__Username: ${AUTH_USERNAME:-admin}
       Auth__Password: ${AUTH_PASSWORD:-}
+      Analytics__TimeZone: ${ANALYTICS_TIMEZONE:-America/New_York}
+      TZ: ${TZ:-America/New_York}
     restart: unless-stopped
 
 volumes:

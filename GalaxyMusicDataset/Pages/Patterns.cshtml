@@ -6,7 +6,7 @@
 }
 
 <h1 class="h3 mb-1">Time patterns</h1>
-<p class="text-muted">When you listen: hour × weekday heatmap, time-of-day buckets, and monthly volume. Hours are UTC.</p>
+<p class="text-muted">When you listen: hour × weekday heatmap, time-of-day buckets, and monthly volume. Hours are @AnalyticsDisplay.ZoneLabel.</p>
 
 <partial name="_AnalyticsNav" model='"patterns"' />
 <partial name="_TimeRange" model='Model.TimeRangeView("/Patterns")' />
@@ -40,7 +40,7 @@
                     ? $"{bucket.StartHour:00}–{bucket.EndHourExclusive:00}"
                     : $"{bucket.StartHour:00}–{bucket.EndHourExclusive:00}+";
                 <div class="col-6 col-md-3">
-                    <div class="text-muted small">@bucket.Name <span class="text-muted">(@hours UTC)</span></div>
+                    <div class="text-muted small">@bucket.Name <span class="text-muted">(@hours @AnalyticsDisplay.ZoneLabel)</span></div>
                     <div class="fs-4">@AnalyticsDisplay.Count(bucket.Count)</div>
                     <div class="small">@AnalyticsDisplay.Duration(bucket.DurationMs) · @AnalyticsDisplay.Percent(bucket.Count * 100.0 / bucketTotal)</div>
                 </div>

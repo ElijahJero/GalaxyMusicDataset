@@ -27,8 +27,22 @@ public static class AnalyticsDisplay
 
     public static string Count(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
 
-    public static string Timestamp(DateTimeOffset? value) =>
-        value is null ? "—" : value.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC";
+    public static AppTimeZone TimeZone { get; set; } = AppTimeZone.Eastern;
+
+    public static string ZoneLabel => TimeZone.DisplayLabel;
+
+    public static string Timestamp(DateTimeOffset? value)
+    {
+        if (value is null)
+        {
+            return "—";
+        }
+
+        var local = TimeZone.ToLocal(value.Value);
+        return local.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+               + " "
+               + TimeZone.Abbreviation(value.Value);
+    }
 
     public static string Percent(double value) =>
         value.ToString("0.#", CultureInfo.InvariantCulture) + "%";
@@ -53,4 +67,6 @@ public static class AnalyticsDisplay
 
     public static DateOnly UtcDay(long unixTimestamp) =>
         DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(unixTimestamp).UtcDateTime);
+
+    public static DateOnly LocalDay(long unixTimestamp) => TimeZone.LocalDate(unixTimestamp);
 }

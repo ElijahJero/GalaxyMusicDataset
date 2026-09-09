@@ -225,3 +225,14 @@ public sealed class AggregationOptions
     public double ReviewThreshold { get; set; } = 0.55;
     public int ApiLogRetention { get; set; } = 500;
 }
+
+public sealed class AnalyticsOptions
+{
+    public const string SectionName = "Analytics";
+
+    /// <summary>
+    /// IANA or Windows zone id for analytics aggregations and display.
+    /// Aliases: EST/ET → America/New_York, UTC. Default Eastern Time.
+    /// </summary>
+    public string TimeZone { get; set; } = "America/New_York";
+}

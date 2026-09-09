@@ -46,9 +46,9 @@
             <button class="btn btn-primary btn-sm" type="submit">Apply</button>
             <a class="btn btn-outline-secondary btn-sm" asp-page="@Model.Page" asp-route-id="@Model.RouteId">Reset</a>
             <span class="small text-muted align-self-center">
-                @TimeRangeParser.IsoDate(Model.RangeFrom) –
-                @TimeRangeParser.IsoDate(Model.RangeTo.AddSeconds(-1))
-                UTC
+                @TimeRangeParser.IsoDate(Model.RangeFrom, AnalyticsDisplay.TimeZone.Zone) –
+                @TimeRangeParser.IsoDate(Model.RangeTo.AddSeconds(-1), AnalyticsDisplay.TimeZone.Zone)
+                @AnalyticsDisplay.ZoneLabel
             </span>
         </div>
     </div>

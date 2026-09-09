@@ -34,7 +34,7 @@ Or build locally:
 docker compose up -d --build
 ```
 
-Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`).
+Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`). Analytics use Eastern Time by default; set `ANALYTICS_TIMEZONE` (IANA id or `EST` / `UTC`) in docker compose to change it.
 
 Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, sessions, wrapped, artist/track detail) are public — anyone who can reach the host can browse them. Progress, Library, Lookups, Review, and Settings require an admin cookie. Set `AUTH_USERNAME` (default `admin`) and `AUTH_PASSWORD`. If the password is empty, analytics stay public and nobody can sign in. Locally: `dotnet user-secrets set Auth:Password "your-password"` (or `Auth__Username` / `Auth__Password` env vars). Anonymous visits to `/` redirect to `/Dashboard`.
 
@@ -59,8 +59,9 @@ Development seeds 14 sample scrobbles when the database is empty (`Aggregation:S
 | `MusicBrainz:CoverArtBaseUrl` | Cover Art Archive origin. Default `https://coverartarchive.org`. musicbrainz-docker’s website is not CAA — leave this unless you host a CAA mirror. |
 | `MusicBrainz:MinIntervalMs` | Optional Web Service throttle. Unset = 1200ms on the public API, 50ms on a self-hosted mirror. `0` = no extra delay. Public Cover Art Archive stays at 1200ms. |
 | `Auth:Username` / `Auth:Password` | Cookie login for admin pages. Default username `admin`. Leave password empty to disable sign-in (analytics remain public). |
+| `Analytics:TimeZone` | Zone for day/hour aggregations and timestamps. Default `America/New_York` (EST/EDT). Aliases: `EST`, `ET`, `UTC`. |
 
-User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Auth__Username`, `Auth__Password`.
+User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Auth__Username`, `Auth__Password`, `Analytics__TimeZone`.
 
 Get a Last.fm API key at https://www.last.fm/api/account/create. History export needs “Hide recent listening information” **off** on Last.fm.
 

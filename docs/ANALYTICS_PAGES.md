@@ -23,7 +23,7 @@ Razor Pages + Bootstrap + Chart.js (sparklines and monthly bars). Heatmaps use C
 **Global filters** (query string, sticky in `_TimeRange.cshtml`):
 
 - Presets: `7d`, `30d`, `90d`, `1y`, `all`, plus `custom` (`from`, `to` ISO dates)
-- Timezone: UTC for aggregations and display (local zone can land in settings later)
+- Timezone: Eastern Time (`America/New_York`, EST/EDT) for aggregations and display. Override with `Analytics:TimeZone` / `Analytics__TimeZone` (docker-compose `ANALYTICS_TIMEZONE`).
 - Search: artist / track / album, matching `Name`, `Title`, and `ArtistAliases`
 
 Every chart page takes the same `TimeRange` record:
@@ -45,9 +45,9 @@ At-a-glance numbers for the selected range (and all-time in a secondary line).
 | Total scrobbles | `COUNT(*)` on ranged scrobbles |
 | Unique tracks / artists / albums | `COUNT(DISTINCT TrackId / ArtistId / AlbumId)` |
 | Listening time | `SUM(Tracks.DurationMs)` where duration is known; also show `% of plays missing duration` |
-| Days tracked | distinct UTC dates with ≥1 scrobble (all-time, not the filter) |
+| Days tracked | distinct local dates with ≥1 scrobble (all-time, not the filter) |
 | Average scrobbles / day | total / calendar days in range (or days tracked for all-time) |
-| Current streak | consecutive UTC days with ≥1 scrobble, ending today or yesterday |
+| Current streak | consecutive local days with ≥1 scrobble, ending today or yesterday |
 | Now playing / most recent | latest `Scrobbles` row with artist, track, album, timestamp |
 
 Layout: stat cards on top, sparkline of daily volume, most recent track card linking to `/Tracks/{id}`.
@@ -80,7 +80,7 @@ Play-weighted rollup of `TrackTags` for the selected range. Duplicate names from
 
 ### 5. Time patterns (`/Patterns`)
 
-**Heatmap (hour × weekday)** — 7 rows (Mon–Sun) × 24 columns. Cell = scrobble count. UTC.
+**Heatmap (hour × weekday)** — 7 rows (Mon–Sun) × 24 columns. Cell = scrobble count. Display timezone (default EST).
 
 **Time of day buckets** — Morning 5–11, afternoon 11–17, evening 17–22, night 22–5.
 

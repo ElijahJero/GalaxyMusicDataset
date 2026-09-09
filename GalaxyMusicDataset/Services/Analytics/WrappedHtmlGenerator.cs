@@ -255,7 +255,7 @@ h2 { font-size: clamp(2rem, 7vw, 4rem); margin-bottom: 1.25rem; }
         sb.Append("<h2>How you listened</h2>\n");
         sb.Append("<div class=\"substats\">\n");
         SubStat(sb, AnalyticsDisplay.Count(data.LongestStreak), "day streak");
-        SubStat(sb, data.BusiestHourUtc.ToString("00", CultureInfo.InvariantCulture) + ":00 UTC", "busiest hour");
+        SubStat(sb, data.BusiestHourUtc.ToString("00", CultureInfo.InvariantCulture) + ":00 " + AnalyticsDisplay.ZoneLabel, "busiest hour");
         SubStat(sb, AnalyticsDisplay.Count(data.BusiestHourCount), "plays that hour");
         SubStat(sb, AnalyticsDisplay.Count(data.Overview.DistinctDaysInRange), "active days");
         sb.Append("</div>\n");

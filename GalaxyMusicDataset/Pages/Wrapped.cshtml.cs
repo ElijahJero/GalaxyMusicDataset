@@ -17,14 +17,14 @@ public class WrappedModel(AnalyticsQueries analytics) : AnalyticsPageModel
         Years = await analytics.GetYears(cancellationToken);
         if (Year is null or < 1970)
         {
-            Year = Years.FirstOrDefault(DateTime.UtcNow.Year);
+            Year = Years.FirstOrDefault(DisplayTimeZone.LocalDate(DateTimeOffset.UtcNow).Year);
             return RedirectToPage(new { year = Year, q = Q });
         }
 
-        TimeRange = TimeRangeParser.ForCalendarYear(Year.Value);
+        TimeRange = TimeRangeParser.ForCalendarYear(Year.Value, DisplayTimeZone.Zone);
         Range = "custom";
-        From = TimeRangeParser.IsoDate(TimeRange.From);
-        To = TimeRangeParser.IsoDate(TimeRange.To.AddSeconds(-1));
+        From = TimeRangeParser.IsoDate(TimeRange.From, DisplayTimeZone.Zone);
+        To = TimeRangeParser.IsoDate(TimeRange.To.AddSeconds(-1), DisplayTimeZone.Zone);
         Result = await analytics.GetWrapped(Year.Value, Q, cancellationToken);
         SetChrome("wrapped", Years);
         return Page();
@@ -35,7 +35,7 @@ public class WrappedModel(AnalyticsQueries analytics) : AnalyticsPageModel
         Years = await analytics.GetYears(cancellationToken);
         if (Year is null or < 1970)
         {
-            Year = Years.FirstOrDefault(DateTime.UtcNow.Year);
+            Year = Years.FirstOrDefault(DisplayTimeZone.LocalDate(DateTimeOffset.UtcNow).Year);
             return RedirectToPage(new { year = Year, q = Q, handler = "Download" });
         }
 

@@ -24,6 +24,13 @@ public class AnalyticsQueriesTests
         var previous = TimeRangeParser.PreviousWindow(custom);
         Assert.Equal(new DateTimeOffset(2023, 12, 25, 0, 0, 0, TimeSpan.Zero), previous.From);
         Assert.Equal(custom.From, previous.To);
+
+        var eastern = AppTimeZone.FromId("EST");
+        var customEst = TimeRangeParser.Parse("custom", "2024-01-01", "2024-01-07", Now, eastern.Zone);
+        Assert.Equal(eastern.StartOfLocalDay(new DateOnly(2024, 1, 1)), customEst.From);
+        Assert.Equal(eastern.StartOfLocalDay(new DateOnly(2024, 1, 8)), customEst.To);
+        Assert.Equal("EST", eastern.DisplayLabel);
+        Assert.Equal("EST", eastern.Abbreviation(new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)));
     }
 
     [Fact]
@@ -74,6 +81,11 @@ public class AnalyticsQueriesTests
 
         var buckets = queries.GetTimeOfDayBuckets(heatmap);
         Assert.Equal(4, buckets.Single(b => b.Name == "Morning").Count);
+
+        var estQueries = new AnalyticsQueries(harness.Db, AppTimeZone.FromId("EST"));
+        var estHeatmap = await estQueries.GetHeatmap(range, null, CancellationToken.None);
+        var mondayEst = estHeatmap.Cells.Single(c => c.WeekdayMonday0 == 0 && c.HourUtc == 5);
+        Assert.Equal(2, mondayEst.Count);
     }
 
     [Fact]
