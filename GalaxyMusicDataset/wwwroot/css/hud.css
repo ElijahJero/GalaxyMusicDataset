@@ -1,0 +1,169 @@
+/* Cockpit atmosphere and HUD chrome. Tokens live in site.css. */
+
+.cockpit {
+  background-color: var(--galaxy-void);
+  isolation: isolate;
+}
+
+.cockpit::before,
+.cockpit::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  inset: 0;
+}
+
+.cockpit::before {
+  z-index: -2;
+  background-color: var(--galaxy-void);
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 2px,
+      color-mix(in srgb, #000 14%, transparent) 2px 3px
+    ),
+    radial-gradient(ellipse 90% 55% at 50% -8%, color-mix(in srgb, var(--galaxy-accent) 18%, transparent), transparent 58%),
+    radial-gradient(ellipse 45% 30% at 92% 108%, color-mix(in srgb, var(--galaxy-accent-strong) 14%, transparent), transparent 55%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 0.7px, transparent 1.1px),
+    radial-gradient(circle, rgba(180, 230, 255, 0.55) 0.6px, transparent 1px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.28) 0.5px, transparent 0.9px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    170px 170px,
+    260px 220px,
+    90px 130px;
+  background-position:
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    40px 70px,
+    18px 34px;
+}
+
+.cockpit::after {
+  z-index: -1;
+  left: -10%;
+  right: -10%;
+  top: auto;
+  height: 48vh;
+  background-image:
+    linear-gradient(to top, color-mix(in srgb, var(--galaxy-void) 88%, transparent), transparent 70%),
+    repeating-linear-gradient(90deg, transparent 0 47px, color-mix(in srgb, var(--galaxy-accent) 16%, transparent) 47px 48px),
+    repeating-linear-gradient(0deg, transparent 0 27px, color-mix(in srgb, var(--galaxy-accent) 12%, transparent) 27px 28px);
+  mask-image: linear-gradient(to top, black 5%, transparent 95%);
+  transform: perspective(420px) rotateX(58deg) scale(1.35);
+  transform-origin: 50% 100%;
+  opacity: 0.55;
+}
+
+header,
+.hud-stage,
+.hud-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.card {
+  position: relative;
+  background: color-mix(in srgb, var(--galaxy-panel) 92%, transparent);
+  border: 1px solid var(--galaxy-line);
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--galaxy-accent) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--galaxy-accent) 16%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) top left / 12px 1.5px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) top left / 1.5px 12px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) top right / 12px 1.5px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) top right / 1.5px 12px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) bottom left / 12px 1.5px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) bottom left / 1.5px 12px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) bottom right / 12px 1.5px no-repeat,
+    linear-gradient(var(--galaxy-accent), var(--galaxy-accent)) bottom right / 1.5px 12px no-repeat;
+  opacity: 0.85;
+}
+
+.card-header {
+  background: color-mix(in srgb, var(--galaxy-accent) 8%, transparent);
+  border-bottom: 1px solid var(--galaxy-line);
+  font-family: var(--galaxy-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--galaxy-accent);
+}
+
+.card-footer {
+  background: transparent;
+  border-top: 1px solid var(--galaxy-line);
+}
+
+.btn-primary {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--galaxy-accent) 35%, transparent);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--galaxy-accent) 55%, transparent);
+}
+
+.nav-pills .nav-link.active {
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--galaxy-accent) 40%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--galaxy-accent) 20%, transparent);
+}
+
+.table-responsive,
+.card .table {
+  --bs-table-bg: transparent;
+}
+
+.log-box {
+  background:
+    linear-gradient(color-mix(in srgb, var(--galaxy-accent) 6%, transparent), transparent 40%),
+    var(--galaxy-panel);
+  border-top: 1px solid var(--galaxy-line);
+  color: color-mix(in srgb, var(--galaxy-ok) 70%, var(--bs-body-color));
+  text-shadow: 0 0 8px color-mix(in srgb, var(--galaxy-ok) 25%, transparent);
+}
+
+[data-bs-theme="light"] .cockpit::before {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 2px,
+      color-mix(in srgb, var(--galaxy-accent) 6%, transparent) 2px 3px
+    ),
+    radial-gradient(ellipse 90% 50% at 50% -12%, color-mix(in srgb, var(--galaxy-accent) 22%, white), transparent 60%),
+    radial-gradient(ellipse 50% 30% at 10% 110%, color-mix(in srgb, var(--galaxy-accent) 10%, transparent), transparent 55%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0.8px, transparent 1.2px),
+    radial-gradient(circle, color-mix(in srgb, var(--galaxy-accent) 35%, white) 0.6px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 190px 190px, 280px 240px;
+}
+
+[data-bs-theme="light"] .cockpit::after {
+  opacity: 0.28;
+}
+
+[data-bs-theme="light"] .log-box {
+  color: var(--bs-body-color);
+  text-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cockpit::after {
+    transform: none;
+    height: 22vh;
+    opacity: 0.25;
+  }
+}
