@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - GalaxyMusicDataset</title>
+    <title>@ViewData["Title"] - Galaxy Music</title>
     <script>
         (() => {
             try {
@@ -13,15 +13,22 @@
         })();
     </script>
     <script type="importmap"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/hud.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/GalaxyMusicDataset.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body class="cockpit">
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm bg-body-tertiary border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm hud-nav mb-3">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="@(User.Identity?.IsAuthenticated == true ? "/Index" : "/Dashboard")">GalaxyMusicDataset</a>
+                <a class="navbar-brand" asp-area="" asp-page="@(User.Identity?.IsAuthenticated == true ? "/Index" : "/Dashboard")">
+                    <span class="brand-mark" aria-hidden="true">GM</span>
+                    <span class="brand-wordmark">Galaxy Music</span>
+                </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -79,15 +86,15 @@
             </div>
         </nav>
     </header>
-    <div class="container">
+    <div class="container hud-stage">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
+    <footer class="footer hud-footer">
         <div class="container">
-            &copy; 2026 - GalaxyMusicDataset - <a asp-area="" asp-page="/Privacy">Privacy</a>
+            &copy; 2026 - Galaxy Music - <a asp-area="" asp-page="/Privacy">Privacy</a>
         </div>
     </footer>
 
