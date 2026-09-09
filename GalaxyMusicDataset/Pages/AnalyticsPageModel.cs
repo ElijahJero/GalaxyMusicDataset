@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GalaxyMusicDataset.Pages;
 
@@ -23,14 +24,18 @@ public abstract class AnalyticsPageModel : PageModel
 
     public TimeRange TimeRange { get; protected set; } = TimeRangeParser.Parse("30d", null, null, DateTimeOffset.UtcNow);
 
+    protected AppTimeZone DisplayTimeZone =>
+        HttpContext?.RequestServices.GetService<AppTimeZone>() ?? AppTimeZone.Eastern;
+
     protected void ResolveFilter(DateTimeOffset? utcNow = null)
     {
-        TimeRange = TimeRangeParser.Parse(Range, From, To, utcNow ?? DateTimeOffset.UtcNow);
+        var tz = DisplayTimeZone;
+        TimeRange = TimeRangeParser.Parse(Range, From, To, utcNow ?? DateTimeOffset.UtcNow, tz.Zone);
         Range = TimeRange.Preset;
         if (TimeRange.Preset == "custom")
         {
-            From ??= TimeRangeParser.IsoDate(TimeRange.From);
-            To ??= TimeRangeParser.IsoDate(TimeRange.To.AddSeconds(-1));
+            From ??= TimeRangeParser.IsoDate(TimeRange.From, tz.Zone);
+            To ??= TimeRangeParser.IsoDate(TimeRange.To.AddSeconds(-1), tz.Zone);
         }
     }
 

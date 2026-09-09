@@ -11,6 +11,7 @@ using GalaxyMusicDataset.Services.Search;
 using GalaxyMusicDataset.Services.TheAudioDb;
 using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace GalaxyMusicDataset.Services;
 
@@ -26,7 +27,14 @@ public static class ServiceCollectionExtensions
         services.Configure<UtaiteDbOptions>(configuration.GetSection(UtaiteDbOptions.SectionName));
         services.Configure<TouhouDbOptions>(configuration.GetSection(TouhouDbOptions.SectionName));
         services.Configure<AggregationOptions>(configuration.GetSection(AggregationOptions.SectionName));
+        services.Configure<AnalyticsOptions>(configuration.GetSection(AnalyticsOptions.SectionName));
         services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+        services.AddSingleton(sp =>
+        {
+            var zone = AppTimeZone.FromOptions(sp.GetRequiredService<IOptions<AnalyticsOptions>>().Value);
+            AnalyticsDisplay.TimeZone = zone;
+            return zone;
+        });
         services.AddSingleton<AdminSignIn>();
 
         var dbPath = Path.Combine(environment.ContentRootPath, "App_Data", "galaxy.db");

@@ -6,7 +6,7 @@
 }
 
 <div class="heatmap-wrap">
-    <div class="heatmap" role="img" aria-label="Scrobble heatmap by weekday and hour UTC">
+    <div class="heatmap" role="img" aria-label="Scrobble heatmap by weekday and hour @AnalyticsDisplay.ZoneLabel">
         <div class="heatmap-corner"></div>
         @for (var hour = 0; hour < 24; hour++)
         {
@@ -20,10 +20,10 @@
                 map.TryGetValue((day, hour), out var cell);
                 var count = cell?.Count ?? 0;
                 var level = count == 0 ? 0 : 0.15 + 0.85 * (count / (double)max);
-                var title = $"{days[day]} {hour:00}:00 UTC — {count} scrobble{(count == 1 ? "" : "s")}";
+                var title = $"{days[day]} {hour:00}:00 {AnalyticsDisplay.ZoneLabel} — {count} scrobble{(count == 1 ? "" : "s")}";
                 <div class="heatmap-cell" style="--level: @level.ToString(System.Globalization.CultureInfo.InvariantCulture)" title="@title"></div>
             }
         }
     </div>
-    <div class="small text-muted mt-2">Hours in UTC. Darker cells have more scrobbles.</div>
+    <div class="small text-muted mt-2">Hours in @AnalyticsDisplay.ZoneLabel. Darker cells have more scrobbles.</div>
 </div>
