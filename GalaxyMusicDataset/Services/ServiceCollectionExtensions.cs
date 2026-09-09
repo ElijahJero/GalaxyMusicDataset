@@ -2,6 +2,7 @@ using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
+using GalaxyMusicDataset.Services.Api;
 using GalaxyMusicDataset.Services.Auth;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
@@ -63,6 +64,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AggregationStatusService>();
         services.AddScoped<AnalyticsQueries>();
         services.AddSingleton<UserSettingsStore>();
+        services.AddSingleton<ApiKeyStore>();
         services.AddSingleton<LibrarySearchService>();
         services.AddHostedService<AggregationHostedService>();
         return services;

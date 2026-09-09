@@ -1,0 +1,63 @@
+@page "/api-docs"
+@model ApiModel
+@{
+    ViewData["Title"] = "REST API";
+}
+
+<h1 class="h3">REST API</h1>
+<p class="text-muted">JSON API at <code>/api/v1</code> covering the same features as this site, for a mobile app or other clients. Full markdown: <a href="/api/docs">/api/docs</a>. Machine catalog: <code>GET /api</code>.</p>
+
+<div class="card card-body mb-4">
+    <h2 class="h5">Authentication</h2>
+    <p>Every <code>/api/v1/…</code> route except the catalog requires an API key. Create and revoke keys on <a asp-page="/Settings">Settings</a> (admin login). The token is shown once.</p>
+    <pre class="mb-2">Authorization: Bearer gmk_…
+X-Api-Key: gmk_…</pre>
+    <p class="mb-0">Scopes: <strong>read</strong> for GET (analytics, library, lookups, review, status, settings). <strong>write</strong> for POST/PUT/DELETE (edits, review actions, jobs, settings, key management). A write key always includes read.</p>
+</div>
+
+<div class="card card-body mb-4">
+    <h2 class="h5">Shared query parameters</h2>
+    <p>Analytics endpoints accept the same filters as the website:</p>
+    <ul class="mb-0">
+        <li><code>range</code> — <code>7d</code>, <code>30d</code> (default), <code>90d</code>, <code>1y</code>, <code>all</code>, <code>custom</code></li>
+        <li><code>from</code> / <code>to</code> — ISO dates when <code>range=custom</code></li>
+        <li><code>q</code> — artist / track / album search (names and aliases)</li>
+        <li><code>take</code> — list size (default 50, max 500 on most lists)</li>
+    </ul>
+</div>
+
+<div class="table-responsive mb-4">
+    <table class="table table-sm">
+        <thead>
+        <tr><th>Website</th><th>API</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>Overview</td><td><code>GET /api/v1/overview</code></td><td>read</td></tr>
+        <tr><td>Tops</td><td><code>GET /api/v1/tops/{artists|tracks|albums}</code></td><td>read</td></tr>
+        <tr><td>Genres</td><td><code>GET /api/v1/tags</code> and <code>GET /api/v1/tags/{name}</code></td><td>read</td></tr>
+        <tr><td>Discovery</td><td><code>GET /api/v1/discovery</code></td><td>read</td></tr>
+        <tr><td>Patterns</td><td><code>GET /api/v1/patterns</code></td><td>read</td></tr>
+        <tr><td>Deep cuts</td><td><code>GET /api/v1/deep-cuts?n=10</code></td><td>read</td></tr>
+        <tr><td>Sessions</td><td><code>GET /api/v1/sessions?gap=30</code></td><td>read</td></tr>
+        <tr><td>Wrapped</td><td><code>GET /api/v1/wrapped/{year}</code> and <code>…/html</code></td><td>read</td></tr>
+        <tr><td>Artist / track</td><td><code>GET /api/v1/artists/{id}</code>, <code>GET /api/v1/tracks/{id}</code></td><td>read</td></tr>
+        <tr><td>Recent plays</td><td><code>GET /api/v1/scrobbles</code></td><td>read</td></tr>
+        <tr><td>Library</td><td><code>GET /api/v1/library</code>, <code>PUT /api/v1/library/{id}</code></td><td>read / write</td></tr>
+        <tr><td>Fetch MBID</td><td><code>POST /api/v1/tracks/{id}/enrich</code></td><td>write</td></tr>
+        <tr><td>Lookups</td><td><code>GET /api/v1/lookups</code>, <code>POST …/lookups/{id}/retry</code></td><td>read / write</td></tr>
+        <tr><td>Review</td><td><code>GET /api/v1/review</code>, accept / not-found / retry</td><td>read / write</td></tr>
+        <tr><td>Progress</td><td><code>GET /api/v1/status</code></td><td>read</td></tr>
+        <tr><td>Jobs</td><td><code>POST /api/v1/jobs/{sync|backfill|pause|resume|retry-lookups|seed}</code></td><td>write</td></tr>
+        <tr><td>Settings</td><td><code>GET/PUT /api/v1/settings</code></td><td>read / write</td></tr>
+        <tr><td>API keys</td><td><code>GET/POST /api/v1/keys</code>, <code>DELETE /api/v1/keys/{id}</code></td><td>read / write</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card card-body mb-4">
+    <h2 class="h5">Example</h2>
+    <pre class="mb-0">curl -H "Authorization: Bearer gmk_…" http://localhost:5107/api/v1/overview?range=30d
+curl -H "Authorization: Bearer gmk_…" http://localhost:5107/api/v1/me</pre>
+</div>
+
+<p>JSON uses camelCase. Enums are strings. Errors look like <code>{"error":"…"}</code>. <code>401</code> missing/invalid key, <code>403</code> wrong scope, <code>404</code> unknown id.</p>

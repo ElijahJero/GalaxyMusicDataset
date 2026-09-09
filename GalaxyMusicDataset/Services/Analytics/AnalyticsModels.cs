@@ -29,6 +29,17 @@ public sealed record RecentTrackInfo(
     string? AlbumTitle,
     DateTimeOffset PlayedAt);
 
+public sealed record RecentPlay(
+    long ScrobbleId,
+    long TrackId,
+    string Title,
+    long ArtistId,
+    string ArtistName,
+    long? AlbumId,
+    string? AlbumTitle,
+    string? CoverUrl,
+    DateTimeOffset PlayedAt);
+
 public sealed record DailyCount(DateOnly Day, int Count, long DurationMs);
 
 public sealed record RankedItem(
@@ -203,3 +214,11 @@ public sealed record TagDetailResult(
     IReadOnlyList<RankedItem> Tracks,
     IReadOnlyList<RankedItem> Artists,
     IReadOnlyList<string> Sources);
+
+public sealed record PagedResult<T>(
+    IReadOnlyList<T> Items,
+    int Total,
+    int Page,
+    int PageSize,
+    int TotalPages,
+    bool HasMore);

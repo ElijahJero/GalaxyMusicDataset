@@ -5,7 +5,7 @@
 }
 
 <h1 class="h3">Aggregation settings</h1>
-<p class="text-muted">Keys are stored in <code>App_Data/user-settings.json</code> (gitignored). Secret fields are never shown after save — leave them blank to keep the current value, or paste a new value to replace it.</p>
+<p class="text-muted">Keys are stored in <code>App_Data/user-settings.json</code> (gitignored). Secret fields are never shown after save — leave them blank to keep the current value, or paste a new value to replace it. REST API keys for a mobile app are managed in the section below and stored hashed in <code>App_Data/api-keys.json</code>.</p>
 
 @if (Model.Saved is not null)
 {
@@ -118,3 +118,81 @@
     </div>
     <button class="btn btn-primary" type="submit">Save</button>
 </form>
+
+<div class="card card-body mt-4" id="api-keys">
+    <h2 class="h5">REST API keys</h2>
+    <p class="text-muted">Keys let a mobile app (or anything else) call <code>/api/v1</code> with the same features as this site. See the <a asp-page="/Api">API docs</a>. The full token is shown once at creation — store it on the device. Send it as <code>Authorization: Bearer gmk_…</code> or <code>X-Api-Key</code>.</p>
+
+    @if (Model.CreatedApiKey is not null)
+    {
+        <div class="alert alert-warning">
+            <div class="fw-semibold mb-1">Copy this key for @(Model.CreatedApiKeyName). It will not be shown again.</div>
+            <code class="user-select-all d-block text-break">@Model.CreatedApiKey</code>
+        </div>
+    }
+
+    @if (Model.ApiKeyError is not null)
+    {
+        <div class="alert alert-danger">@Model.ApiKeyError</div>
+    }
+
+    @if (Model.ApiKeys.Count == 0)
+    {
+        <p class="text-muted mb-3">No active API keys yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Prefix</th>
+                    <th>Scopes</th>
+                    <th>Created</th>
+                    <th>Last used</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var key in Model.ApiKeys)
+                {
+                    <tr>
+                        <td>@key.Name</td>
+                        <td><code>@key.Prefix…</code></td>
+                        <td>@string.Join(", ", key.Scopes)</td>
+                        <td class="text-nowrap">@key.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</td>
+                        <td class="text-nowrap">@(key.LastUsedAt is null ? "never" : key.LastUsedAt.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") + " UTC")</td>
+                        <td class="text-end">
+                            <form method="post" asp-page-handler="RevokeApiKey" class="d-inline" onsubmit="return confirm('Revoke this API key? Apps using it will stop working.');">
+                                <input type="hidden" name="id" value="@key.Id" />
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Revoke</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <form method="post" asp-page-handler="CreateApiKey" class="row g-3 align-items-end" autocomplete="off">
+        <div class="col-md-5">
+            <label class="form-label" asp-for="NewApiKeyName">Key name</label>
+            <input class="form-control" asp-for="NewApiKeyName" placeholder="Phone, tablet, …" />
+        </div>
+        <div class="col-md-4 d-flex flex-wrap gap-3 pb-2">
+            <div class="form-check">
+                <input class="form-check-input" asp-for="NewApiKeyRead" />
+                <label class="form-check-label" asp-for="NewApiKeyRead">Read (analytics &amp; catalog)</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="NewApiKeyWrite" />
+                <label class="form-check-label" asp-for="NewApiKeyWrite">Write (edits &amp; jobs)</label>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-outline-primary w-100" type="submit">Create API key</button>
+        </div>
+    </form>
+</div>

@@ -43,7 +43,11 @@ Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, ses
 - **Library** (`/Recent`) — all unique tracks, 50 per page, with Lucene.NET search (case-insensitive, partial tokens, light typo tolerance), filters (including has/missing tags), and inline editing
 - **Lookups** — fingerprint cache (one MusicBrainz search per unique song)
 - **Review** — accept/reject low-confidence MusicBrainz matches
-- **Settings** — API keys (written to `App_Data/user-settings.json`, gitignored)
+- **Settings** — Last.fm / Discogs / TheAudioDB keys and **REST API keys** for mobile clients (written to `App_Data/user-settings.json` and `App_Data/api-keys.json`, gitignored)
+
+## REST API
+
+`/api/v1` exposes the same features as the site (analytics, library, lookups, review, ingest jobs, settings). Create keys on Settings; send `Authorization: Bearer gmk_…` or `X-Api-Key`. Docs: [docs/API.md](docs/API.md), in-app `/api-docs`, or `GET /api/docs`.
 
 Development seeds 14 sample scrobbles when the database is empty (`Aggregation:SeedSampleData`).
 

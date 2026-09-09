@@ -22,4 +22,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="GalaxyMusicDataset.Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\docs\API.md" Link="docs\API.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -1,5 +1,6 @@
 using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -14,15 +15,29 @@ public class SettingsModel(
     IOptionsMonitor<TheAudioDbOptions> audioDb,
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
     IOptionsMonitor<AggregationOptions> aggregation,
-    UserSettingsStore store) : PageModel
+    UserSettingsStore store,
+    ApiKeyStore apiKeys) : PageModel
 {
     [BindProperty]
     public UserSettingsModel Input { get; set; } = new();
 
+    [BindProperty]
+    public string NewApiKeyName { get; set; } = "";
+
+    [BindProperty]
+    public bool NewApiKeyRead { get; set; } = true;
+
+    [BindProperty]
+    public bool NewApiKeyWrite { get; set; } = true;
+
     public string? Saved { get; set; }
+    public string? ApiKeyError { get; set; }
+    public string? CreatedApiKey { get; set; }
+    public string? CreatedApiKeyName { get; set; }
     public bool LastFmKeySaved { get; set; }
     public bool DiscogsTokenSaved { get; set; }
     public bool TheAudioDbKeySaved { get; set; }
+    public IReadOnlyList<ApiKeyInfo> ApiKeys { get; private set; } = [];
 
     public void OnGet() => LoadForm();
 
@@ -44,6 +59,39 @@ public class SettingsModel(
         return Page();
     }
 
+    public IActionResult OnPostCreateApiKey()
+    {
+        try
+        {
+            var created = apiKeys.Create(NewApiKeyName, NewApiKeyRead, NewApiKeyWrite);
+            CreatedApiKey = created.Token;
+            CreatedApiKeyName = created.Info.Name;
+            NewApiKeyName = "";
+        }
+        catch (InvalidOperationException ex)
+        {
+            ApiKeyError = ex.Message;
+        }
+
+        LoadForm();
+        return Page();
+    }
+
+    public IActionResult OnPostRevokeApiKey(string id)
+    {
+        if (!apiKeys.Revoke(id))
+        {
+            ApiKeyError = "That API key was not found or is already revoked.";
+        }
+        else
+        {
+            Saved = "API key revoked.";
+        }
+
+        LoadForm();
+        return Page();
+    }
+
     private void LoadForm()
     {
         var lf = lastFm.CurrentValue;
@@ -54,6 +102,7 @@ public class SettingsModel(
         LastFmKeySaved = !string.IsNullOrWhiteSpace(lf.ApiKey);
         DiscogsTokenSaved = !string.IsNullOrWhiteSpace(d.Token);
         TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(a.ApiKey);
+        ApiKeys = apiKeys.List();
         Input = new UserSettingsModel
         {
             LastFmUsername = lf.Username,
