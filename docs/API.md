@@ -2,7 +2,7 @@
 
 JSON API at `/api/v1` so a mobile app (or any client) can match the website: public analytics, library editing, MusicBrainz review, ingest jobs, and settings.
 
-Human-readable page: `/Api`. Machine catalog: `GET /api` (no key).
+Human-readable page: `/api-docs`. Machine catalog: `GET /api` (no key).
 
 ## Authentication
 

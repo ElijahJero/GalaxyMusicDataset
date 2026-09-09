@@ -47,7 +47,7 @@ Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, ses
 
 ## REST API
 
-`/api/v1` exposes the same features as the site (analytics, library, lookups, review, ingest jobs, settings). Create keys on Settings; send `Authorization: Bearer gmk_…` or `X-Api-Key`. Docs: [docs/API.md](docs/API.md), in-app `/Api`, or `GET /api/docs`.
+`/api/v1` exposes the same features as the site (analytics, library, lookups, review, ingest jobs, settings). Create keys on Settings; send `Authorization: Bearer gmk_…` or `X-Api-Key`. Docs: [docs/API.md](docs/API.md), in-app `/api-docs`, or `GET /api/docs`.
 
 Development seeds 14 sample scrobbles when the database is empty (`Aggregation:SeedSampleData`).
 

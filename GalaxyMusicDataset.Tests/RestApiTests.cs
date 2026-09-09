@@ -91,8 +91,11 @@ public class RestApiTests
         var markdown = await docs.Content.ReadAsStringAsync();
         Assert.Contains("Galaxy Music REST API", markdown);
 
-        var page = await client.GetAsync("/Api");
+        var page = await client.GetAsync("/api-docs");
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("Authentication", html);
+        Assert.Contains("/api/v1/overview", html);
     }
 
     [Fact]

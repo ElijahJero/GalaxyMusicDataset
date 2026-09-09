@@ -121,7 +121,7 @@
 
 <div class="card card-body mt-4" id="api-keys">
     <h2 class="h5">REST API keys</h2>
-    <p class="text-muted">Keys let a mobile app (or anything else) call <a asp-page="/Api">/api/v1</a> with the same features as this site. The full token is shown once at creation — store it on the device. Send it as <code>Authorization: Bearer gmk_…</code> or <code>X-Api-Key</code>.</p>
+    <p class="text-muted">Keys let a mobile app (or anything else) call <code>/api/v1</code> with the same features as this site. See the <a asp-page="/Api">API docs</a>. The full token is shown once at creation — store it on the device. Send it as <code>Authorization: Bearer gmk_…</code> or <code>X-Api-Key</code>.</p>
 
     @if (Model.CreatedApiKey is not null)
     {

@@ -11,7 +11,7 @@ namespace GalaxyMusicDataset.Api.Controllers;
 public sealed class ApiRootController(IWebHostEnvironment env) : ControllerBase
 {
     public const string Version = "v1";
-    public const string DocsPath = "/Api";
+    public const string DocsPath = "/api-docs";
 
     [AllowAnonymous]
     [HttpGet("")]
