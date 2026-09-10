@@ -15,9 +15,9 @@ public sealed class LibrarySearchService : IDisposable
         var count = await db.Tracks.CountAsync(cancellationToken);
         var stamp = new[]
         {
-            (await db.Tracks.AsNoTracking().Select(t => t.UpdatedAt).ToListAsync(cancellationToken)).DefaultIfEmpty().Max(),
-            (await db.Artists.AsNoTracking().Select(a => a.UpdatedAt).ToListAsync(cancellationToken)).DefaultIfEmpty().Max(),
-            (await db.Albums.AsNoTracking().Select(a => a.UpdatedAt).ToListAsync(cancellationToken)).DefaultIfEmpty().Max()
+            await LatestUpdatedAtAsync(db, "Tracks", cancellationToken),
+            await LatestUpdatedAtAsync(db, "Artists", cancellationToken),
+            await LatestUpdatedAtAsync(db, "Albums", cancellationToken)
         }.Max();
 
         lock (_gate)
@@ -49,6 +49,21 @@ public sealed class LibrarySearchService : IDisposable
 
     public IReadOnlyList<long> Search(string? q, string? artist, string? title, string? album) =>
         _engine.Search(q, artist, title, album);
+
+    private static async Task<DateTimeOffset> LatestUpdatedAtAsync(
+        AppDbContext db,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        if (table is not ("Tracks" or "Artists" or "Albums"))
+        {
+            throw new ArgumentOutOfRangeException(nameof(table), table, "Unknown catalog table.");
+        }
+
+        var sql = $"SELECT MAX(UpdatedAt) AS Value FROM {table}";
+        var value = await db.Database.SqlQueryRaw<string?>(sql).FirstOrDefaultAsync(cancellationToken);
+        return DateTimeOffset.TryParse(value, out var parsed) ? parsed : DateTimeOffset.MinValue;
+    }
 
     public void Dispose() => _engine.Dispose();
 }

@@ -1,3 +1,4 @@
+using System.Text;
 using GalaxyMusicDataset.Services.Normalization;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
@@ -120,18 +121,39 @@ public sealed class LibrarySearchEngine : IDisposable
     private Query? BuildFieldQuery(string field, string raw)
     {
         var tokens = Analyze(raw);
-        if (tokens.Count == 0)
+        var compact = CompactAlphanumeric(raw);
+        Query? parts = null;
+        if (tokens.Count > 0)
         {
-            return null;
+            var query = new BooleanQuery();
+            foreach (var token in tokens)
+            {
+                query.Add(BuildTokenQuery(field, token), Occur.MUST);
+            }
+
+            parts = query;
         }
 
-        var query = new BooleanQuery();
-        foreach (var token in tokens)
+        Query? compactQuery = null;
+        if (compact.Length >= 2 && (tokens.Count != 1 || !string.Equals(tokens[0], compact, StringComparison.Ordinal)))
         {
-            query.Add(BuildTokenQuery(field, token), Occur.MUST);
+            compactQuery = BuildTokenQuery(field, compact);
         }
 
-        return query;
+        if (parts is null)
+        {
+            return compactQuery;
+        }
+
+        if (compactQuery is null)
+        {
+            return parts;
+        }
+
+        var either = new BooleanQuery { MinimumNumberShouldMatch = 1 };
+        either.Add(parts, Occur.SHOULD);
+        either.Add(compactQuery, Occur.SHOULD);
+        return either;
     }
 
     private static Query BuildTokenQuery(string field, string token)
@@ -203,14 +225,55 @@ public sealed class LibrarySearchEngine : IDisposable
                 continue;
             }
 
-            values.Add(part);
+            AddSearchableForms(values, part);
             var romanized = TextNormalizer.RomanizeIfKana(part);
             if (!string.IsNullOrEmpty(romanized))
             {
-                values.Add(romanized);
+                AddSearchableForms(values, romanized);
             }
         }
 
         return string.Join(" ", values);
+    }
+
+    private static void AddSearchableForms(List<string> values, string part)
+    {
+        values.Add(part);
+        var spaced = FoldPunctuationToSpace(part);
+        if (!string.Equals(spaced, part, StringComparison.OrdinalIgnoreCase))
+        {
+            values.Add(spaced);
+        }
+
+        var compact = CompactAlphanumeric(part);
+        if (compact.Length > 0 && !string.Equals(compact, part, StringComparison.OrdinalIgnoreCase))
+        {
+            values.Add(compact);
+        }
+    }
+
+    internal static string FoldPunctuationToSpace(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var c in value)
+        {
+            builder.Append(char.IsLetterOrDigit(c) || char.IsWhiteSpace(c) ? c : ' ');
+        }
+
+        return builder.ToString();
+    }
+
+    internal static string CompactAlphanumeric(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var c in value)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                builder.Append(char.ToLowerInvariant(c));
+            }
+        }
+
+        return builder.ToString();
     }
 }

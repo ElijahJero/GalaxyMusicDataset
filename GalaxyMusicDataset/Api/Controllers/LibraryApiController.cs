@@ -1,9 +1,7 @@
 using GalaxyMusicDataset.Data;
-using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Pages;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
-using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Api;
 using GalaxyMusicDataset.Services.Search;
 using Microsoft.AspNetCore.Authorization;
@@ -56,53 +54,18 @@ public sealed class LibraryApiController(
         }
 
         query = LibraryFilters.Apply(query, db, search, q, artist, title, album, hasMbid, hasTags, source, status, hasAudio, audioKind, audioLabel);
-        query = sort switch
-        {
-            "title" => query.OrderBy(t => t.Title).ThenBy(t => t.Artist.Name),
-            "artist" => query.OrderBy(t => t.Artist.Name).ThenBy(t => t.Title),
-            "plays" => query.OrderByDescending(t => t.Scrobbles.Count()).ThenBy(t => t.Title),
-            _ => query.OrderByDescending(t => t.Scrobbles.Max(s => (long?)s.UnixTimestamp)).ThenBy(t => t.Title)
-        };
+        query = LibraryListQuery.ApplySort(query, sort);
 
-        var total = await query.CountAsync(cancellationToken);
-        var totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
-        if (page > totalPages)
-        {
-            page = totalPages;
-        }
+        var loaded = await LibraryListQuery.LoadPageAsync(db, query, page, pageSize, cancellationToken);
+        var items = loaded.Items.Select(item => Map(item)).ToList();
 
-        var tracks = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Include(t => t.Artist).ThenInclude(a => a.Aliases)
-            .Include(t => t.Album)
-            .Include(t => t.Tags).ThenInclude(t => t.Tag)
-            .Include(t => t.SourcePayloads)
-            .Include(t => t.AudioProfile)
-                .ThenInclude(p => p!.Labels)
-            .ToListAsync(cancellationToken);
-
-        var ids = tracks.Select(t => t.Id).ToList();
-        var stats = await db.Scrobbles.AsNoTracking()
-            .Where(s => ids.Contains(s.TrackId))
-            .GroupBy(s => s.TrackId)
-            .Select(g => new { TrackId = g.Key, Count = g.Count(), Last = g.Max(x => x.UnixTimestamp) })
-            .ToListAsync(cancellationToken);
-        var statMap = stats.ToDictionary(x => x.TrackId);
-        var fingerprints = tracks.Select(t => t.Fingerprint).Distinct().ToList();
-        var lookups = await db.TrackLookups.AsNoTracking()
-            .Where(l => fingerprints.Contains(l.Fingerprint))
-            .ToListAsync(cancellationToken);
-        var lookupMap = lookups.ToDictionary(l => l.Fingerprint);
-
-        var items = tracks.Select(t =>
-        {
-            statMap.TryGetValue(t.Id, out var st);
-            lookupMap.TryGetValue(t.Fingerprint, out var lookup);
-            return Map(t, lookup, st?.Count ?? 0, st?.Last);
-        }).ToList();
-
-        return Ok(new PagedResult<LibraryTrackDto>(items, total, page, pageSize, totalPages, page < totalPages));
+        return Ok(new PagedResult<LibraryTrackDto>(
+            items,
+            loaded.TotalCount,
+            loaded.Page,
+            pageSize,
+            loaded.TotalPages,
+            loaded.Page < loaded.TotalPages));
     }
 
     [Authorize(Policy = ApiPolicies.Write)]
@@ -134,8 +97,10 @@ public sealed class LibraryApiController(
         }
     }
 
-    private static LibraryTrackDto Map(Track track, TrackLookup? lookup, int playCount, long? lastUnix) =>
-        new(
+    private static LibraryTrackDto Map(LibraryListItem item)
+    {
+        var track = item.Track;
+        return new(
             track.Id,
             track.Title,
             track.ArtistId,
@@ -150,17 +115,13 @@ public sealed class LibraryApiController(
             track.TouhouDbSongId,
             track.DurationMs,
             track.Fingerprint,
-            playCount,
-            lastUnix is null ? null : DateTimeOffset.FromUnixTimeSeconds(lastUnix.Value),
-            lookup?.Status.ToString(),
-            lookup?.BestScore,
-            lookup?.ErrorMessage,
+            item.PlayCount,
+            item.LastPlayedUnix is null ? null : DateTimeOffset.FromUnixTimeSeconds(item.LastPlayedUnix.Value),
+            item.Lookup?.Status.ToString(),
+            item.Lookup?.BestScore,
+            item.Lookup?.ErrorMessage,
             track.Tags.Select(t => t.Tag.Name).Distinct().OrderBy(n => n).ToList(),
-            track.SourcePayloads.Select(p => new SourcePayloadInfo(
-                p.Source.ToString(),
-                p.Status.ToString(),
-                p.ExternalId,
-                p.ErrorMessage,
-                p.PayloadJson)).ToList(),
-            track.AudioProfile is null ? null : AudioProfileService.ToView(track.AudioProfile));
+            item.Sources,
+            item.Audio);
+    }
 }

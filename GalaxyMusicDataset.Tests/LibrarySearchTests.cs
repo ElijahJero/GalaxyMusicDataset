@@ -1,3 +1,4 @@
+using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Pages;
 using GalaxyMusicDataset.Services.Search;
@@ -31,6 +32,23 @@ public class LibrarySearchTests
         Assert.Equal([3], Ids(engine.Search(null, null, "really want", null)));
         Assert.Equal([1], Ids(engine.Search(null, null, null, "disaster")));
         Assert.Empty(engine.Search(null, "mori", "loading", null));
+    }
+
+    [Fact]
+    public void Search_matches_hyphen_underscore_and_concatenated_names()
+    {
+        using var engine = new LibrarySearchEngine();
+        engine.Rebuild(
+        [
+            new(1, "Song", "kathy-chan", null, []),
+            new(2, "Other", "kathy_chan", null, []),
+            new(3, "Plain", "someone else", null, [])
+        ]);
+
+        Assert.Equal([1, 2], Ids(engine.Search("kathychan", null, null, null)));
+        Assert.Equal([1, 2], Ids(engine.Search("kathy-chan", null, null, null)));
+        Assert.Equal([1, 2], Ids(engine.Search("kathy_chan", null, null, null)));
+        Assert.DoesNotContain(3L, engine.Search("kathychan", null, null, null));
     }
 
     [Fact]
@@ -86,6 +104,77 @@ public class LibrarySearchTests
             .Select(t => t.Title)
             .ToListAsync();
         Assert.Equal(["INSOMNIAC BLACK"], missingMbid);
+    }
+
+    [Fact]
+    public async Task Library_list_omits_payload_json_and_audio_raw()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var artist = new Artist { Name = "kathy-chan", CreatedAt = now, UpdatedAt = now };
+        harness.Db.Artists.Add(artist);
+        await harness.Db.SaveChangesAsync();
+        var track = new Track
+        {
+            ArtistId = artist.Id,
+            Title = "Demo",
+            Fingerprint = "fp-demo",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        harness.Db.Tracks.Add(track);
+        await harness.Db.SaveChangesAsync();
+
+        var blob = new string('x', 8000);
+        harness.Db.TrackSourcePayloads.Add(new TrackSourcePayload
+        {
+            TrackId = track.Id,
+            Source = EnrichmentSource.MusicBrainz,
+            Status = SourceFetchStatus.Success,
+            ExternalId = "mbid",
+            PayloadJson = blob
+        });
+        harness.Db.TrackAudioProfiles.Add(new TrackAudioProfile
+        {
+            TrackId = track.Id,
+            AnalyzedAt = now,
+            Bpm = 128,
+            RawJson = blob
+        });
+        await harness.Db.SaveChangesAsync();
+        harness.Db.TrackAudioLabels.Add(new TrackAudioLabel
+        {
+            TrackId = track.Id,
+            Kind = AudioLabelKind.Genre,
+            Name = "Electronic/House",
+            Score = 0.9
+        });
+        var tag = new Tag { Name = "j-pop", NormalizedName = "j-pop" };
+        harness.Db.Tags.Add(tag);
+        await harness.Db.SaveChangesAsync();
+        harness.Db.TrackTags.Add(new TrackTag
+        {
+            TrackId = track.Id,
+            TagId = tag.Id,
+            Source = EnrichmentSource.LastFm,
+            Weight = 100
+        });
+        await harness.Db.SaveChangesAsync();
+
+        var query = LibraryListQuery.ApplySort(harness.Db.Tracks.AsNoTracking(), "title");
+        var page = await LibraryListQuery.LoadPageAsync(harness.Db, query, 1, 50, CancellationToken.None);
+
+        var item = Assert.Single(page.Items);
+        Assert.Equal("Demo", item.Track.Title);
+        Assert.Contains("j-pop", item.Track.Tags.Select(t => t.Tag.Name));
+        Assert.NotNull(item.Audio);
+        Assert.Null(item.Audio.RawJson);
+        Assert.Equal(128, item.Audio.Bpm);
+        Assert.Contains(item.Audio.Genres, g => g.Name == "Electronic/House");
+        var source = Assert.Single(item.Sources);
+        Assert.Equal("MusicBrainz", source.Source);
+        Assert.Null(source.Json);
+        Assert.Empty(item.Track.SourcePayloads);
     }
 
     private static long[] Ids(IReadOnlyList<long> ids) => [.. ids.OrderBy(id => id)];
