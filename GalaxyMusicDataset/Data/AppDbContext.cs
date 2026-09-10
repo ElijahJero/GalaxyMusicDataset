@@ -80,6 +80,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => x.UnixTimestamp).IsUnique();
             e.HasIndex(x => x.PlayedAt);
             e.HasIndex(x => x.TrackId);
+            e.HasIndex(x => new { x.TrackId, x.UnixTimestamp });
             e.Property(x => x.OriginalArtist).HasMaxLength(512);
             e.Property(x => x.OriginalTitle).HasMaxLength(1024);
             e.Property(x => x.OriginalAlbum).HasMaxLength(1024);

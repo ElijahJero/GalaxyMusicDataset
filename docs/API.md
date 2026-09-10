@@ -174,6 +174,8 @@ Paged unique tracks. Query:
 | `source` | Enrichment source that succeeded (`LastFm`, `MusicBrainz`, …) |
 | `sort` | `recent` (default), `plays`, `artist`, `title` |
 
+List items include source **status** only (`sources[].json` is omitted). Full payloads are on `GET /api/v1/tracks/{id}`.
+
 ### `PUT /api/v1/library/{id}` (write)
 
 Body matches the library edit form:

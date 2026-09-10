@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Analytics;
 using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Search;
 using Microsoft.AspNetCore.Authorization;
@@ -84,57 +85,19 @@ public class RecentModel(
         }
 
         query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status, HasAudio, AudioKind, AudioLabel);
+        query = LibraryListQuery.ApplySort(query, Sort);
 
-        query = Sort switch
-        {
-            "title" => query.OrderBy(t => t.Title).ThenBy(t => t.Artist.Name),
-            "artist" => query.OrderBy(t => t.Artist.Name).ThenBy(t => t.Title),
-            "plays" => query.OrderByDescending(t => t.Scrobbles.Count()).ThenBy(t => t.Title),
-            _ => query.OrderByDescending(t => t.Scrobbles.Max(s => (long?)s.UnixTimestamp)).ThenBy(t => t.Title)
-        };
-
-        TotalCount = await query.CountAsync(cancellationToken);
-        TotalPages = Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
-        if (P > TotalPages)
-        {
-            P = TotalPages;
-        }
-
-        var tracks = await query
-            .Skip((P - 1) * PageSize)
-            .Take(PageSize)
-            .Include(t => t.Artist).ThenInclude(a => a.Aliases)
-            .Include(t => t.Album)
-            .Include(t => t.Tags).ThenInclude(t => t.Tag)
-            .Include(t => t.SourcePayloads)
-            .Include(t => t.AudioProfile)
-                .ThenInclude(p => p!.Labels)
-            .ToListAsync(cancellationToken);
-
-        var ids = tracks.Select(t => t.Id).ToList();
-        var stats = await db.Scrobbles.AsNoTracking()
-            .Where(s => ids.Contains(s.TrackId))
-            .GroupBy(s => s.TrackId)
-            .Select(g => new { TrackId = g.Key, Count = g.Count(), Last = g.Max(x => x.UnixTimestamp) })
-            .ToListAsync(cancellationToken);
-        var statMap = stats.ToDictionary(x => x.TrackId);
-
-        var fingerprints = tracks.Select(t => t.Fingerprint).Distinct().ToList();
-        var lookups = await db.TrackLookups.AsNoTracking()
-            .Where(l => fingerprints.Contains(l.Fingerprint))
-            .ToListAsync(cancellationToken);
-        var lookupMap = lookups.ToDictionary(l => l.Fingerprint);
-
-        Rows = tracks.Select(t =>
-        {
-            statMap.TryGetValue(t.Id, out var st);
-            return new LibraryRow(
-                t,
-                lookupMap.GetValueOrDefault(t.Fingerprint),
-                st?.Count ?? 0,
-                st?.Last,
-                t.AudioProfile is null ? null : AudioProfileService.ToView(t.AudioProfile));
-        }).ToList();
+        var page = await LibraryListQuery.LoadPageAsync(db, query, P, PageSize, cancellationToken);
+        P = page.Page;
+        TotalCount = page.TotalCount;
+        TotalPages = page.TotalPages;
+        Rows = page.Items.Select(item => new LibraryRow(
+            item.Track,
+            item.Lookup,
+            item.PlayCount,
+            item.LastPlayedUnix,
+            item.Audio,
+            item.Sources)).ToList();
     }
 
     public async Task<IActionResult> OnPostEditAsync(CancellationToken cancellationToken)
@@ -179,7 +142,13 @@ public class RecentModel(
     public object FilterRoute(long? edit = null) => FilterRoutes(edit);
 }
 
-public sealed record LibraryRow(Track Track, TrackLookup? Lookup, int PlayCount, long? LastPlayedUnix, AudioProfileView? Audio);
+public sealed record LibraryRow(
+    Track Track,
+    TrackLookup? Lookup,
+    int PlayCount,
+    long? LastPlayedUnix,
+    AudioProfileView? Audio,
+    IReadOnlyList<SourcePayloadInfo> Sources);
 
 public static class LibraryFilters
 {

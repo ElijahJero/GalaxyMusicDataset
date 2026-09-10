@@ -126,6 +126,8 @@
         <a class="btn btn-sm btn-outline-secondary" asp-page="/Recent" asp-all-route-data="clear">Clear label</a>
     </div>
 }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
     <div class="text-muted">@Model.TotalCount.ToString("N0") tracks · page @Model.P of @Model.TotalPages</div>
     <partial name="_LibraryPager" model="Model" />
 </div>
@@ -328,7 +330,7 @@
             }
 
             <details class="small mt-3">
-                <summary>Identity, lookup, and source payloads</summary>
+                <summary>Identity, lookup, and sources</summary>
                 <ul class="list-unstyled mt-2 mb-2">
                     <li>Fingerprint <code>@t.Fingerprint</code></li>
                     <li>Artist MBID @(t.Artist.Mbid ?? "—") · Album MBID @(t.Album?.Mbid ?? "—")</li>
@@ -345,18 +347,15 @@
                             <li class="text-danger">@row.Lookup.ErrorMessage</li>
                         }
                     }
+                    @if (row.Sources.Count > 0)
+                    {
+                        <li>
+                            Sources:
+                            @string.Join(" · ", row.Sources.Select(s => $"{s.Source} {s.Status}"))
+                        </li>
+                    }
                 </ul>
-                @foreach (var payload in t.SourcePayloads)
-                {
-                    <details class="mb-2">
-                        <summary>@payload.Source — @payload.Status @(payload.ExternalId is null ? "" : $"id={payload.ExternalId}")</summary>
-                        @if (!string.IsNullOrWhiteSpace(payload.ErrorMessage))
-                        {
-                            <div class="text-danger">@payload.ErrorMessage</div>
-                        }
-                        <pre class="payload-json">@(payload.PayloadJson ?? "—")</pre>
-                    </details>
-                }
+                <div class="text-muted">Full source JSON is on the <a asp-page="/Tracks" asp-route-id="@t.Id">track analytics</a> page.</div>
             </details>
         </div>
     </div>
