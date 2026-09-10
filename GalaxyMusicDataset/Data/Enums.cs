@@ -54,3 +54,10 @@ public enum JobStatus
     Cancelled = 3,
     Partial = 4
 }
+
+public enum AudioLabelKind
+{
+    Genre = 0,
+    Theme = 1,
+    Instrument = 2
+}

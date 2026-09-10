@@ -468,6 +468,26 @@ public sealed class CatalogService(AppDbContext db)
             }
         }
 
+        var keepAudio = await db.TrackAudioProfiles
+            .Include(p => p.Labels)
+            .FirstOrDefaultAsync(p => p.TrackId == keep.Id, cancellationToken);
+        var dropAudio = await db.TrackAudioProfiles
+            .Include(p => p.Labels)
+            .FirstOrDefaultAsync(p => p.TrackId == drop.Id, cancellationToken);
+        if (dropAudio is not null)
+        {
+            if (keepAudio is not null)
+            {
+                db.TrackAudioProfiles.Remove(dropAudio);
+            }
+            else
+            {
+                var moved = CloneAudioProfile(dropAudio, keep.Id);
+                db.TrackAudioProfiles.Remove(dropAudio);
+                db.TrackAudioProfiles.Add(moved);
+            }
+        }
+
         await db.TrackLookups.Where(l => l.TrackId == drop.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.TrackId, keep.Id), cancellationToken);
 
@@ -493,5 +513,46 @@ public sealed class CatalogService(AppDbContext db)
 
         db.Tracks.Remove(drop);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static TrackAudioProfile CloneAudioProfile(TrackAudioProfile source, long trackId)
+    {
+        var clone = new TrackAudioProfile
+        {
+            TrackId = trackId,
+            AnalyzedAt = source.AnalyzedAt,
+            Bpm = source.Bpm,
+            Key = source.Key,
+            Scale = source.Scale,
+            KeyStrength = source.KeyStrength,
+            Loudness = source.Loudness,
+            Danceability = source.Danceability,
+            Acoustic = source.Acoustic,
+            Electronic = source.Electronic,
+            Voice = source.Voice,
+            Instrumental = source.Instrumental,
+            Tonal = source.Tonal,
+            Timbre = source.Timbre,
+            TimbreBright = source.TimbreBright,
+            Approachability = source.Approachability,
+            Engagement = source.Engagement,
+            MoodHappy = source.MoodHappy,
+            MoodSad = source.MoodSad,
+            MoodAggressive = source.MoodAggressive,
+            MoodRelaxed = source.MoodRelaxed,
+            MoodParty = source.MoodParty,
+            RawJson = source.RawJson
+        };
+        foreach (var label in source.Labels)
+        {
+            clone.Labels.Add(new TrackAudioLabel
+            {
+                Kind = label.Kind,
+                Name = label.Name,
+                Score = label.Score
+            });
+        }
+
+        return clone;
     }
 }

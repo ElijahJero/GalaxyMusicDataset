@@ -1,0 +1,192 @@
+@page "/Audio"
+@model AudioProfilesModel
+@{
+    ViewData["Title"] = "Audio profile";
+}
+
+<h1 class="h3 mb-1">Audio profile</h1>
+<p class="text-muted">
+    Play-weighted Essentia features from a local client. These classifiers are stored separately from MusicBrainz / Last.fm tags.
+</p>
+
+<partial name="_AnalyticsNav" model='"audio"' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/AudioProfiles")' />
+
+@if (Model.Audio.ProfiledPlays == 0)
+{
+    <div class="alert alert-info">
+        No Essentia profiles in this range yet. Run the local client against
+        <code>GET /api/v1/tracks/pending-audio</code> with a write API key.
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Profiled plays</div>
+                <div class="fs-3">@AnalyticsDisplay.Count(Model.Audio.ProfiledPlays)</div>
+                <div class="small text-muted">@AnalyticsDisplay.Percent(Model.Audio.PercentProfiledPlays) of plays</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Mean BPM</div>
+                <div class="fs-3">@(Model.Audio.MeanBpm?.ToString("0") ?? "—")</div>
+                <div class="small text-muted">@AnalyticsDisplay.Count(Model.Audio.ProfiledTracks) tracks</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Danceability</div>
+                <div class="fs-3">@(Model.Audio.MeanDanceability?.ToString("0.00") ?? "—")</div>
+                <div class="small text-muted">voice @(Model.Audio.MeanVoice?.ToString("0.00") ?? "—")</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Top mood</div>
+                <div class="fs-3 text-capitalize">@(Model.Audio.TopMood ?? "—")</div>
+                <div class="small text-muted">play-weighted</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">BPM</div>
+            <div class="card-body">
+                @if (Model.Audio.BpmBuckets.Count == 0)
+                {
+                    <div class="text-muted">No BPM values yet.</div>
+                }
+                else
+                {
+                    <canvas height="180" data-chart="audio-bars" data-payload="@Model.BpmJson"></canvas>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Key</div>
+            <div class="card-body">
+                @if (Model.Audio.Keys.Count == 0)
+                {
+                    <div class="text-muted">No keys yet.</div>
+                }
+                else
+                {
+                    <canvas height="180" data-chart="genres" data-payload="@Model.KeyJson"></canvas>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Moods</div>
+            <div class="card-body">
+                @if (Model.Audio.MoodAverages.Count == 0)
+                {
+                    <div class="text-muted">No mood scores yet.</div>
+                }
+                else
+                {
+                    <canvas height="180" data-chart="audio-bars" data-payload="@Model.MoodJson"></canvas>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Essentia genres</div>
+            <div class="card-body">
+                @if (Model.Audio.Genres.Count == 0)
+                {
+                    <div class="text-muted">No audio genres yet.</div>
+                }
+                else
+                {
+                    <canvas height="180" data-chart="genres" data-payload="@Model.GenreJson"></canvas>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Themes</div>
+            @if (Model.Audio.Themes.Count == 0)
+            {
+                <div class="card-body text-muted">Nothing to list.</div>
+            }
+            else
+            {
+                <div class="table-responsive hud-scroll-panel">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr><th>Theme</th><th class="text-end">Plays</th><th class="text-end">Tracks</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Audio.Themes)
+                        {
+                            <tr>
+                                <td>@row.Name</td>
+                                <td class="text-end">@AnalyticsDisplay.Count(row.Plays)</td>
+                                <td class="text-end">@AnalyticsDisplay.Count(row.TrackCount)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Instruments</div>
+            @if (Model.Audio.Instruments.Count == 0)
+            {
+                <div class="card-body text-muted">Nothing to list.</div>
+            }
+            else
+            {
+                <div class="table-responsive hud-scroll-panel">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr><th>Instrument</th><th class="text-end">Plays</th><th class="text-end">Tracks</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Audio.Instruments)
+                        {
+                            <tr>
+                                <td>@row.Name</td>
+                                <td class="text-end">@AnalyticsDisplay.Count(row.Plays)</td>
+                                <td class="text-end">@AnalyticsDisplay.Count(row.TrackCount)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/analytics.js" asp-append-version="true"></script>
+}

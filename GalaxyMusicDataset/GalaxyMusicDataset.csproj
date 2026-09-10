@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- SDK 10.0.300+ Razor source generator misparses tags inside @if (RZ1021). -->
+    <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
     <UserSecretsId>e4eeefc1-d4d7-4a48-b21d-845eee160b2b</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>

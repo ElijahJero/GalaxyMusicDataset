@@ -68,6 +68,14 @@
             </select>
         </div>
         <div class="col-md-2">
+            <label class="form-label" for="HasAudio">Essentia</label>
+            <select class="form-select" id="HasAudio" name="hasAudio">
+                <option value="">Any</option>
+                <option value="yes" selected="@(Model.HasAudio == "yes")">Has audio profile</option>
+                <option value="no" selected="@(Model.HasAudio == "no")">Missing audio profile</option>
+            </select>
+        </div>
+        <div class="col-md-2">
             <label class="form-label" for="Source">Source hit</label>
             <select class="form-select" id="Source" name="source">
                 <option value="">Any source</option>
@@ -165,6 +173,12 @@
                             }
                         </div>
                     }
+                    @if (row.Audio is not null)
+                    {
+                        <div class="mt-2">
+                            <partial name="_AudioChips" model="@(row.Audio)" />
+                        </div>
+                    }
                     @if (!string.IsNullOrWhiteSpace(t.Summary))
                     {
                         <p class="small text-muted mt-2 mb-0">@t.Summary</p>
@@ -184,6 +198,7 @@
                             ["status"] = Model.Status,
                             ["hasMbid"] = Model.HasMbid,
                             ["hasTags"] = Model.HasTags,
+                            ["hasAudio"] = Model.HasAudio,
                             ["source"] = Model.Source,
                             ["sort"] = Model.Sort,
                             ["edit"] = t.Id.ToString()
@@ -204,6 +219,7 @@
                     <input type="hidden" name="status" value="@Model.Status" />
                     <input type="hidden" name="hasMbid" value="@Model.HasMbid" />
                     <input type="hidden" name="hasTags" value="@Model.HasTags" />
+                    <input type="hidden" name="hasAudio" value="@Model.HasAudio" />
                     <input type="hidden" name="source" value="@Model.Source" />
                     <input type="hidden" name="sort" value="@Model.Sort" />
                     <div class="row g-2">
@@ -293,6 +309,7 @@
                             ["status"] = Model.Status,
                             ["hasMbid"] = Model.HasMbid,
                             ["hasTags"] = Model.HasTags,
+                            ["hasAudio"] = Model.HasAudio,
                             ["source"] = Model.Source,
                             ["sort"] = Model.Sort
                         })">Cancel</a>

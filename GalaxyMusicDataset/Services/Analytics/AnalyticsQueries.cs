@@ -1,5 +1,6 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
+using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Normalization;
 using Microsoft.EntityFrameworkCore;
 
@@ -364,6 +365,8 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             .Include(t => t.Album)
             .Include(t => t.Tags).ThenInclude(tt => tt.Tag)
             .Include(t => t.SourcePayloads)
+            .Include(t => t.AudioProfile)
+                .ThenInclude(p => p!.Labels)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
         if (track is null)
         {
@@ -412,7 +415,8 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             playedAt.LastOrDefault() is var last && stamps.Count > 0 ? last : null,
             playedAt,
             tags,
-            sources);
+            sources,
+            track.AudioProfile is null ? null : AudioProfileService.ToView(track.AudioProfile));
     }
 
     public async Task<DeepCutsResult> GetDeepCuts(
@@ -1008,6 +1012,164 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
     }
 
     private static int ClampTake(int take) => take is < 1 or > 500 ? DefaultTake : take;
+
+    public async Task<AudioAnalyticsResult> GetAudioAnalytics(
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        take = ClampTake(take);
+        var playRows = await Filter(range, search)
+            .GroupBy(s => s.TrackId)
+            .Select(g => new TrackPlayRow(g.Key, g.Count(), g.Sum(s => (long?)s.Track.DurationMs) ?? 0L))
+            .ToListAsync(cancellationToken);
+        var playMap = playRows.ToDictionary(x => x.TrackId);
+        if (playMap.Count == 0)
+        {
+            return EmptyAudio();
+        }
+
+        var trackIds = playMap.Keys.ToList();
+        var profiles = await db.TrackAudioProfiles.AsNoTracking()
+            .Include(p => p.Labels)
+            .Where(p => trackIds.Contains(p.TrackId))
+            .ToListAsync(cancellationToken);
+        var profiledIds = profiles.Select(p => p.TrackId).ToHashSet();
+        var profiledPlays = profiledIds.Sum(id => playMap[id].Plays);
+        var unprofiledPlays = playRows.Where(x => !profiledIds.Contains(x.TrackId)).Sum(x => x.Plays);
+        var percent = playRows.Sum(x => x.Plays) == 0
+            ? 0
+            : Math.Round(100.0 * profiledPlays / playRows.Sum(x => x.Plays), 1);
+
+        double? Weighted(Func<TrackAudioProfile, double?> selector)
+        {
+            double sum = 0;
+            var weight = 0;
+            foreach (var profile in profiles)
+            {
+                if (selector(profile) is not double value)
+                {
+                    continue;
+                }
+
+                var plays = playMap[profile.TrackId].Plays;
+                sum += value * plays;
+                weight += plays;
+            }
+
+            return weight == 0 ? null : sum / weight;
+        }
+
+        var moodAverages = new List<NamedAverage>();
+        AddMood(moodAverages, "party", Weighted(p => p.MoodParty));
+        AddMood(moodAverages, "happy", Weighted(p => p.MoodHappy));
+        AddMood(moodAverages, "aggressive", Weighted(p => p.MoodAggressive));
+        AddMood(moodAverages, "relaxed", Weighted(p => p.MoodRelaxed));
+        AddMood(moodAverages, "sad", Weighted(p => p.MoodSad));
+        var topMood = moodAverages.OrderByDescending(m => m.Value).Select(m => m.Name).FirstOrDefault();
+
+        var bpmBuckets = new Dictionary<string, (int Tracks, int Plays)>(StringComparer.Ordinal);
+        var keys = new Dictionary<string, (int Tracks, int Plays)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var profile in profiles)
+        {
+            var plays = playMap[profile.TrackId].Plays;
+            if (profile.Bpm is double bpm)
+            {
+                var bucket = BpmBucket(bpm);
+                bpmBuckets.TryGetValue(bucket, out var current);
+                bpmBuckets[bucket] = (current.Tracks + 1, current.Plays + plays);
+            }
+
+            var keyDisplay = AudioProfileMapper.KeyDisplay(profile.Key, profile.Scale);
+            if (!string.IsNullOrWhiteSpace(keyDisplay))
+            {
+                keys.TryGetValue(keyDisplay, out var current);
+                keys[keyDisplay] = (current.Tracks + 1, current.Plays + plays);
+            }
+        }
+
+        return new AudioAnalyticsResult(
+            profiledPlays,
+            unprofiledPlays,
+            profiles.Count,
+            playRows.Count - profiles.Count,
+            percent,
+            Weighted(p => p.Bpm),
+            Weighted(p => p.Danceability),
+            Weighted(p => p.Voice),
+            Weighted(p => p.Acoustic),
+            Weighted(p => p.Electronic),
+            Weighted(p => p.Approachability),
+            Weighted(p => p.Engagement),
+            topMood,
+            moodAverages,
+            NamedCounts(bpmBuckets, BpmBucketOrder),
+            keys.OrderByDescending(kv => kv.Value.Plays)
+                .ThenBy(kv => kv.Key)
+                .Take(take)
+                .Select(kv => new NamedCount(kv.Key, kv.Value.Tracks, kv.Value.Plays))
+                .ToList(),
+            RollupAudioLabels(profiles, AudioLabelKind.Genre, playMap, take),
+            RollupAudioLabels(profiles, AudioLabelKind.Theme, playMap, take),
+            RollupAudioLabels(profiles, AudioLabelKind.Instrument, playMap, take));
+    }
+
+    private static AudioAnalyticsResult EmptyAudio() =>
+        new(0, 0, 0, 0, 0, null, null, null, null, null, null, null, null, [], [], [], [], [], []);
+
+    private static void AddMood(List<NamedAverage> list, string name, double? value)
+    {
+        if (value is double v)
+        {
+            list.Add(new NamedAverage(name, v));
+        }
+    }
+
+    private static string BpmBucket(double bpm) => bpm switch
+    {
+        < 70 => "<70",
+        < 90 => "70–89",
+        < 110 => "90–109",
+        < 130 => "110–129",
+        < 150 => "130–149",
+        _ => "150+"
+    };
+
+    private static readonly string[] BpmBucketOrder = ["<70", "70–89", "90–109", "110–129", "130–149", "150+"];
+
+    private static List<NamedCount> NamedCounts(
+        Dictionary<string, (int Tracks, int Plays)> map,
+        IReadOnlyList<string> order)
+    {
+        return order
+            .Where(map.ContainsKey)
+            .Select(name => new NamedCount(name, map[name].Tracks, map[name].Plays))
+            .ToList();
+    }
+
+    private static List<TagStat> RollupAudioLabels(
+        IReadOnlyList<TrackAudioProfile> profiles,
+        AudioLabelKind kind,
+        Dictionary<long, TrackPlayRow> playMap,
+        int take)
+    {
+        return profiles
+            .SelectMany(p => p.Labels.Where(l => l.Kind == kind).Select(l => (p.TrackId, l.Name)))
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var ids = g.Select(x => x.TrackId).Distinct().ToList();
+                var plays = ids.Sum(id => playMap.GetValueOrDefault(id)?.Plays ?? 0);
+                var duration = ids.Sum(id => playMap.GetValueOrDefault(id)?.Duration ?? 0);
+                var display = g.OrderBy(x => x.Name).First().Name;
+                return new TagStat(display, plays, ids.Count, duration, ["Essentia"]);
+            })
+            .OrderByDescending(t => t.Plays)
+            .ThenBy(t => t.Name)
+            .Take(take)
+            .ToList();
+    }
 
     private enum TopKind { Artist, Track, Album }
 

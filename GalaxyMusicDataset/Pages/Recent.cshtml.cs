@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Aggregation;
+using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Search;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +44,9 @@ public class RecentModel(
     public string? HasTags { get; set; }
 
     [BindProperty(SupportsGet = true)]
+    public string? HasAudio { get; set; }
+
+    [BindProperty(SupportsGet = true)]
     public string? Source { get; set; }
 
     [BindProperty(SupportsGet = true)]
@@ -73,7 +77,7 @@ public class RecentModel(
             await search.EnsureCurrentAsync(db, cancellationToken);
         }
 
-        query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status);
+        query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status, HasAudio);
 
         query = Sort switch
         {
@@ -97,6 +101,8 @@ public class RecentModel(
             .Include(t => t.Album)
             .Include(t => t.Tags).ThenInclude(t => t.Tag)
             .Include(t => t.SourcePayloads)
+            .Include(t => t.AudioProfile)
+                .ThenInclude(p => p!.Labels)
             .ToListAsync(cancellationToken);
 
         var ids = tracks.Select(t => t.Id).ToList();
@@ -120,7 +126,8 @@ public class RecentModel(
                 t,
                 lookupMap.GetValueOrDefault(t.Fingerprint),
                 st?.Count ?? 0,
-                st?.Last);
+                st?.Last,
+                t.AudioProfile is null ? null : AudioProfileService.ToView(t.AudioProfile));
         }).ToList();
     }
 
@@ -147,13 +154,14 @@ public class RecentModel(
         Status,
         HasMbid,
         HasTags,
+        HasAudio,
         Source,
         Sort,
         Edit = edit
     };
 }
 
-public sealed record LibraryRow(Track Track, TrackLookup? Lookup, int PlayCount, long? LastPlayedUnix);
+public sealed record LibraryRow(Track Track, TrackLookup? Lookup, int PlayCount, long? LastPlayedUnix, AudioProfileView? Audio);
 
 public static class LibraryFilters
 {
@@ -174,7 +182,8 @@ public static class LibraryFilters
         string? hasMbid,
         string? hasTags,
         string? source,
-        string? status)
+        string? status,
+        string? hasAudio = null)
     {
         if (HasTextFilter(q, artist, title, album))
         {
@@ -198,6 +207,15 @@ public static class LibraryFilters
         else if (string.Equals(hasTags, "no", StringComparison.OrdinalIgnoreCase))
         {
             query = query.Where(t => !t.Tags.Any());
+        }
+
+        if (string.Equals(hasAudio, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => t.AudioProfile != null);
+        }
+        else if (string.Equals(hasAudio, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => t.AudioProfile == null);
         }
 
         if (!string.IsNullOrWhiteSpace(source) && Enum.TryParse<EnrichmentSource>(source, out var parsedSource))

@@ -14,6 +14,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<TrackTag> TrackTags => Set<TrackTag>();
     public DbSet<TrackSourcePayload> TrackSourcePayloads => Set<TrackSourcePayload>();
+    public DbSet<TrackAudioProfile> TrackAudioProfiles => Set<TrackAudioProfile>();
+    public DbSet<TrackAudioLabel> TrackAudioLabels => Set<TrackAudioLabel>();
     public DbSet<SyncState> SyncStates => Set<SyncState>();
     public DbSet<AggregationJob> AggregationJobs => Set<AggregationJob>();
     public DbSet<ApiRequestLog> ApiRequestLogs => Set<ApiRequestLog>();
@@ -110,6 +112,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasIndex(x => new { x.TrackId, x.Source }).IsUnique();
             e.HasOne(x => x.Track).WithMany(x => x.SourcePayloads).HasForeignKey(x => x.TrackId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TrackAudioProfile>(e =>
+        {
+            e.HasKey(x => x.TrackId);
+            e.Property(x => x.Key).HasMaxLength(16);
+            e.Property(x => x.Scale).HasMaxLength(16);
+            e.Property(x => x.Timbre).HasMaxLength(32);
+            e.HasOne(x => x.Track)
+                .WithOne(t => t.AudioProfile)
+                .HasForeignKey<TrackAudioProfile>(x => x.TrackId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TrackAudioLabel>(e =>
+        {
+            e.HasIndex(x => new { x.TrackId, x.Kind, x.Name }).IsUnique();
+            e.HasIndex(x => new { x.Kind, x.Name });
+            e.Property(x => x.Name).HasMaxLength(256);
+            e.HasOne(x => x.Profile)
+                .WithMany(p => p.Labels)
+                .HasForeignKey(x => x.TrackId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SyncState>(e =>

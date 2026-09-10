@@ -1,6 +1,7 @@
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
+using GalaxyMusicDataset.Services.Audio;
 
 namespace GalaxyMusicDataset.Api;
 
@@ -58,7 +59,11 @@ public sealed record LibraryTrackDto(
     double? LookupScore,
     string? LookupError,
     IReadOnlyList<string> Tags,
-    IReadOnlyList<SourcePayloadInfo> Sources);
+    IReadOnlyList<SourcePayloadInfo> Sources,
+    AudioProfileView? Audio)
+{
+    public bool HasAudio => Audio is not null;
+}
 
 public sealed record LookupDto(
     long Id,
@@ -171,6 +176,7 @@ public sealed record StatusResponse(
     int TracksWithMbid,
     int TracksWithDuration,
     int TracksWithTags,
+    int TracksWithAudio,
     double MbidCoveragePercent,
     IReadOnlyList<SourceCoverage> Coverage,
     long? LastFmPlaycount,
@@ -224,6 +230,7 @@ public static class ApiMapping
             s.TracksWithMbid,
             s.TracksWithDuration,
             s.TracksWithTags,
+            s.TracksWithAudio,
             s.MbidCoveragePercent,
             s.Coverage,
             s.LastFmPlaycount,

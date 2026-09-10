@@ -39,7 +39,7 @@ Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in t
 Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, sessions, wrapped, artist/track detail) are public — anyone who can reach the host can browse them. Progress, Library, Lookups, Review, and Settings require an admin cookie. Set `AUTH_USERNAME` (default `admin`) and `AUTH_PASSWORD`. If the password is empty, analytics stay public and nobody can sign in. Locally: `dotnet user-secrets set Auth:Password "your-password"` (or `Auth__Username` / `Auth__Password` env vars). Anonymous visits to `/` redirect to `/Dashboard`.
 
 - **Progress** — ingest/enrichment status, per-database coverage, job log, API stats
-- **Analytics** — overview, tops, **genres/tags**, discovery, time patterns, deep cuts, sessions, wrapped year, artist/track detail ([spec](docs/ANALYTICS_PAGES.md))
+- **Analytics** — overview, tops, **genres/tags**, **audio profile**, discovery, time patterns, deep cuts, sessions, wrapped year, artist/track detail ([spec](docs/ANALYTICS_PAGES.md))
 - **Library** (`/Recent`) — all unique tracks, 50 per page, with Lucene.NET search (case-insensitive, partial tokens, light typo tolerance), filters (including has/missing tags), and inline editing
 - **Lookups** — fingerprint cache (one MusicBrainz search per unique song)
 - **Review** — accept/reject low-confidence MusicBrainz matches
@@ -47,7 +47,9 @@ Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, ses
 
 ## REST API
 
-`/api/v1` exposes the same features as the site (analytics, library, lookups, review, ingest jobs, settings). Create keys on Settings; send `Authorization: Bearer gmk_…` or `X-Api-Key`. Docs: [docs/API.md](docs/API.md), in-app `/api-docs`, or `GET /api/docs`.
+`/api/v1` exposes the same features as the site (analytics, library, lookups, review, ingest jobs, settings, Essentia audio profiles). Create keys on Settings; send `Authorization: Bearer gmk_…` or `X-Api-Key`. Docs: [docs/API.md](docs/API.md), in-app `/api-docs`, or `GET /api/docs`.
+
+A local Essentia client (not this server) can pull unprofiled tracks and upload BPM/mood/genre features: [tools/essentia-client](tools/essentia-client).
 
 Development seeds 14 sample scrobbles when the database is empty (`Aggregation:SeedSampleData`).
 
