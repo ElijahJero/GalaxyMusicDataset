@@ -70,15 +70,17 @@ Play-weighted rollup of `TrackTags` for the selected range. Duplicate names from
 - **Crowd tags** — all sources including Last.fm
 - Click a name for tracks and artists that carry it
 - Overview and Wrapped also surface the top genres
-- A separate **Audio profile** block lists Essentia classifier genres/themes/instruments (not crowd tags)
+- A separate **Audio profile** block lists Essentia classifier genres as primary/sub folders (click to list recordings), plus themes/instruments
 
 ### 3b. Audio (`/Audio`)
 
 Play-weighted rollup of `TrackAudioProfiles` uploaded by the local Essentia client (`tools/essentia-client`). The server does not run Essentia.
 
 - Coverage (% of plays with a profile), mean BPM / danceability / voice
-- BPM histogram, key pie, mood averages
-- Top Essentia genres, themes, and instruments
+- BPM histogram, key pie, mood averages (pie uses **primary** genre folders)
+- **Genre folders** — Discogs-400 labels (`Electronic/House`) group under a primary (`Electronic`). Click the folder for every matching recording, or a subgenre for the leaf (`Electronic/Synth-pop`)
+- Themes and instruments are clickable the same way
+- `All recordings in library` opens `/Recent` filtered to that Essentia label (prefix match on a primary)
 
 ### 4. Discovery (`/Discovery`)
 
@@ -129,7 +131,8 @@ Shows session list, average length, median tracks/session, **repeat rate** (cons
 - `GetOverview(TimeRange)`
 - `GetTopArtists/Tracks/Albums(TimeRange, previousRange)`
 - `GetTagCloud(TimeRange)` / `GetTagDetail(name, TimeRange)`
-- `GetAudioAnalytics(TimeRange)` — play-weighted Essentia features and labels
+- `GetAudioAnalytics(TimeRange)` — play-weighted Essentia features, primary genre folders, and labels
+- `GetAudioLabelDetail(kind, name, TimeRange)` — recordings for one Essentia genre/theme/instrument (folder prefix for a primary genre)
 - `GetDiscoveries(TimeRange)`
 - `GetHeatmap(TimeRange)`
 - `GetStreak()`

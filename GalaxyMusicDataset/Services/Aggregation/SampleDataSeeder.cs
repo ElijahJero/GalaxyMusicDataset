@@ -65,6 +65,80 @@ public sealed class SampleDataSeeder(AppDbContext db, ScrobbleIngestService inge
         await Tag("Lilac", EnrichmentSource.MusicBrainz, ("j-pop", 80));
         await Tag("INSOMNIAC BLACK", EnrichmentSource.LastFm, ("rap", 8));
         await Tag("Left For Dead Lullaby", EnrichmentSource.Discogs, ("Hip Hop", 50));
+        await SeedSampleAudioAsync(byTitle, cancellationToken);
+    }
+
+    private async Task SeedSampleAudioAsync(List<Track> tracks, CancellationToken cancellationToken)
+    {
+        void Profile(string title, params (AudioLabelKind Kind, string Name, double Score)[] labels)
+        {
+            var track = tracks.FirstOrDefault(t => t.Title == title);
+            if (track is null)
+            {
+                return;
+            }
+
+            var profile = new TrackAudioProfile
+            {
+                TrackId = track.Id,
+                AnalyzedAt = DateTimeOffset.UtcNow,
+                Bpm = 118,
+                Key = "A",
+                Scale = "minor",
+                Danceability = 0.72,
+                Voice = 0.8,
+                Electronic = 0.55,
+                MoodParty = 0.6
+            };
+            foreach (var (kind, name, score) in labels)
+            {
+                profile.Labels.Add(new TrackAudioLabel { Kind = kind, Name = name, Score = score });
+            }
+
+            db.TrackAudioProfiles.Add(profile);
+        }
+
+        Profile("Now Loading!!!!",
+            (AudioLabelKind.Genre, "Pop/J-pop", 0.42),
+            (AudioLabelKind.Genre, "Pop/Anison", 0.31),
+            (AudioLabelKind.Theme, "energetic", 0.8),
+            (AudioLabelKind.Instrument, "synthesizer", 0.7));
+        Profile("Lilac",
+            (AudioLabelKind.Genre, "Pop/Ballad", 0.51),
+            (AudioLabelKind.Theme, "romantic", 0.66));
+        Profile("ススメRunner!!(instrumental)",
+            (AudioLabelKind.Genre, "Pop/J-pop", 0.38),
+            (AudioLabelKind.Genre, "Electronic/Dance-pop", 0.22),
+            (AudioLabelKind.Instrument, "drums", 0.81));
+        Profile("Way 2 U",
+            (AudioLabelKind.Genre, "Electronic/Synth-pop", 0.44),
+            (AudioLabelKind.Genre, "Electronic/Dance-pop", 0.29),
+            (AudioLabelKind.Theme, "futuristic", 0.7));
+        Profile("Shopping Malls",
+            (AudioLabelKind.Genre, "Electronic/House", 0.48),
+            (AudioLabelKind.Genre, "Electronic/Electro", 0.21));
+        Profile("Brain Rot",
+            (AudioLabelKind.Genre, "Electronic/Electro", 0.4),
+            (AudioLabelKind.Genre, "Electronic/Grime", 0.18));
+        Profile("I Really Want to Stay at Your House",
+            (AudioLabelKind.Genre, "Electronic/Synth-pop", 0.36),
+            (AudioLabelKind.Genre, "Pop/Ballad", 0.22),
+            (AudioLabelKind.Theme, "melancholic", 0.61));
+        Profile("INSOMNIAC BLACK",
+            (AudioLabelKind.Genre, "Hip Hop/Grime", 0.47),
+            (AudioLabelKind.Theme, "aggressive", 0.74));
+        Profile("Left For Dead Lullaby",
+            (AudioLabelKind.Genre, "Hip Hop/Grime", 0.41),
+            (AudioLabelKind.Genre, "Electronic/Downtempo", 0.2));
+        Profile("Lose-Lose Days",
+            (AudioLabelKind.Genre, "Hip Hop/Grime", 0.52),
+            (AudioLabelKind.Theme, "energetic", 0.58),
+            (AudioLabelKind.Instrument, "drums", 0.77));
+        Profile("思い出とペトリコール - Omoide to Petrichor",
+            (AudioLabelKind.Genre, "Pop/Ballad", 0.33),
+            (AudioLabelKind.Genre, "Electronic/Downtempo", 0.28));
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public static IReadOnlyList<LastFmRecentTrack> DefaultSample()

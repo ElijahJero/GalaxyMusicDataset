@@ -42,6 +42,7 @@ public sealed class ApiRootController(IWebHostEnvironment env) : ControllerBase
                 ["audioProfile"] = "/api/v1/tracks/{id}/audio-profile",
                 ["audioProfiles"] = "/api/v1/audio-profiles",
                 ["audio"] = "/api/v1/audio",
+                ["audioLabels"] = "/api/v1/audio/labels",
                 ["scrobbles"] = "/api/v1/scrobbles",
                 ["library"] = "/api/v1/library",
                 ["lookups"] = "/api/v1/lookups",

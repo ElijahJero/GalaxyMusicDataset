@@ -40,7 +40,7 @@ Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, ses
 
 - **Progress** — ingest/enrichment status, per-database coverage, job log, API stats
 - **Analytics** — overview, tops, **genres/tags**, **audio profile**, discovery, time patterns, deep cuts, sessions, wrapped year, artist/track detail ([spec](docs/ANALYTICS_PAGES.md))
-- **Library** (`/Recent`) — all unique tracks, 50 per page, with Lucene.NET search (case-insensitive, partial tokens, light typo tolerance), filters (including has/missing tags), and inline editing
+- **Library** (`/Recent`) — all unique tracks, 50 per page, with Lucene.NET search (case-insensitive, partial tokens, light typo tolerance), filters (including has/missing tags and Essentia genre folders), and inline editing
 - **Lookups** — fingerprint cache (one MusicBrainz search per unique song)
 - **Review** — accept/reject low-confidence MusicBrainz matches
 - **Settings** — Last.fm / Discogs / TheAudioDB keys and **REST API keys** for mobile clients (written to `App_Data/user-settings.json` and `App_Data/api-keys.json`, gitignored)

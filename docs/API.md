@@ -146,7 +146,11 @@ Same body plus `artist` and `title`; matches the library fingerprint.
 
 ### `GET /api/v1/audio`
 
-Play-weighted Essentia analytics for the selected range (BPM, key, moods, classifier genres/themes/instruments).
+Play-weighted Essentia analytics for the selected range (BPM, key, moods, **primary genre folders** with subgenre children, themes, instruments). `audio.genres` is the primary-folder rollup used by the pie chart.
+
+### `GET /api/v1/audio/labels`
+
+Tracks and artists for one Essentia label. Query: `kind` (`genre` | `theme` | `instrument`), `name` (e.g. `Electronic` or `Electronic/House`). A primary genre name is a folder and includes every `Primary/Sub` leaf.
 
 ### `GET /api/v1/scrobbles`
 
@@ -166,6 +170,7 @@ Paged unique tracks. Query:
 | `q`, `artist`, `title`, `album` | Lucene search (same as the site) |
 | `status` | Lookup status enum (`Pending`, `NeedsReview`, …) |
 | `hasMbid`, `hasTags`, `hasAudio` | `yes` / `no` |
+| `audioKind`, `audioLabel` | Essentia label filter (`genre` + `Electronic` or `Electronic/House`) |
 | `source` | Enrichment source that succeeded (`LastFm`, `MusicBrainz`, …) |
 | `sort` | `recent` (default), `plays`, `artist`, `title` |
 

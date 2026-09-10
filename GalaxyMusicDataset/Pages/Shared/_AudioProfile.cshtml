@@ -67,39 +67,21 @@
         <div class="mb-2">
             @foreach (var genre in audio.Genres)
             {
-                <span class="badge rounded-pill audio-chip me-1 mb-1">
-                    @genre.Name
-                    @if (genre.Score is double score)
-                    {
-                        <span class="text-muted">@score.ToString("0.00")</span>
-                    }
-                </span>
+                <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(genre.Name, AudioLabelKind.Genre, new Dictionary<string, string?>(), genre.Score?.ToString("0.00"))' />
             }
         </div>
         <div class="small mb-1 text-muted">Themes</div>
         <div class="mb-2">
             @foreach (var theme in audio.Themes)
             {
-                <span class="badge rounded-pill audio-chip-theme me-1 mb-1">
-                    @theme.Name
-                    @if (theme.Score is double score)
-                    {
-                        <span class="text-muted">@score.ToString("0.00")</span>
-                    }
-                </span>
+                <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(theme.Name, AudioLabelKind.Theme, new Dictionary<string, string?>(), theme.Score?.ToString("0.00"), null, "audio-chip-theme")' />
             }
         </div>
         <div class="small mb-1 text-muted">Instruments</div>
         <div>
             @foreach (var inst in audio.Instruments)
             {
-                <span class="badge rounded-pill audio-chip-instrument me-1 mb-1">
-                    @inst.Name
-                    @if (inst.Score is double score)
-                    {
-                        <span class="text-muted">@score.ToString("0.00")</span>
-                    }
-                </span>
+                <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(inst.Name, AudioLabelKind.Instrument, new Dictionary<string, string?>(), inst.Score?.ToString("0.00"), null, "audio-chip-instrument")' />
             }
         </div>
     </div>

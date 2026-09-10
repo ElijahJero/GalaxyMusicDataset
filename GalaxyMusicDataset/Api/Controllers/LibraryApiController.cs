@@ -36,6 +36,8 @@ public sealed class LibraryApiController(
         [FromQuery] string? hasMbid = null,
         [FromQuery] string? hasTags = null,
         [FromQuery] string? hasAudio = null,
+        [FromQuery] string? audioKind = null,
+        [FromQuery] string? audioLabel = null,
         [FromQuery] string? source = null,
         [FromQuery] string sort = "recent",
         CancellationToken cancellationToken = default)
@@ -53,7 +55,7 @@ public sealed class LibraryApiController(
             await search.EnsureCurrentAsync(db, cancellationToken);
         }
 
-        query = LibraryFilters.Apply(query, db, search, q, artist, title, album, hasMbid, hasTags, source, status, hasAudio);
+        query = LibraryFilters.Apply(query, db, search, q, artist, title, album, hasMbid, hasTags, source, status, hasAudio, audioKind, audioLabel);
         query = sort switch
         {
             "title" => query.OrderBy(t => t.Title).ThenBy(t => t.Artist.Name),

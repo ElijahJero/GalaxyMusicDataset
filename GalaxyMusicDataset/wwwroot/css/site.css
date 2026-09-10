@@ -405,6 +405,47 @@ a:hover {
   color: var(--bs-body-color);
 }
 
+a.audio-chip,
+a.audio-chip-theme,
+a.audio-chip-instrument {
+  text-decoration: none;
+}
+
+a.audio-chip:hover,
+a.audio-chip-theme:hover,
+a.audio-chip-instrument:hover {
+  color: var(--galaxy-accent);
+  border-color: var(--galaxy-accent);
+}
+
+.audio-genre-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.audio-genre-slash {
+  font-weight: 600;
+}
+
+.audio-genre-tree .audio-genre-folder {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.audio-genre-tree .audio-genre-child {
+  padding-left: 1.75rem;
+}
+
+.audio-genre-tree .audio-genre-child a::before {
+  content: "↳ ";
+  color: var(--bs-secondary-color);
+}
+
+.audio-genre-tree tr.audio-genre-active {
+  background: color-mix(in srgb, var(--galaxy-accent) 12%, transparent);
+}
+
 [data-bs-theme="dark"] {
   --galaxy-accent: #5ce1ff;
   --galaxy-accent-strong: #2ec8f0;

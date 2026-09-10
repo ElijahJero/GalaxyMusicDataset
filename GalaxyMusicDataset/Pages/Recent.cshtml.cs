@@ -47,6 +47,12 @@ public class RecentModel(
     public string? HasAudio { get; set; }
 
     [BindProperty(SupportsGet = true)]
+    public string? AudioKind { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? AudioLabel { get; set; }
+
+    [BindProperty(SupportsGet = true)]
     public string? Source { get; set; }
 
     [BindProperty(SupportsGet = true)]
@@ -77,7 +83,7 @@ public class RecentModel(
             await search.EnsureCurrentAsync(db, cancellationToken);
         }
 
-        query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status, HasAudio);
+        query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status, HasAudio, AudioKind, AudioLabel);
 
         query = Sort switch
         {
@@ -144,21 +150,33 @@ public class RecentModel(
         return RedirectToPage(FilterRoute(result.TrackId));
     }
 
-    public object FilterRoute(long? edit = null) => new
+    public Dictionary<string, string?> FilterRoutes(long? edit = null, int? page = null)
     {
-        P,
-        Q,
-        Artist,
-        Title,
-        Album,
-        Status,
-        HasMbid,
-        HasTags,
-        HasAudio,
-        Source,
-        Sort,
-        Edit = edit
-    };
+        var d = new Dictionary<string, string?>
+        {
+            ["p"] = (page ?? P).ToString(),
+            ["q"] = Q,
+            ["artist"] = Artist,
+            ["title"] = Title,
+            ["album"] = Album,
+            ["status"] = Status,
+            ["hasMbid"] = HasMbid,
+            ["hasTags"] = HasTags,
+            ["hasAudio"] = HasAudio,
+            ["audioKind"] = AudioKind,
+            ["audioLabel"] = AudioLabel,
+            ["source"] = Source,
+            ["sort"] = Sort
+        };
+        if (edit is not null)
+        {
+            d["edit"] = edit.Value.ToString();
+        }
+
+        return d;
+    }
+
+    public object FilterRoute(long? edit = null) => FilterRoutes(edit);
 }
 
 public sealed record LibraryRow(Track Track, TrackLookup? Lookup, int PlayCount, long? LastPlayedUnix, AudioProfileView? Audio);
@@ -183,7 +201,9 @@ public static class LibraryFilters
         string? hasTags,
         string? source,
         string? status,
-        string? hasAudio = null)
+        string? hasAudio = null,
+        string? audioKind = null,
+        string? audioLabel = null)
     {
         if (HasTextFilter(q, artist, title, album))
         {
@@ -218,6 +238,12 @@ public static class LibraryFilters
             query = query.Where(t => t.AudioProfile == null);
         }
 
+        if (!string.IsNullOrWhiteSpace(audioLabel) &&
+            Enum.TryParse<AudioLabelKind>(audioKind, true, out var parsedKind))
+        {
+            query = ApplyAudioLabel(query, parsedKind, audioLabel);
+        }
+
         if (!string.IsNullOrWhiteSpace(source) && Enum.TryParse<EnrichmentSource>(source, out var parsedSource))
         {
             query = query.Where(t => t.SourcePayloads.Any(p =>
@@ -230,5 +256,25 @@ public static class LibraryFilters
         }
 
         return query;
+    }
+
+    public static IQueryable<Track> ApplyAudioLabel(
+        IQueryable<Track> query,
+        AudioLabelKind kind,
+        string label)
+    {
+        var needle = label.Trim();
+        var folder = AudioGenrePath.IsFolderQuery(kind, needle);
+        var lower = needle.ToLower();
+        var prefix = lower + AudioGenrePath.DisplaySeparator;
+        if (folder)
+        {
+            return query.Where(t => t.AudioProfile != null && t.AudioProfile.Labels.Any(l =>
+                l.Kind == kind &&
+                (l.Name.ToLower() == lower || l.Name.ToLower().StartsWith(prefix))));
+        }
+
+        return query.Where(t => t.AudioProfile != null && t.AudioProfile.Labels.Any(l =>
+            l.Kind == kind && l.Name.ToLower() == lower));
     }
 }

@@ -1,4 +1,6 @@
+using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Analytics;
+using GalaxyMusicDataset.Services.Audio;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -81,6 +83,13 @@ public abstract class AnalyticsPageModel : PageModel
         ViewData["Years"] = years ?? [];
     }
 
+    public Dictionary<string, string?> AudioLabelQuery(AudioLabelKind kind, string name) =>
+        FilterQuery(new Dictionary<string, string?>
+        {
+            ["kind"] = kind.ToString().ToLowerInvariant(),
+            ["name"] = name
+        });
+
     public TimeRangeViewModel TimeRangeView(string page, IReadOnlyDictionary<string, string?>? extra = null, long? routeId = null) =>
         new(page, Range, From, To, Q, extra ?? new Dictionary<string, string?>(), TimeRange.From, TimeRange.To, routeId);
 }
@@ -102,3 +111,16 @@ public sealed record TopTableModel(
     string NameHeader,
     string? DetailPage,
     bool ShowMovers);
+
+public sealed record AudioLabelLinkModel(
+    string Name,
+    AudioLabelKind Kind,
+    Dictionary<string, string?> Filter,
+    string? Count = null,
+    double? Score = null,
+    string CssClass = "audio-chip");
+
+public sealed record AudioGenreTreeModel(
+    IReadOnlyList<AudioGenreFolder> Folders,
+    Dictionary<string, string?> Filter,
+    string? ActivePath = null);

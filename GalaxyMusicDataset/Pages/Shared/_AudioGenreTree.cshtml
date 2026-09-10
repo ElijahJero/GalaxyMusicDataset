@@ -1,0 +1,57 @@
+@model AudioGenreTreeModel
+@{
+    var active = Model.ActivePath;
+}
+
+@if (Model.Folders.Count == 0)
+{
+    <div class="card-body text-muted">No audio genres yet.</div>
+}
+else
+{
+    <div class="table-responsive hud-scroll-panel">
+        <table class="table table-sm align-middle mb-0 audio-genre-tree">
+            <thead>
+            <tr>
+                <th>Genre</th>
+                <th class="text-end">Plays</th>
+                <th class="text-end">Tracks</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var folder in Model.Folders)
+            {
+                var folderRoutes = new Dictionary<string, string?>(Model.Filter)
+                {
+                    ["kind"] = "genre",
+                    ["name"] = folder.Path
+                };
+                var folderActive = string.Equals(active, folder.Path, StringComparison.OrdinalIgnoreCase);
+                <tr class="@(folderActive ? "audio-genre-active" : null)">
+                    <td>
+                        <a class="audio-genre-folder" asp-page="/AudioProfiles" asp-all-route-data="folderRoutes">@folder.Name</a>
+                    </td>
+                    <td class="text-end">@AnalyticsDisplay.Count(folder.Plays)</td>
+                    <td class="text-end">@AnalyticsDisplay.Count(folder.TrackCount)</td>
+                </tr>
+                @foreach (var child in folder.Children)
+                {
+                    var childRoutes = new Dictionary<string, string?>(Model.Filter)
+                    {
+                        ["kind"] = "genre",
+                        ["name"] = child.Path
+                    };
+                    var childActive = string.Equals(active, child.Path, StringComparison.OrdinalIgnoreCase);
+                    <tr class="@(childActive ? "audio-genre-active" : null)">
+                        <td class="audio-genre-child">
+                            <a asp-page="/AudioProfiles" asp-all-route-data="childRoutes">@child.Name</a>
+                        </td>
+                        <td class="text-end">@AnalyticsDisplay.Count(child.Plays)</td>
+                        <td class="text-end">@AnalyticsDisplay.Count(child.TrackCount)</td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+}

@@ -177,6 +177,44 @@ public class RestApiTests
             t => t.GetProperty("id").GetInt64() == trackId);
     }
 
+    [Fact]
+    public async Task Audio_label_detail_and_library_filter_use_genre_folders()
+    {
+        var store = _factory.Services.GetRequiredService<ApiKeyStore>();
+        var client = Authenticated(store.Create("audio-labels", true, false).Token);
+
+        var audio = await client.GetAsync("/api/v1/audio?range=all");
+        audio.EnsureSuccessStatusCode();
+        var audioJson = await audio.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var folders = audioJson.GetProperty("audio").GetProperty("genreFolders");
+        Assert.True(folders.GetArrayLength() > 0);
+        Assert.Contains(
+            folders.EnumerateArray(),
+            f => f.GetProperty("name").GetString() == "Electronic" && f.GetProperty("children").GetArrayLength() > 0);
+
+        var folder = await client.GetAsync("/api/v1/audio/labels?kind=genre&name=Electronic&range=all");
+        folder.EnsureSuccessStatusCode();
+        var folderJson = await folder.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var detail = folderJson.GetProperty("detail");
+        Assert.True(detail.GetProperty("isFolder").GetBoolean());
+        Assert.True(detail.GetProperty("tracks").GetArrayLength() >= 2);
+        Assert.True(detail.GetProperty("children").GetArrayLength() > 0);
+
+        var leaf = await client.GetAsync("/api/v1/audio/labels?kind=genre&name=Electronic%2FSynth-pop&range=all");
+        leaf.EnsureSuccessStatusCode();
+        var leafJson = await leaf.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.False(leafJson.GetProperty("detail").GetProperty("isFolder").GetBoolean());
+        Assert.Equal("Electronic", leafJson.GetProperty("detail").GetProperty("parent").GetString());
+
+        var library = await client.GetAsync("/api/v1/library?audioKind=genre&audioLabel=Electronic&sort=title");
+        library.EnsureSuccessStatusCode();
+        var libraryJson = await library.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.True(libraryJson.GetProperty("total").GetInt32() >= 2);
+        Assert.Contains(
+            libraryJson.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("title").GetString() == "Way 2 U");
+    }
+
     private static object SampleAudioBody() => new
     {
         bpm = 85,
