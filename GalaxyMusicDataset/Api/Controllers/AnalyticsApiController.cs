@@ -1,3 +1,4 @@
+using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
 using GalaxyMusicDataset.Services.Api;
@@ -95,6 +96,33 @@ public sealed class AnalyticsApiController(AnalyticsQueries analytics, AppTimeZo
         var window = ApiTimeRange.Resolve(zone, range, from, to);
         var audio = await analytics.GetAudioAnalytics(window, q, take, cancellationToken);
         return Ok(new { range = ApiMapping.Window(window, q), take, audio });
+    }
+
+    [HttpGet("audio/labels")]
+    public async Task<IActionResult> AudioLabel(
+        [FromQuery] string? kind,
+        [FromQuery] string? name,
+        [FromQuery] string? range,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
+        [FromQuery] string? q,
+        [FromQuery] int take = AnalyticsQueries.DefaultTake,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name) ||
+            !Enum.TryParse<AudioLabelKind>(kind, true, out var parsedKind))
+        {
+            return BadRequest(new ApiError("kind must be genre, theme, or instrument, and name is required."));
+        }
+
+        var window = ApiTimeRange.Resolve(zone, range, from, to);
+        var detail = await analytics.GetAudioLabelDetail(parsedKind, name, window, q, take, cancellationToken);
+        if (detail is null)
+        {
+            return NotFound(new ApiError("Audio label not found."));
+        }
+
+        return Ok(new { range = ApiMapping.Window(window, q), take, detail });
     }
 
     [HttpGet("tags/{name}")]

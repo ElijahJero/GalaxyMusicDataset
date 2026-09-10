@@ -1089,6 +1089,12 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             }
         }
 
+        var genreFolders = RollupGenreFolders(profiles, playMap);
+        var genres = genreFolders
+            .Select(f => new TagStat(f.Name, f.Plays, f.TrackCount, f.DurationMs, ["Essentia"]))
+            .Take(take)
+            .ToList();
+
         return new AudioAnalyticsResult(
             profiledPlays,
             unprofiledPlays,
@@ -1110,13 +1116,100 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
                 .Take(take)
                 .Select(kv => new NamedCount(kv.Key, kv.Value.Tracks, kv.Value.Plays))
                 .ToList(),
-            RollupAudioLabels(profiles, AudioLabelKind.Genre, playMap, take),
+            genres,
+            genreFolders,
             RollupAudioLabels(profiles, AudioLabelKind.Theme, playMap, take),
             RollupAudioLabels(profiles, AudioLabelKind.Instrument, playMap, take));
     }
 
+    public async Task<AudioLabelDetailResult?> GetAudioLabelDetail(
+        AudioLabelKind kind,
+        string name,
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        take = ClampTake(take);
+        var needle = name.Trim();
+        var folder = AudioGenrePath.IsFolderQuery(kind, needle);
+        var labels = await db.TrackAudioLabels.AsNoTracking()
+            .Where(l => l.Kind == kind)
+            .Select(l => new { l.TrackId, l.Name })
+            .ToListAsync(cancellationToken);
+        var matches = labels.Where(l => AudioGenrePath.Matches(l.Name, kind, needle)).ToList();
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var sample = matches.OrderBy(m => m.Name).First();
+        var display = AudioGenrePath.DisplayName(sample.Name, needle);
+        var sampleSplit = AudioGenrePath.Split(sample.Name);
+        var path = folder ? display : AudioGenrePath.Join(sampleSplit.Primary, sampleSplit.Sub);
+        string? parent = folder || kind != AudioLabelKind.Genre ? null : sampleSplit.Primary;
+
+        var trackIds = matches.Select(m => m.TrackId).Distinct().ToList();
+        var rows = await Filter(range, search)
+            .Where(s => trackIds.Contains(s.TrackId))
+            .GroupBy(s => new { s.TrackId, s.Track.Title, Artist = s.Track.Artist.Name, s.Track.ArtistId })
+            .Select(g => new
+            {
+                g.Key.TrackId,
+                g.Key.Title,
+                g.Key.Artist,
+                g.Key.ArtistId,
+                Plays = g.Count(),
+                Duration = g.Sum(s => (long?)s.Track.DurationMs)
+            })
+            .ToListAsync(cancellationToken);
+
+        var playMap = rows.ToDictionary(
+            x => x.TrackId,
+            x => new TrackPlayRow(x.TrackId, x.Plays, x.Duration ?? 0L));
+        var tracks = rows
+            .OrderByDescending(x => x.Plays)
+            .ThenBy(x => x.Title)
+            .Take(take)
+            .Select((x, i) => new RankedItem(x.TrackId, x.Title, x.Artist, x.Plays, x.Duration, i + 1, 0, x.Plays, null, false))
+            .ToList();
+        var artists = rows
+            .GroupBy(x => new { x.ArtistId, x.Artist })
+            .Select(g => new { g.Key.ArtistId, g.Key.Artist, Plays = g.Sum(x => x.Plays), Duration = g.Sum(x => x.Duration ?? 0) })
+            .OrderByDescending(x => x.Plays)
+            .ThenBy(x => x.Artist)
+            .Take(take)
+            .Select((x, i) => new RankedItem(x.ArtistId, x.Artist, null, x.Plays, x.Duration, i + 1, 0, x.Plays, null, false))
+            .ToList();
+
+        IReadOnlyList<AudioGenreFolder> children = [];
+        if (folder)
+        {
+            children = matches
+                .Where(m => playMap.ContainsKey(m.TrackId))
+                .Select(m =>
+                {
+                    var split = AudioGenrePath.Split(m.Name);
+                    return (m.TrackId, split.Primary, split.Sub);
+                })
+                .Where(x => x.Sub is not null)
+                .GroupBy(x => x.Sub!, StringComparer.OrdinalIgnoreCase)
+                .Select(g => FolderFromGroup(g.Key, g.First().Primary, g.Select(x => x.TrackId), playMap))
+                .OrderByDescending(c => c.Plays)
+                .ThenBy(c => c.Name)
+                .ToList();
+        }
+
+        return new AudioLabelDetailResult(kind, display, path, parent, folder, children, tracks, artists);
+    }
+
     private static AudioAnalyticsResult EmptyAudio() =>
-        new(0, 0, 0, 0, 0, null, null, null, null, null, null, null, null, [], [], [], [], [], []);
+        new(0, 0, 0, 0, 0, null, null, null, null, null, null, null, null, [], [], [], [], [], [], []);
 
     private static void AddMood(List<NamedAverage> list, string name, double? value)
     {
@@ -1169,6 +1262,54 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             .ThenBy(t => t.Name)
             .Take(take)
             .ToList();
+    }
+
+    private static List<AudioGenreFolder> RollupGenreFolders(
+        IReadOnlyList<TrackAudioProfile> profiles,
+        Dictionary<long, TrackPlayRow> playMap)
+    {
+        var rows = profiles
+            .SelectMany(p => p.Labels
+                .Where(l => l.Kind == AudioLabelKind.Genre)
+                .Select(l =>
+                {
+                    var split = AudioGenrePath.Split(l.Name);
+                    return (p.TrackId, split.Primary, split.Sub);
+                })
+                .Where(x => !string.IsNullOrEmpty(x.Primary)))
+            .ToList();
+
+        return rows
+            .GroupBy(x => x.Primary, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var primary = g.OrderBy(x => x.Primary).First().Primary;
+                var children = g
+                    .Where(x => x.Sub is not null)
+                    .GroupBy(x => x.Sub!, StringComparer.OrdinalIgnoreCase)
+                    .Select(c => FolderFromGroup(c.Key, primary, c.Select(x => x.TrackId), playMap))
+                    .OrderByDescending(c => c.Plays)
+                    .ThenBy(c => c.Name)
+                    .ToList();
+                var folder = FolderFromGroup(primary, null, g.Select(x => x.TrackId), playMap);
+                return folder with { Children = children };
+            })
+            .OrderByDescending(f => f.Plays)
+            .ThenBy(f => f.Name)
+            .ToList();
+    }
+
+    private static AudioGenreFolder FolderFromGroup(
+        string name,
+        string? parent,
+        IEnumerable<long> trackIds,
+        Dictionary<long, TrackPlayRow> playMap)
+    {
+        var ids = trackIds.Distinct().ToList();
+        var plays = ids.Sum(id => playMap.GetValueOrDefault(id)?.Plays ?? 0);
+        var duration = ids.Sum(id => playMap.GetValueOrDefault(id)?.Duration ?? 0);
+        var path = parent is null ? name : AudioGenrePath.Join(parent, name);
+        return new AudioGenreFolder(name, parent, path, plays, ids.Count, duration, []);
     }
 
     private enum TopKind { Artist, Track, Album }

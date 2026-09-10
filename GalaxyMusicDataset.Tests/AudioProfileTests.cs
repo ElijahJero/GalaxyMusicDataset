@@ -1,6 +1,7 @@
 using System.Text.Json;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
+using GalaxyMusicDataset.Pages;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
 using GalaxyMusicDataset.Services.Audio;
@@ -123,9 +124,86 @@ public class AudioProfileTests
         Assert.DoesNotContain(cloud.Tags, t => t.Name == "energetic");
 
         var audio = await queries.GetAudioAnalytics(range, null, 20, CancellationToken.None);
-        Assert.Contains(audio.Genres, t => t.Name == "Pop/J-pop");
+        Assert.Contains(audio.GenreFolders.SelectMany(f => f.Children), t => t.Path == "Pop/J-pop");
+        Assert.Contains(audio.Genres, t => t.Name == "Pop");
         Assert.True(audio.ProfiledPlays > 0);
-        Assert.Equal(["Essentia"], audio.Genres.Single(t => t.Name == "Pop/J-pop").Sources);
+        Assert.Equal(["Essentia"], audio.Genres.Single(t => t.Name == "Pop").Sources);
+    }
+
+    [Fact]
+    public void Genre_path_splits_primary_and_sub_without_eating_spaced_slashes()
+    {
+        Assert.Equal(("Electronic", "Synth-pop"), AudioGenrePath.Split("Electronic/Synth-pop"));
+        Assert.Equal(("Electronic", "Electro House"), AudioGenrePath.Split("Electronic---Electro House"));
+        Assert.Equal(("Funk / Soul", "Disco"), AudioGenrePath.Split("Funk / Soul/Disco"));
+        Assert.Equal(("Pop", null), AudioGenrePath.Split("Pop"));
+        Assert.True(AudioGenrePath.Matches("Electronic/House", AudioLabelKind.Genre, "Electronic"));
+        Assert.True(AudioGenrePath.Matches("Electronic/House", AudioLabelKind.Genre, "Electronic/House"));
+        Assert.False(AudioGenrePath.Matches("Electronic/Electro House", AudioLabelKind.Genre, "Electronic/Electro"));
+        Assert.False(AudioGenrePath.Matches("Pop/K-pop", AudioLabelKind.Genre, "Electronic"));
+        Assert.True(AudioGenrePath.IsFolderQuery(AudioLabelKind.Genre, "Electronic"));
+        Assert.False(AudioGenrePath.IsFolderQuery(AudioLabelKind.Genre, "Electronic/House"));
+        Assert.True(AudioGenrePath.IsFolderQuery(AudioLabelKind.Genre, "Funk / Soul"));
+    }
+
+    [Fact]
+    public async Task Audio_genre_folders_dedupe_tracks_and_label_detail_filters()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var catalog = new CatalogService(harness.Db);
+        var artist = await catalog.GetOrCreateArtistAsync("fourfolium", null, CancellationToken.None);
+        var house = await AddNamed(harness.Db, artist, "House Track");
+        var synth = await AddNamed(harness.Db, artist, "Synth Track");
+        var kpop = await AddNamed(harness.Db, artist, "Kpop Track");
+        await AddPlay(harness.Db, house, Unix(2024, 1, 1, 10, 0));
+        await AddPlay(harness.Db, house, Unix(2024, 1, 1, 11, 0));
+        await AddPlay(harness.Db, synth, Unix(2024, 1, 1, 12, 0));
+        await AddPlay(harness.Db, kpop, Unix(2024, 1, 1, 13, 0));
+        await harness.Db.SaveChangesAsync();
+
+        var service = new AudioProfileService(harness.Db);
+        await service.UpsertAsync(house.Id, RequestWithGenres("Electronic/House", "Electronic/Dubstep"), CancellationToken.None);
+        await service.UpsertAsync(synth.Id, RequestWithGenres("Electronic/Synth-pop"), CancellationToken.None);
+        await service.UpsertAsync(kpop.Id, RequestWithGenres("Pop/K-pop"), CancellationToken.None);
+
+        var queries = new AnalyticsQueries(harness.Db);
+        var range = TimeRangeParser.ForCalendarYear(2024);
+        var audio = await queries.GetAudioAnalytics(range, null, 20, CancellationToken.None);
+        var electronic = audio.GenreFolders.Single(f => f.Name == "Electronic");
+        Assert.Equal(3, electronic.Plays);
+        Assert.Equal(2, electronic.TrackCount);
+        Assert.Equal(["Dubstep", "House", "Synth-pop"], electronic.Children.Select(c => c.Name).OrderBy(n => n).ToList());
+        Assert.Equal(2, electronic.Children.Single(c => c.Name == "House").Plays);
+        Assert.Equal("Electronic", audio.Genres.First().Name);
+
+        var folder = await queries.GetAudioLabelDetail(AudioLabelKind.Genre, "Electronic", range, null, 20, CancellationToken.None);
+        Assert.NotNull(folder);
+        Assert.True(folder.IsFolder);
+        Assert.Equal(2, folder.Tracks.Count);
+        Assert.DoesNotContain(folder.Tracks, t => t.Name == "Kpop Track");
+        Assert.Contains(folder.Children, c => c.Path == "Electronic/Synth-pop");
+
+        var leaf = await queries.GetAudioLabelDetail(AudioLabelKind.Genre, "Electronic/House", range, null, 20, CancellationToken.None);
+        Assert.NotNull(leaf);
+        Assert.False(leaf.IsFolder);
+        Assert.Equal("Electronic", leaf.Parent);
+        Assert.Equal(["House Track"], leaf.Tracks.Select(t => t.Name).ToList());
+
+        var electro = await queries.GetAudioLabelDetail(AudioLabelKind.Genre, "Electronic/Electro", range, null, 20, CancellationToken.None);
+        Assert.Null(electro);
+
+        var libraryFolder = await LibraryFilters.Apply(
+                harness.Db.Tracks, harness.Db, null, null, null, null, null, null, null, null, null, null, "genre", "Electronic")
+            .Select(t => t.Title)
+            .OrderBy(t => t)
+            .ToListAsync();
+        Assert.Equal(["House Track", "Synth Track"], libraryFolder);
+
+        var libraryLeaf = await LibraryFilters.Apply(
+                harness.Db.Tracks, harness.Db, null, null, null, null, null, null, null, null, null, null, "genre", "Electronic/House")
+            .Select(t => t.Title)
+            .ToListAsync();
+        Assert.Equal(["House Track"], libraryLeaf);
     }
 
     [Fact]
@@ -264,4 +342,13 @@ public class AudioProfileTests
             Instruments = instruments.RootElement.Clone()
         };
     }
+
+    private static AudioProfileWriteRequest RequestWithGenres(params string[] names)
+    {
+        using var genres = JsonDocument.Parse(JsonSerializer.Serialize(names));
+        return new AudioProfileWriteRequest { Genres = genres.RootElement.Clone() };
+    }
+
+    private static long Unix(int year, int month, int day, int hour, int minute) =>
+        new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.Zero).ToUnixTimeSeconds();
 }

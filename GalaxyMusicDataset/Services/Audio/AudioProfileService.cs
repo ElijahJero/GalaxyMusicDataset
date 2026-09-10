@@ -606,8 +606,28 @@ public sealed record AudioAnalyticsResult(
     IReadOnlyList<NamedCount> BpmBuckets,
     IReadOnlyList<NamedCount> Keys,
     IReadOnlyList<TagStat> Genres,
+    IReadOnlyList<AudioGenreFolder> GenreFolders,
     IReadOnlyList<TagStat> Themes,
     IReadOnlyList<TagStat> Instruments);
+
+public sealed record AudioGenreFolder(
+    string Name,
+    string? Parent,
+    string Path,
+    int Plays,
+    int TrackCount,
+    long DurationMs,
+    IReadOnlyList<AudioGenreFolder> Children);
+
+public sealed record AudioLabelDetailResult(
+    AudioLabelKind Kind,
+    string Name,
+    string Path,
+    string? Parent,
+    bool IsFolder,
+    IReadOnlyList<AudioGenreFolder> Children,
+    IReadOnlyList<RankedItem> Tracks,
+    IReadOnlyList<RankedItem> Artists);
 
 public sealed record NamedAverage(string Name, double Value);
 

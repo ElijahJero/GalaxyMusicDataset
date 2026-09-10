@@ -1,0 +1,44 @@
+@model AudioLabelLinkModel
+@{
+    var kind = Model.Kind.ToString().ToLowerInvariant();
+    var extra = Model.Count is null ? "" : $" {Model.Count}";
+    if (Model.Score is double score)
+    {
+        extra += $" {score.ToString("0.00")}";
+    }
+}
+
+@if (Model.Kind == AudioLabelKind.Genre && AudioGenrePath.HasHierarchySeparator(Model.Name))
+{
+    var (primary, sub) = AudioGenrePath.Split(Model.Name);
+    var parent = new Dictionary<string, string?>(Model.Filter)
+    {
+        ["kind"] = kind,
+        ["name"] = primary
+    };
+    var leaf = new Dictionary<string, string?>(Model.Filter)
+    {
+        ["kind"] = kind,
+        ["name"] = AudioGenrePath.Join(primary, sub)
+    };
+    <span class="audio-genre-path me-1 mb-1">
+        <a class="badge rounded-pill @Model.CssClass" asp-page="/AudioProfiles" asp-all-route-data="parent">@primary</a>
+        <span class="text-muted audio-genre-slash">/</span>
+        <a class="badge rounded-pill @Model.CssClass" asp-page="/AudioProfiles" asp-all-route-data="leaf">@sub<span class="text-muted">@extra</span></a>
+    </span>
+}
+else
+{
+    var routes = new Dictionary<string, string?>(Model.Filter)
+    {
+        ["kind"] = kind,
+        ["name"] = Model.Name
+    };
+    <a class="badge rounded-pill @Model.CssClass me-1 mb-1" asp-page="/AudioProfiles" asp-all-route-data="routes">
+        @Model.Name
+        @if (!string.IsNullOrEmpty(extra))
+        {
+            <span class="text-muted">@extra.Trim()</span>
+        }
+    </a>
+}

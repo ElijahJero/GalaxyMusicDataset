@@ -129,7 +129,15 @@
                         </div>
                         <div class="col-md-3">
                             <div class="text-muted small">Top audio genre</div>
-                            <div class="fs-5">@(Model.Audio.Genres.FirstOrDefault()?.Name ?? "—")</div>
+                            @if (Model.Audio.Genres.FirstOrDefault() is { } topGenre)
+                            {
+                                var genreRoutes = Model.AudioLabelQuery(AudioLabelKind.Genre, topGenre.Name);
+                                <div class="fs-5"><a asp-page="/AudioProfiles" asp-all-route-data="genreRoutes">@topGenre.Name</a></div>
+                            }
+                            else
+                            {
+                                <div class="fs-5">—</div>
+                            }
                         </div>
                     </div>
                 }

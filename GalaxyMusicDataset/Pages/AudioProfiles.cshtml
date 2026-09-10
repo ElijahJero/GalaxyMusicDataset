@@ -1,16 +1,54 @@
 @page "/Audio"
 @model AudioProfilesModel
 @{
-    ViewData["Title"] = "Audio profile";
+    ViewData["Title"] = Model.Detail is null ? "Audio profile" : Model.Detail.Path;
 }
 
-<h1 class="h3 mb-1">Audio profile</h1>
+<h1 class="h3 mb-1">@(Model.Detail?.Path ?? "Audio profile")</h1>
 <p class="text-muted">
-    Play-weighted Essentia features from a local client. These classifiers are stored separately from MusicBrainz / Last.fm tags.
+    Play-weighted Essentia features from a local client. Classifier genres use Discogs-style folders
+    (primary / subgenre), so you can open everything Electronic or just Electronic/Synth-pop.
 </p>
 
 <partial name="_AnalyticsNav" model='"audio"' />
-<partial name="_TimeRange" model='Model.TimeRangeView("/AudioProfiles")' />
+<partial name="_TimeRange" model='Model.TimeRangeView("/AudioProfiles", Model.Extra())' />
+
+@if (Model.Detail is not null)
+{
+    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+        <a class="btn btn-sm btn-outline-secondary" asp-page="/AudioProfiles" asp-all-route-data="Model.FilterQuery()">All audio labels</a>
+        @if (Model.Detail.Parent is not null)
+        {
+            var parentRoutes = Model.AudioLabelQuery(AudioLabelKind.Genre, Model.Detail.Parent);
+            <a class="btn btn-sm btn-outline-secondary" asp-page="/AudioProfiles" asp-all-route-data="parentRoutes">@Model.Detail.Parent</a>
+        }
+        <a class="btn btn-sm btn-outline-primary" asp-page="/Recent" asp-route-audioKind="@Model.Detail.Kind.ToString().ToLowerInvariant()" asp-route-audioLabel="@Model.Detail.Path" asp-route-sort="plays">All recordings in library</a>
+        <span class="small text-muted">@Model.Detail.Kind · @(Model.Detail.IsFolder ? "folder" : "tag")</span>
+    </div>
+
+    @if (Model.Detail.Children.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header">Subgenres of @Model.Detail.Name</div>
+            <partial name="_AudioGenreTree" model='new AudioGenreTreeModel(Model.Detail.Children, Model.FilterQuery(), Model.Detail.Path)' />
+        </div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Tracks</div>
+                <partial name="_TopTable" model='new TopTableModel(Model.Detail.Tracks, Model.FilterQuery(), "Track", "/Tracks", false)' />
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Artists</div>
+                <partial name="_TopTable" model='new TopTableModel(Model.Detail.Artists, Model.FilterQuery(), "Artist", "/Artists", false)' />
+            </div>
+        </div>
+    </div>
+}
 
 @if (Model.Audio.ProfiledPlays == 0)
 {
@@ -110,7 +148,7 @@
     </div>
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header">Essentia genres</div>
+            <div class="card-header">Primary genres</div>
             <div class="card-body">
                 @if (Model.Audio.Genres.Count == 0)
                 {
@@ -123,6 +161,14 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Essentia genres</div>
+    <p class="small text-muted px-3 pt-3 mb-0">
+        Click a primary folder to see every recording in that family, or a subgenre for the leaf.
+    </p>
+    <partial name="_AudioGenreTree" model='new AudioGenreTreeModel(Model.Audio.GenreFolders, Model.FilterQuery(), Model.Detail?.Path)' />
 </div>
 
 <div class="row g-3 mb-4">
@@ -143,8 +189,9 @@
                         <tbody>
                         @foreach (var row in Model.Audio.Themes)
                         {
+                            var routes = Model.AudioLabelQuery(AudioLabelKind.Theme, row.Name);
                             <tr>
-                                <td>@row.Name</td>
+                                <td><a asp-page="/AudioProfiles" asp-all-route-data="routes">@row.Name</a></td>
                                 <td class="text-end">@AnalyticsDisplay.Count(row.Plays)</td>
                                 <td class="text-end">@AnalyticsDisplay.Count(row.TrackCount)</td>
                             </tr>
@@ -172,8 +219,9 @@
                         <tbody>
                         @foreach (var row in Model.Audio.Instruments)
                         {
+                            var routes = Model.AudioLabelQuery(AudioLabelKind.Instrument, row.Name);
                             <tr>
-                                <td>@row.Name</td>
+                                <td><a asp-page="/AudioProfiles" asp-all-route-data="routes">@row.Name</a></td>
                                 <td class="text-end">@AnalyticsDisplay.Count(row.Plays)</td>
                                 <td class="text-end">@AnalyticsDisplay.Count(row.TrackCount)</td>
                             </tr>

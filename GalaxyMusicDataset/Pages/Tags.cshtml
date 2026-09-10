@@ -7,7 +7,7 @@
 <h1 class="h3 mb-1">@(Model.Detail?.Name ?? "Genres & tags")</h1>
 <p class="text-muted">
     Ranked by plays in this range. Genres come from MusicBrainz, Discogs, TheAudioDB, VocaDB, UtaiteDB, and TouhouDB.
-    Crowd tags include Last.fm.
+    Crowd tags include Last.fm. Essentia classifier genres are folders on this page and on Audio.
 </p>
 
 <partial name="_AnalyticsNav" model='"tags"' />
@@ -126,12 +126,12 @@
     <div class="card-body">
         <p class="small text-muted mb-3">
             Classifier genres, themes, and instruments from the local Essentia client.
-            They are stored separately from MusicBrainz / Last.fm / Discogs tags.
+            Genres are folders (primary / subgenre). Click a name to list recordings.
             @AnalyticsDisplay.Count(Model.Audio.ProfiledPlays) plays have an audio profile
             · @AnalyticsDisplay.Count(Model.Audio.UnprofiledPlays) still unprofiled.
             <a asp-page="/AudioProfiles" asp-all-route-data="Model.FilterQuery()">Open audio analytics</a>
         </p>
-        @if (Model.Audio.Genres.Count == 0 && Model.Audio.Themes.Count == 0)
+        @if (Model.Audio.GenreFolders.Count == 0 && Model.Audio.Themes.Count == 0)
         {
             <div class="text-muted">No Essentia labels in this range yet.</div>
         }
@@ -140,23 +140,34 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <div class="small text-muted mb-2">Genres</div>
-                    @foreach (var tag in Model.Audio.Genres.Take(12))
+                    @foreach (var folder in Model.Audio.GenreFolders.Take(8))
                     {
-                        <span class="badge rounded-pill audio-chip me-1 mb-1">@tag.Name <span class="text-muted">@AnalyticsDisplay.Count(tag.Plays)</span></span>
+                        var folderRoutes = Model.AudioLabelQuery(AudioLabelKind.Genre, folder.Path);
+                        <div class="mb-2">
+                            <a class="badge rounded-pill audio-chip" asp-page="/AudioProfiles" asp-all-route-data="folderRoutes">
+                                @folder.Name <span class="text-muted">@AnalyticsDisplay.Count(folder.Plays)</span>
+                            </a>
+                            <div class="mt-1 ms-1">
+                                @foreach (var child in folder.Children.Take(6))
+                                {
+                                    <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(child.Path, AudioLabelKind.Genre, Model.FilterQuery(), AnalyticsDisplay.Count(child.Plays))' />
+                                }
+                            </div>
+                        </div>
                     }
                 </div>
                 <div class="col-md-4">
                     <div class="small text-muted mb-2">Themes</div>
                     @foreach (var tag in Model.Audio.Themes.Take(12))
                     {
-                        <span class="badge rounded-pill audio-chip-theme me-1 mb-1">@tag.Name <span class="text-muted">@AnalyticsDisplay.Count(tag.Plays)</span></span>
+                        <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(tag.Name, AudioLabelKind.Theme, Model.FilterQuery(), AnalyticsDisplay.Count(tag.Plays), null, "audio-chip-theme")' />
                     }
                 </div>
                 <div class="col-md-4">
                     <div class="small text-muted mb-2">Instruments</div>
                     @foreach (var tag in Model.Audio.Instruments.Take(12))
                     {
-                        <span class="badge rounded-pill audio-chip-instrument me-1 mb-1">@tag.Name <span class="text-muted">@AnalyticsDisplay.Count(tag.Plays)</span></span>
+                        <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(tag.Name, AudioLabelKind.Instrument, Model.FilterQuery(), AnalyticsDisplay.Count(tag.Plays), null, "audio-chip-instrument")' />
                     }
                 </div>
             </div>
