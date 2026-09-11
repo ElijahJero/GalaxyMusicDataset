@@ -379,11 +379,14 @@ a:hover {
   border-color: var(--galaxy-accent);
 }
 
-.audio-chip,
-.audio-chip-theme,
-.audio-chip-instrument,
-.audio-chip-bpm,
-.audio-chip-key {
+.audio-chart {
+  position: relative;
+  height: 180px;
+}
+
+.audio-chart canvas {
+  display: block;
+}
   border-radius: 0;
   font-weight: 600;
   letter-spacing: 0.03em;

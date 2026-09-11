@@ -109,7 +109,9 @@
                 }
                 else
                 {
-                    <canvas height="180" data-chart="audio-bars" data-payload="@Model.BpmJson"></canvas>
+                    <div class="audio-chart">
+                        <canvas height="180" data-chart="audio-bars" data-payload="@Model.BpmJson"></canvas>
+                    </div>
                     <p class="small text-muted mb-2 mt-3">Click a range to list recordings, the same way as a genre folder.</p>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
@@ -145,7 +147,9 @@
                 }
                 else
                 {
-                    <canvas height="180" data-chart="genres" data-payload="@Model.KeyJson"></canvas>
+                    <div class="audio-chart">
+                        <canvas height="180" data-chart="genres" data-payload="@Model.KeyJson"></canvas>
+                    </div>
                     <p class="small text-muted mb-2 mt-3">Click a key to list recordings in that key and scale.</p>
                     <div class="table-responsive hud-scroll-panel">
                         <table class="table table-sm align-middle mb-0">
