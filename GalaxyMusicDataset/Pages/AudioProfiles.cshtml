@@ -4,10 +4,11 @@
     ViewData["Title"] = Model.Detail is null ? "Audio profile" : Model.Detail.Path;
 }
 
-<h1 class="h3 mb-1">@(Model.Detail?.Path ?? "Audio profile")</h1>
+<h1 class="h3 mb-1">@(Model.Detail?.Name ?? "Audio profile")</h1>
 <p class="text-muted">
     Play-weighted Essentia features from a local client. Classifier genres use Discogs-style folders
     (primary / subgenre), so you can open everything Electronic or just Electronic/Synth-pop.
+    Click a BPM range or key to list matching recordings the same way.
 </p>
 
 <partial name="_AnalyticsNav" model='"audio"' />
@@ -22,8 +23,8 @@
             var parentRoutes = Model.AudioLabelQuery(AudioLabelKind.Genre, Model.Detail.Parent);
             <a class="btn btn-sm btn-outline-secondary" asp-page="/AudioProfiles" asp-all-route-data="parentRoutes">@Model.Detail.Parent</a>
         }
-        <a class="btn btn-sm btn-outline-primary" asp-page="/Recent" asp-route-audioKind="@Model.Detail.Kind.ToString().ToLowerInvariant()" asp-route-audioLabel="@Model.Detail.Path" asp-route-sort="plays">All recordings in library</a>
-        <span class="small text-muted">@Model.Detail.Kind · @(Model.Detail.IsFolder ? "folder" : "tag")</span>
+        <a class="btn btn-sm btn-outline-primary" asp-page="/Recent" asp-all-route-data="Model.LibraryFilterForDetail()">All recordings in library</a>
+        <span class="small text-muted">@Model.Detail.Kind · @Model.DetailKindLabel</span>
     </div>
 
     @if (Model.Detail.Children.Count > 0)
@@ -109,6 +110,27 @@
                 else
                 {
                     <canvas height="180" data-chart="audio-bars" data-payload="@Model.BpmJson"></canvas>
+                    <p class="small text-muted mb-2 mt-3">Click a range to list recordings, the same way as a genre folder.</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                            <tr><th>BPM</th><th class="text-end">Plays</th><th class="text-end">Tracks</th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.Audio.BpmBuckets)
+                            {
+                                var slug = AudioBpm.Find(row.Name)?.Slug ?? row.Name;
+                                var routes = Model.AudioFeatureQuery("bpm", slug);
+                                var active = string.Equals(Model.Detail?.Path, slug, StringComparison.OrdinalIgnoreCase);
+                                <tr class="@(active ? "audio-genre-active" : null)">
+                                    <td><a asp-page="/AudioProfiles" asp-all-route-data="routes">@row.Name</a></td>
+                                    <td class="text-end">@AnalyticsDisplay.Count(row.Plays)</td>
+                                    <td class="text-end">@AnalyticsDisplay.Count(row.Count)</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
                 }
             </div>
         </div>
@@ -124,6 +146,26 @@
                 else
                 {
                     <canvas height="180" data-chart="genres" data-payload="@Model.KeyJson"></canvas>
+                    <p class="small text-muted mb-2 mt-3">Click a key to list recordings in that key and scale.</p>
+                    <div class="table-responsive hud-scroll-panel">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                            <tr><th>Key</th><th class="text-end">Plays</th><th class="text-end">Tracks</th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.Audio.Keys)
+                            {
+                                var routes = Model.AudioFeatureQuery("key", row.Name);
+                                var active = string.Equals(Model.Detail?.Path, row.Name, StringComparison.OrdinalIgnoreCase);
+                                <tr class="@(active ? "audio-genre-active" : null)">
+                                    <td><a asp-page="/AudioProfiles" asp-all-route-data="routes">@row.Name</a></td>
+                                    <td class="text-end">@AnalyticsDisplay.Count(row.Plays)</td>
+                                    <td class="text-end">@AnalyticsDisplay.Count(row.Count)</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
                 }
             </div>
         </div>

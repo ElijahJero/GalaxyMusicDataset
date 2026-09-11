@@ -36,6 +36,10 @@ public sealed class LibraryApiController(
         [FromQuery] string? hasAudio = null,
         [FromQuery] string? audioKind = null,
         [FromQuery] string? audioLabel = null,
+        [FromQuery] double? bpmMin = null,
+        [FromQuery] double? bpmMax = null,
+        [FromQuery] string? bpmBucket = null,
+        [FromQuery] string? audioKey = null,
         [FromQuery] string? source = null,
         [FromQuery] string sort = "recent",
         CancellationToken cancellationToken = default)
@@ -53,7 +57,9 @@ public sealed class LibraryApiController(
             await search.EnsureCurrentAsync(db, cancellationToken);
         }
 
-        query = LibraryFilters.Apply(query, db, search, q, artist, title, album, hasMbid, hasTags, source, status, hasAudio, audioKind, audioLabel);
+        query = LibraryFilters.Apply(
+            query, db, search, q, artist, title, album, hasMbid, hasTags, source, status,
+            hasAudio, audioKind, audioLabel, bpmMin, bpmMax, bpmBucket, audioKey);
         query = LibraryListQuery.ApplySort(query, sort);
 
         var loaded = await LibraryListQuery.LoadPageAsync(db, query, page, pageSize, cancellationToken);

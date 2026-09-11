@@ -70,7 +70,7 @@ public sealed class SampleDataSeeder(AppDbContext db, ScrobbleIngestService inge
 
     private async Task SeedSampleAudioAsync(List<Track> tracks, CancellationToken cancellationToken)
     {
-        void Profile(string title, params (AudioLabelKind Kind, string Name, double Score)[] labels)
+        void Profile(string title, double bpm, string key, string scale, params (AudioLabelKind Kind, string Name, double Score)[] labels)
         {
             var track = tracks.FirstOrDefault(t => t.Title == title);
             if (track is null)
@@ -82,9 +82,9 @@ public sealed class SampleDataSeeder(AppDbContext db, ScrobbleIngestService inge
             {
                 TrackId = track.Id,
                 AnalyzedAt = DateTimeOffset.UtcNow,
-                Bpm = 118,
-                Key = "A",
-                Scale = "minor",
+                Bpm = bpm,
+                Key = key,
+                Scale = scale,
                 Danceability = 0.72,
                 Voice = 0.8,
                 Electronic = 0.55,
@@ -98,43 +98,43 @@ public sealed class SampleDataSeeder(AppDbContext db, ScrobbleIngestService inge
             db.TrackAudioProfiles.Add(profile);
         }
 
-        Profile("Now Loading!!!!",
+        Profile("Now Loading!!!!", 128, "C", "major",
             (AudioLabelKind.Genre, "Pop/J-pop", 0.42),
             (AudioLabelKind.Genre, "Pop/Anison", 0.31),
             (AudioLabelKind.Theme, "energetic", 0.8),
             (AudioLabelKind.Instrument, "synthesizer", 0.7));
-        Profile("Lilac",
+        Profile("Lilac", 72, "D", "minor",
             (AudioLabelKind.Genre, "Pop/Ballad", 0.51),
             (AudioLabelKind.Theme, "romantic", 0.66));
-        Profile("ススメRunner!!(instrumental)",
+        Profile("ススメRunner!!(instrumental)", 140, "F", "major",
             (AudioLabelKind.Genre, "Pop/J-pop", 0.38),
             (AudioLabelKind.Genre, "Electronic/Dance-pop", 0.22),
             (AudioLabelKind.Instrument, "drums", 0.81));
-        Profile("Way 2 U",
+        Profile("Way 2 U", 118, "A", "minor",
             (AudioLabelKind.Genre, "Electronic/Synth-pop", 0.44),
             (AudioLabelKind.Genre, "Electronic/Dance-pop", 0.29),
             (AudioLabelKind.Theme, "futuristic", 0.7));
-        Profile("Shopping Malls",
+        Profile("Shopping Malls", 124, "G", "minor",
             (AudioLabelKind.Genre, "Electronic/House", 0.48),
             (AudioLabelKind.Genre, "Electronic/Electro", 0.21));
-        Profile("Brain Rot",
+        Profile("Brain Rot", 95, "E", "minor",
             (AudioLabelKind.Genre, "Electronic/Electro", 0.4),
             (AudioLabelKind.Genre, "Electronic/Grime", 0.18));
-        Profile("I Really Want to Stay at Your House",
+        Profile("I Really Want to Stay at Your House", 85, "C", "minor",
             (AudioLabelKind.Genre, "Electronic/Synth-pop", 0.36),
             (AudioLabelKind.Genre, "Pop/Ballad", 0.22),
             (AudioLabelKind.Theme, "melancholic", 0.61));
-        Profile("INSOMNIAC BLACK",
+        Profile("INSOMNIAC BLACK", 160, "A#", "minor",
             (AudioLabelKind.Genre, "Hip Hop/Grime", 0.47),
             (AudioLabelKind.Theme, "aggressive", 0.74));
-        Profile("Left For Dead Lullaby",
+        Profile("Left For Dead Lullaby", 68, "F#", "minor",
             (AudioLabelKind.Genre, "Hip Hop/Grime", 0.41),
             (AudioLabelKind.Genre, "Electronic/Downtempo", 0.2));
-        Profile("Lose-Lose Days",
+        Profile("Lose-Lose Days", 150, "D#", "minor",
             (AudioLabelKind.Genre, "Hip Hop/Grime", 0.52),
             (AudioLabelKind.Theme, "energetic", 0.58),
             (AudioLabelKind.Instrument, "drums", 0.77));
-        Profile("思い出とペトリコール - Omoide to Petrichor",
+        Profile("思い出とペトリコール - Omoide to Petrichor", 90, "A", "major",
             (AudioLabelKind.Genre, "Pop/Ballad", 0.33),
             (AudioLabelKind.Genre, "Electronic/Downtempo", 0.28));
 

@@ -215,6 +215,46 @@ public class RestApiTests
             t => t.GetProperty("title").GetString() == "Way 2 U");
     }
 
+    [Fact]
+    public async Task Audio_bpm_and_key_filters_work_on_api()
+    {
+        var store = _factory.Services.GetRequiredService<ApiKeyStore>();
+        var client = Authenticated(store.Create("audio-bpm-key", true, false).Token);
+
+        var bpm = await client.GetAsync("/api/v1/audio/labels?kind=bpm&name=110-129&range=all");
+        bpm.EnsureSuccessStatusCode();
+        var bpmJson = await bpm.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var bpmDetail = bpmJson.GetProperty("detail");
+        Assert.Equal("bpm", bpmDetail.GetProperty("kind").GetString());
+        Assert.True(bpmDetail.GetProperty("tracks").GetArrayLength() >= 1);
+
+        var key = await client.GetAsync("/api/v1/audio/labels?kind=key&name=A%20minor&range=all");
+        key.EnsureSuccessStatusCode();
+        var keyJson = await key.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("key", keyJson.GetProperty("detail").GetProperty("kind").GetString());
+        Assert.Contains(
+            keyJson.GetProperty("detail").GetProperty("tracks").EnumerateArray(),
+            t => t.GetProperty("name").GetString() == "Way 2 U");
+
+        var libraryBpm = await client.GetAsync("/api/v1/library?bpmBucket=110-129&sort=title");
+        libraryBpm.EnsureSuccessStatusCode();
+        var libraryBpmJson = await libraryBpm.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.True(libraryBpmJson.GetProperty("total").GetInt32() >= 1);
+        Assert.Contains(
+            libraryBpmJson.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("title").GetString() == "Way 2 U");
+
+        var libraryKey = await client.GetAsync("/api/v1/library?audioKey=A%20minor&sort=title");
+        libraryKey.EnsureSuccessStatusCode();
+        var libraryKeyJson = await libraryKey.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Contains(
+            libraryKeyJson.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("title").GetString() == "Way 2 U");
+        Assert.DoesNotContain(
+            libraryKeyJson.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("title").GetString() == "Lilac");
+    }
+
     private static object SampleAudioBody() => new
     {
         bpm = 85,

@@ -1076,7 +1076,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             var plays = playMap[profile.TrackId].Plays;
             if (profile.Bpm is double bpm)
             {
-                var bucket = BpmBucket(bpm);
+                var bucket = AudioBpm.Bucket(bpm).Name;
                 bpmBuckets.TryGetValue(bucket, out var current);
                 bpmBuckets[bucket] = (current.Tracks + 1, current.Plays + plays);
             }
@@ -1110,7 +1110,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             Weighted(p => p.Engagement),
             topMood,
             moodAverages,
-            NamedCounts(bpmBuckets, BpmBucketOrder),
+            NamedCounts(bpmBuckets, AudioBpm.Buckets.Select(b => b.Name).ToArray()),
             keys.OrderByDescending(kv => kv.Value.Plays)
                 .ThenBy(kv => kv.Key)
                 .Take(take)
@@ -1122,27 +1122,52 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             RollupAudioLabels(profiles, AudioLabelKind.Instrument, playMap, take));
     }
 
-    public async Task<AudioLabelDetailResult?> GetAudioLabelDetail(
+    public Task<AudioLabelDetailResult?> GetAudioLabelDetail(
         AudioLabelKind kind,
+        string name,
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken) =>
+        GetAudioLabelDetail(kind.ToString(), name, range, search, take, cancellationToken);
+
+    public async Task<AudioLabelDetailResult?> GetAudioLabelDetail(
+        string? kind,
         string name,
         TimeRange range,
         string? search,
         int take,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(kind) || string.IsNullOrWhiteSpace(name))
         {
             return null;
         }
 
         take = ClampTake(take);
+        var kindKey = kind.Trim().ToLowerInvariant();
+        if (kindKey is "bpm" or "tempo")
+        {
+            return await GetAudioBpmDetail(name, range, search, take, cancellationToken);
+        }
+
+        if (kindKey == "key")
+        {
+            return await GetAudioKeyDetail(name, range, search, take, cancellationToken);
+        }
+
+        if (!Enum.TryParse<AudioLabelKind>(kind, true, out var parsedKind))
+        {
+            return null;
+        }
+
         var needle = name.Trim();
-        var folder = AudioGenrePath.IsFolderQuery(kind, needle);
+        var folder = AudioGenrePath.IsFolderQuery(parsedKind, needle);
         var labels = await db.TrackAudioLabels.AsNoTracking()
-            .Where(l => l.Kind == kind)
+            .Where(l => l.Kind == parsedKind)
             .Select(l => new { l.TrackId, l.Name })
             .ToListAsync(cancellationToken);
-        var matches = labels.Where(l => AudioGenrePath.Matches(l.Name, kind, needle)).ToList();
+        var matches = labels.Where(l => AudioGenrePath.Matches(l.Name, parsedKind, needle)).ToList();
         if (matches.Count == 0)
         {
             return null;
@@ -1152,9 +1177,133 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
         var display = AudioGenrePath.DisplayName(sample.Name, needle);
         var sampleSplit = AudioGenrePath.Split(sample.Name);
         var path = folder ? display : AudioGenrePath.Join(sampleSplit.Primary, sampleSplit.Sub);
-        string? parent = folder || kind != AudioLabelKind.Genre ? null : sampleSplit.Primary;
-
+        string? parent = folder || parsedKind != AudioLabelKind.Genre ? null : sampleSplit.Primary;
         var trackIds = matches.Select(m => m.TrackId).Distinct().ToList();
+        var ranked = await RankAudioMatches(trackIds, range, search, take, cancellationToken);
+
+        IReadOnlyList<AudioGenreFolder> children = [];
+        if (folder)
+        {
+            children = matches
+                .Where(m => ranked.PlayMap.ContainsKey(m.TrackId))
+                .Select(m =>
+                {
+                    var split = AudioGenrePath.Split(m.Name);
+                    return (m.TrackId, split.Primary, split.Sub);
+                })
+                .Where(x => x.Sub is not null)
+                .GroupBy(x => x.Sub!, StringComparer.OrdinalIgnoreCase)
+                .Select(g => FolderFromGroup(g.Key, g.First().Primary, g.Select(x => x.TrackId), ranked.PlayMap))
+                .OrderByDescending(c => c.Plays)
+                .ThenBy(c => c.Name)
+                .ToList();
+        }
+
+        return new AudioLabelDetailResult(
+            parsedKind.ToString().ToLowerInvariant(),
+            display,
+            path,
+            parent,
+            folder,
+            children,
+            ranked.Tracks,
+            ranked.Artists);
+    }
+
+    private async Task<AudioLabelDetailResult?> GetAudioBpmDetail(
+        string name,
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (!AudioBpm.TryResolve(name, out var bucket))
+        {
+            return null;
+        }
+
+        var min = bucket.MinInclusive;
+        var maxExclusive = bucket.MaxExclusive;
+        IQueryable<TrackAudioProfile> profiles = db.TrackAudioProfiles.AsNoTracking();
+        if (min is not null && maxExclusive is not null)
+        {
+            profiles = profiles.Where(p => p.Bpm != null && p.Bpm >= min && p.Bpm < maxExclusive);
+        }
+        else if (min is not null)
+        {
+            profiles = profiles.Where(p => p.Bpm != null && p.Bpm >= min);
+        }
+        else if (maxExclusive is not null)
+        {
+            profiles = profiles.Where(p => p.Bpm != null && p.Bpm < maxExclusive);
+        }
+        else
+        {
+            profiles = profiles.Where(p => p.Bpm != null);
+        }
+
+        var ids = await profiles.Select(p => p.TrackId).ToListAsync(cancellationToken);
+        if (ids.Count == 0)
+        {
+            return null;
+        }
+
+        var ranked = await RankAudioMatches(ids, range, search, take, cancellationToken);
+        if (ranked.Tracks.Count == 0)
+        {
+            return null;
+        }
+
+        return new AudioLabelDetailResult("bpm", bucket.Name, bucket.Slug, null, false, [], ranked.Tracks, ranked.Artists);
+    }
+
+    private async Task<AudioLabelDetailResult?> GetAudioKeyDetail(
+        string name,
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var needle = name.Trim();
+        var (key, scale) = AudioProfileMapper.SplitKey(needle, null);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return null;
+        }
+
+        var keyLower = key.ToLower();
+        var scaleLower = scale?.ToLower();
+        var candidates = await db.TrackAudioProfiles.AsNoTracking()
+            .Where(p => p.Key != null && p.Key != "" && p.Key.ToLower() == keyLower)
+            .Select(p => new { p.TrackId, p.Key, p.Scale })
+            .ToListAsync(cancellationToken);
+        var ids = candidates
+            .Where(p => AudioKeys.Matches(p.Key, p.Scale, needle))
+            .Select(p => p.TrackId)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0)
+        {
+            return null;
+        }
+
+        var ranked = await RankAudioMatches(ids, range, search, take, cancellationToken);
+        if (ranked.Tracks.Count == 0)
+        {
+            return null;
+        }
+
+        var display = AudioProfileMapper.KeyDisplay(key, scaleLower) ?? needle;
+        return new AudioLabelDetailResult("key", display, display, null, false, [], ranked.Tracks, ranked.Artists);
+    }
+
+    private async Task<AudioMatchRanking> RankAudioMatches(
+        IReadOnlyList<long> trackIds,
+        TimeRange range,
+        string? search,
+        int take,
+        CancellationToken cancellationToken)
+    {
         var rows = await Filter(range, search)
             .Where(s => trackIds.Contains(s.TrackId))
             .GroupBy(s => new { s.TrackId, s.Track.Title, Artist = s.Track.Artist.Name, s.Track.ArtistId })
@@ -1186,26 +1335,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             .Take(take)
             .Select((x, i) => new RankedItem(x.ArtistId, x.Artist, null, x.Plays, x.Duration, i + 1, 0, x.Plays, null, false))
             .ToList();
-
-        IReadOnlyList<AudioGenreFolder> children = [];
-        if (folder)
-        {
-            children = matches
-                .Where(m => playMap.ContainsKey(m.TrackId))
-                .Select(m =>
-                {
-                    var split = AudioGenrePath.Split(m.Name);
-                    return (m.TrackId, split.Primary, split.Sub);
-                })
-                .Where(x => x.Sub is not null)
-                .GroupBy(x => x.Sub!, StringComparer.OrdinalIgnoreCase)
-                .Select(g => FolderFromGroup(g.Key, g.First().Primary, g.Select(x => x.TrackId), playMap))
-                .OrderByDescending(c => c.Plays)
-                .ThenBy(c => c.Name)
-                .ToList();
-        }
-
-        return new AudioLabelDetailResult(kind, display, path, parent, folder, children, tracks, artists);
+        return new AudioMatchRanking(playMap, tracks, artists);
     }
 
     private static AudioAnalyticsResult EmptyAudio() =>
@@ -1218,18 +1348,6 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             list.Add(new NamedAverage(name, v));
         }
     }
-
-    private static string BpmBucket(double bpm) => bpm switch
-    {
-        < 70 => "<70",
-        < 90 => "70–89",
-        < 110 => "90–109",
-        < 130 => "110–129",
-        < 150 => "130–149",
-        _ => "150+"
-    };
-
-    private static readonly string[] BpmBucketOrder = ["<70", "70–89", "90–109", "110–129", "130–149", "150+"];
 
     private static List<NamedCount> NamedCounts(
         Dictionary<string, (int Tracks, int Plays)> map,
@@ -1319,6 +1437,11 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
     private sealed record PlayRow(long UnixTimestamp, long TrackId, int? DurationMs, string Artist, string Title);
 
     private sealed record TrackPlayRow(long TrackId, int Plays, long Duration);
+
+    private sealed record AudioMatchRanking(
+        Dictionary<long, TrackPlayRow> PlayMap,
+        IReadOnlyList<RankedItem> Tracks,
+        IReadOnlyList<RankedItem> Artists);
 
     private sealed record TagLinkRow(long TrackId, string Name, string NormalizedName, EnrichmentSource Source, int Weight);
 }

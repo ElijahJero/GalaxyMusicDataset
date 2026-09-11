@@ -84,9 +84,12 @@ public abstract class AnalyticsPageModel : PageModel
     }
 
     public Dictionary<string, string?> AudioLabelQuery(AudioLabelKind kind, string name) =>
+        AudioFeatureQuery(kind.ToString().ToLowerInvariant(), name);
+
+    public Dictionary<string, string?> AudioFeatureQuery(string kind, string name) =>
         FilterQuery(new Dictionary<string, string?>
         {
-            ["kind"] = kind.ToString().ToLowerInvariant(),
+            ["kind"] = kind,
             ["name"] = name
         });
 

@@ -3,6 +3,7 @@ using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Analytics;
 using GalaxyMusicDataset.Services.Audio;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 
 namespace GalaxyMusicDataset.Pages;
 
@@ -30,18 +31,13 @@ public class AudioProfilesModel(AnalyticsQueries analytics) : AnalyticsPageModel
         ResolveFilter();
         Years = await analytics.GetYears(cancellationToken);
         Audio = await analytics.GetAudioAnalytics(TimeRange, Q, Take, cancellationToken);
-        BpmJson = JsonSerializer.Serialize(Audio.BpmBuckets.Select(b => new { label = b.Name, count = b.Plays }));
-        KeyJson = JsonSerializer.Serialize(Audio.Keys.Select(k => new { label = k.Name, count = k.Plays }));
+        BpmJson = ChartPayload(Audio.BpmBuckets, bucket => AudioFeatureQuery("bpm", AudioBpm.Find(bucket.Name)?.Slug ?? bucket.Name));
+        KeyJson = ChartPayload(Audio.Keys, key => AudioFeatureQuery("key", key.Name));
         MoodJson = JsonSerializer.Serialize(Audio.MoodAverages.Select(m => new { label = m.Name, count = Math.Round(m.Value, 3) }));
-        GenreJson = JsonSerializer.Serialize(Audio.Genres.Select(t => new { label = t.Name, count = t.Plays }));
+        GenreJson = ChartPayload(Audio.Genres.Select(t => new NamedCount(t.Name, t.TrackCount, t.Plays)), genre => AudioLabelQuery(AudioLabelKind.Genre, genre.Name));
         if (!string.IsNullOrWhiteSpace(Name))
         {
-            if (!Enum.TryParse<AudioLabelKind>(Kind, true, out var kind))
-            {
-                return NotFound();
-            }
-
-            Detail = await analytics.GetAudioLabelDetail(kind, Name, TimeRange, Q, Take, cancellationToken);
+            Detail = await analytics.GetAudioLabelDetail(Kind, Name, TimeRange, Q, Take, cancellationToken);
             if (Detail is null)
             {
                 return NotFound();
@@ -67,4 +63,57 @@ public class AudioProfilesModel(AnalyticsQueries analytics) : AnalyticsPageModel
 
         return extra;
     }
+
+    public Dictionary<string, string?> LibraryFilterForDetail()
+    {
+        var routes = new Dictionary<string, string?> { ["sort"] = "plays" };
+        if (Detail is null)
+        {
+            return routes;
+        }
+
+        switch (Detail.Kind)
+        {
+            case "bpm":
+                routes["bpmBucket"] = Detail.Path;
+                break;
+            case "key":
+                routes["audioKey"] = Detail.Path;
+                break;
+            default:
+                routes["audioKind"] = Detail.Kind;
+                routes["audioLabel"] = Detail.Path;
+                break;
+        }
+
+        return routes;
+    }
+
+    public string DetailKindLabel => Detail?.Kind switch
+    {
+        "bpm" => "range",
+        "key" => "key",
+        _ when Detail?.IsFolder == true => "folder",
+        _ => "tag"
+    };
+
+    private string ChartPayload(IEnumerable<NamedCount> rows, Func<NamedCount, Dictionary<string, string?>> href) =>
+        JsonSerializer.Serialize(rows.Select(row =>
+        {
+            var routes = new RouteValueDictionary();
+            foreach (var pair in href(row))
+            {
+                if (!string.IsNullOrEmpty(pair.Value))
+                {
+                    routes[pair.Key] = pair.Value;
+                }
+            }
+
+            return new
+            {
+                label = row.Name,
+                count = row.Plays,
+                href = Url.Page("/AudioProfiles", routes)
+            };
+        }));
 }

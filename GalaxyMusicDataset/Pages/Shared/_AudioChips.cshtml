@@ -12,6 +12,17 @@
         <div class="small">@summaryLine</div>
     }
     <div class="mt-1">
+        @if (audio.Bpm is double bpm)
+        {
+            var bucket = AudioBpm.Bucket(bpm);
+            var bpmRoutes = new Dictionary<string, string?> { ["kind"] = "bpm", ["name"] = bucket.Slug };
+            <a class="badge rounded-pill audio-chip-bpm me-1 mb-1" asp-page="/AudioProfiles" asp-all-route-data="bpmRoutes">@bucket.Name BPM</a>
+        }
+        @if (!string.IsNullOrWhiteSpace(audio.KeyDisplay))
+        {
+            var keyRoutes = new Dictionary<string, string?> { ["kind"] = "key", ["name"] = audio.KeyDisplay };
+            <a class="badge rounded-pill audio-chip-key me-1 mb-1" asp-page="/AudioProfiles" asp-all-route-data="keyRoutes">@audio.KeyDisplay</a>
+        }
         @foreach (var genre in audio.Genres)
         {
             <partial name="_AudioLabelLink" model='new AudioLabelLinkModel(genre.Name, AudioLabelKind.Genre, filter)' />

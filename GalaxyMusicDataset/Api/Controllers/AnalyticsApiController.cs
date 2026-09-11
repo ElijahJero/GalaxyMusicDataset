@@ -109,14 +109,19 @@ public sealed class AnalyticsApiController(AnalyticsQueries analytics, AppTimeZo
         [FromQuery] int take = AnalyticsQueries.DefaultTake,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(name) ||
-            !Enum.TryParse<AudioLabelKind>(kind, true, out var parsedKind))
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(kind))
         {
-            return BadRequest(new ApiError("kind must be genre, theme, or instrument, and name is required."));
+            return BadRequest(new ApiError("kind must be genre, theme, instrument, bpm, or key, and name is required."));
+        }
+
+        var kindKey = kind.Trim().ToLowerInvariant();
+        if (kindKey is not ("genre" or "theme" or "instrument" or "bpm" or "tempo" or "key"))
+        {
+            return BadRequest(new ApiError("kind must be genre, theme, instrument, bpm, or key, and name is required."));
         }
 
         var window = ApiTimeRange.Resolve(zone, range, from, to);
-        var detail = await analytics.GetAudioLabelDetail(parsedKind, name, window, q, take, cancellationToken);
+        var detail = await analytics.GetAudioLabelDetail(kind, name, window, q, take, cancellationToken);
         if (detail is null)
         {
             return NotFound(new ApiError("Audio label not found."));
