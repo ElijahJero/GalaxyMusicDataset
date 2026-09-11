@@ -620,7 +620,7 @@ public sealed record AudioGenreFolder(
     IReadOnlyList<AudioGenreFolder> Children);
 
 public sealed record AudioLabelDetailResult(
-    AudioLabelKind Kind,
+    string Kind,
     string Name,
     string Path,
     string? Parent,

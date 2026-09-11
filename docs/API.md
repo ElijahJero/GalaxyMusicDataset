@@ -150,7 +150,7 @@ Play-weighted Essentia analytics for the selected range (BPM, key, moods, **prim
 
 ### `GET /api/v1/audio/labels`
 
-Tracks and artists for one Essentia label. Query: `kind` (`genre` | `theme` | `instrument`), `name` (e.g. `Electronic` or `Electronic/House`). A primary genre name is a folder and includes every `Primary/Sub` leaf.
+Tracks and artists for one Essentia filter. Query: `kind` (`genre` | `theme` | `instrument` | `bpm` | `key`), `name` (e.g. `Electronic`, `Electronic/House`, `110-129`, `G major`). A primary genre name is a folder and includes every `Primary/Sub` leaf. BPM `name` values are `lt70`, `70-89`, `90-109`, `110-129`, `130-149`, `150plus` (display names such as `70–89` also work). Key `name` is `G major` or just `G` (both scales).
 
 ### `GET /api/v1/scrobbles`
 
@@ -171,6 +171,9 @@ Paged unique tracks. Query:
 | `status` | Lookup status enum (`Pending`, `NeedsReview`, …) |
 | `hasMbid`, `hasTags`, `hasAudio` | `yes` / `no` |
 | `audioKind`, `audioLabel` | Essentia label filter (`genre` + `Electronic` or `Electronic/House`) |
+| `bpmMin`, `bpmMax` | Inclusive BPM range |
+| `bpmBucket` | Histogram bucket (`lt70`, `70-89`, `90-109`, `110-129`, `130-149`, `150plus`) |
+| `audioKey` | Musical key (`G major`, or `G` for both scales) |
 | `source` | Enrichment source that succeeded (`LastFm`, `MusicBrainz`, …) |
 | `sort` | `recent` (default), `plays`, `artist`, `title` |
 

@@ -379,9 +379,14 @@ a:hover {
   border-color: var(--galaxy-accent);
 }
 
-.audio-chip,
-.audio-chip-theme,
-.audio-chip-instrument {
+.audio-chart {
+  position: relative;
+  height: 180px;
+}
+
+.audio-chart canvas {
+  display: block;
+}
   border-radius: 0;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -405,15 +410,31 @@ a:hover {
   color: var(--bs-body-color);
 }
 
+.audio-chip-bpm {
+  background: color-mix(in srgb, #f59e0b 16%, var(--bs-tertiary-bg));
+  border: 1px solid color-mix(in srgb, #f59e0b 55%, var(--galaxy-line));
+  color: var(--bs-body-color);
+}
+
+.audio-chip-key {
+  background: color-mix(in srgb, #22d3ee 16%, var(--bs-tertiary-bg));
+  border: 1px solid color-mix(in srgb, #22d3ee 55%, var(--galaxy-line));
+  color: var(--bs-body-color);
+}
+
 a.audio-chip,
 a.audio-chip-theme,
-a.audio-chip-instrument {
+a.audio-chip-instrument,
+a.audio-chip-bpm,
+a.audio-chip-key {
   text-decoration: none;
 }
 
 a.audio-chip:hover,
 a.audio-chip-theme:hover,
-a.audio-chip-instrument:hover {
+a.audio-chip-instrument:hover,
+a.audio-chip-bpm:hover,
+a.audio-chip-key:hover {
   color: var(--galaxy-accent);
   border-color: var(--galaxy-accent);
 }

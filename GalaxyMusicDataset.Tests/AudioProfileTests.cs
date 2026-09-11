@@ -147,6 +147,102 @@ public class AudioProfileTests
     }
 
     [Fact]
+    public void Bpm_buckets_and_key_match_helpers()
+    {
+        Assert.Equal("lt70", AudioBpm.Bucket(69.9).Slug);
+        Assert.Equal("70-89", AudioBpm.Bucket(70).Slug);
+        Assert.Equal("70-89", AudioBpm.Bucket(89.9).Slug);
+        Assert.Equal("90-109", AudioBpm.Bucket(90).Slug);
+        Assert.Equal("110-129", AudioBpm.Bucket(118).Slug);
+        Assert.Equal("150plus", AudioBpm.Bucket(150).Slug);
+        Assert.Equal("70-89", AudioBpm.Find("70–89")?.Slug);
+        Assert.Equal("70-89", AudioBpm.Find("70-89")?.Slug);
+        Assert.Equal("<70", AudioBpm.Find("lt70")?.Name);
+        Assert.Null(AudioBpm.Find("not-a-bucket"));
+
+        Assert.True(AudioKeys.Matches("G", "major", "G major"));
+        Assert.True(AudioKeys.Matches("G", "minor", "g"));
+        Assert.True(AudioKeys.Matches("G", "major", "G"));
+        Assert.False(AudioKeys.Matches("G", "minor", "G major"));
+        Assert.False(AudioKeys.Matches("A", "minor", "G"));
+    }
+
+    [Fact]
+    public async Task Audio_bpm_and_key_detail_and_library_filters()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var catalog = new CatalogService(harness.Db);
+        var artist = await catalog.GetOrCreateArtistAsync("fourfolium", null, CancellationToken.None);
+        var house = await AddNamed(harness.Db, artist, "House Track");
+        var ballad = await AddNamed(harness.Db, artist, "Ballad Track");
+        var grime = await AddNamed(harness.Db, artist, "Grime Track");
+        await AddPlay(harness.Db, house, Unix(2024, 1, 1, 10, 0));
+        await AddPlay(harness.Db, house, Unix(2024, 1, 1, 11, 0));
+        await AddPlay(harness.Db, ballad, Unix(2024, 1, 1, 12, 0));
+        await AddPlay(harness.Db, grime, Unix(2024, 1, 1, 13, 0));
+        await harness.Db.SaveChangesAsync();
+
+        var service = new AudioProfileService(harness.Db);
+        await service.UpsertAsync(house.Id, SampleRequest() with { Bpm = 124, Key = "G minor" }, CancellationToken.None);
+        await service.UpsertAsync(ballad.Id, SampleRequest() with { Bpm = 72, Key = "D minor" }, CancellationToken.None);
+        await service.UpsertAsync(grime.Id, SampleRequest() with { Bpm = 160, Key = "G major" }, CancellationToken.None);
+
+        var queries = new AnalyticsQueries(harness.Db);
+        var range = TimeRangeParser.ForCalendarYear(2024);
+        var audio = await queries.GetAudioAnalytics(range, null, 20, CancellationToken.None);
+        Assert.Contains(audio.BpmBuckets, b => b.Name == "110–129" && b.Count == 1 && b.Plays == 2);
+        Assert.Contains(audio.BpmBuckets, b => b.Name == "70–89" && b.Count == 1);
+        Assert.Contains(audio.Keys, k => k.Name == "G minor");
+        Assert.Contains(audio.Keys, k => k.Name == "G major");
+
+        var bpm = await queries.GetAudioLabelDetail("bpm", "110-129", range, null, 20, CancellationToken.None);
+        Assert.NotNull(bpm);
+        Assert.Equal("bpm", bpm.Kind);
+        Assert.Equal("110–129", bpm.Name);
+        Assert.Equal(["House Track"], bpm.Tracks.Select(t => t.Name).ToList());
+
+        var under = await queries.GetAudioLabelDetail("bpm", "lt70", range, null, 20, CancellationToken.None);
+        Assert.Null(under);
+
+        var gMinor = await queries.GetAudioLabelDetail("key", "G minor", range, null, 20, CancellationToken.None);
+        Assert.NotNull(gMinor);
+        Assert.Equal(["House Track"], gMinor.Tracks.Select(t => t.Name).ToList());
+
+        var anyG = await queries.GetAudioLabelDetail("key", "G", range, null, 20, CancellationToken.None);
+        Assert.NotNull(anyG);
+        Assert.Equal(["Grime Track", "House Track"], anyG.Tracks.Select(t => t.Name).OrderBy(n => n).ToList());
+
+        var libraryBucket = await LibraryFilters.Apply(
+                harness.Db.Tracks, harness.Db, null, null, null, null, null, null, null, null, null,
+                bpmBucket: "110-129")
+            .Select(t => t.Title)
+            .ToListAsync();
+        Assert.Equal(["House Track"], libraryBucket);
+
+        var libraryRange = await LibraryFilters.Apply(
+                harness.Db.Tracks, harness.Db, null, null, null, null, null, null, null, null, null,
+                bpmMin: 70, bpmMax: 89)
+            .Select(t => t.Title)
+            .ToListAsync();
+        Assert.Equal(["Ballad Track"], libraryRange);
+
+        var libraryKey = await LibraryFilters.Apply(
+                harness.Db.Tracks, harness.Db, null, null, null, null, null, null, null, null, null,
+                audioKey: "G")
+            .Select(t => t.Title)
+            .OrderBy(t => t)
+            .ToListAsync();
+        Assert.Equal(["Grime Track", "House Track"], libraryKey);
+
+        var libraryGMajor = await LibraryFilters.Apply(
+                harness.Db.Tracks, harness.Db, null, null, null, null, null, null, null, null, null,
+                audioKey: "G major")
+            .Select(t => t.Title)
+            .ToListAsync();
+        Assert.Equal(["Grime Track"], libraryGMajor);
+    }
+
+    [Fact]
     public async Task Audio_genre_folders_dedupe_tracks_and_label_detail_filters()
     {
         await using var harness = await TestDb.CreateAsync();

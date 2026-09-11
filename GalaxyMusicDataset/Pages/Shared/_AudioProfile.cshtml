@@ -30,8 +30,26 @@
         <dl class="row small mb-3">
             <dt class="col-sm-3">BPM / key</dt>
             <dd class="col-sm-9">
-                @(audio.Bpm?.ToString("0.##") ?? "—")
-                · @(audio.KeyDisplay ?? "—")
+                @if (audio.Bpm is double bpm)
+                {
+                    var bucket = AudioBpm.Bucket(bpm);
+                    var bpmRoutes = new Dictionary<string, string?> { ["kind"] = "bpm", ["name"] = bucket.Slug };
+                    <a asp-page="/AudioProfiles" asp-all-route-data="bpmRoutes">@bpm.ToString("0.##")</a>
+                }
+                else
+                {
+                    <text>—</text>
+                }
+                <text> · </text>
+                @if (!string.IsNullOrWhiteSpace(audio.KeyDisplay))
+                {
+                    var keyRoutes = new Dictionary<string, string?> { ["kind"] = "key", ["name"] = audio.KeyDisplay };
+                    <a asp-page="/AudioProfiles" asp-all-route-data="keyRoutes">@audio.KeyDisplay</a>
+                }
+                else
+                {
+                    <text>—</text>
+                }
                 @if (audio.KeyStrength is double ks)
                 {
                     <span> (strength @ks.ToString("0.00"))</span>

@@ -89,6 +89,34 @@
             <input class="form-control" id="AudioLabel" name="audioLabel" value="@Model.AudioLabel" placeholder="Electronic or Electronic/House" />
         </div>
         <div class="col-md-2">
+            <label class="form-label" for="BpmBucket">BPM range</label>
+            <select class="form-select" id="BpmBucket" name="bpmBucket">
+                <option value="">Any BPM</option>
+                @foreach (var bucket in AudioBpm.Buckets)
+                {
+                    <option value="@bucket.Slug" selected="@(string.Equals(Model.BpmBucket, bucket.Slug, StringComparison.OrdinalIgnoreCase) || string.Equals(Model.BpmBucket, bucket.Name, StringComparison.OrdinalIgnoreCase))">@bucket.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-1">
+            <label class="form-label" for="BpmMin">Min BPM</label>
+            <input class="form-control" id="BpmMin" name="bpmMin" type="number" min="0" step="1" value="@(Model.BpmMin?.ToString(System.Globalization.CultureInfo.InvariantCulture))" />
+        </div>
+        <div class="col-md-1">
+            <label class="form-label" for="BpmMax">Max BPM</label>
+            <input class="form-control" id="BpmMax" name="bpmMax" type="number" min="0" step="1" value="@(Model.BpmMax?.ToString(System.Globalization.CultureInfo.InvariantCulture))" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="AudioKey">Key</label>
+            <input class="form-control" id="AudioKey" name="audioKey" value="@Model.AudioKey" list="AudioKeys" placeholder="G or G major" />
+            <datalist id="AudioKeys">
+                @foreach (var key in AudioKeys.CommonDisplays)
+                {
+                    <option value="@key"></option>
+                }
+            </datalist>
+        </div>
+        <div class="col-md-2">
             <label class="form-label" for="Source">Source hit</label>
             <select class="form-select" id="Source" name="source">
                 <option value="">Any source</option>
@@ -124,6 +152,40 @@
             clear["p"] = "1";
         }
         <a class="btn btn-sm btn-outline-secondary" asp-page="/Recent" asp-all-route-data="clear">Clear label</a>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.BpmBucket) || Model.BpmMin is not null || Model.BpmMax is not null)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>
+            Filtered to BPM
+            <strong>@Model.BpmFilterLabel</strong>
+        </span>
+        @{
+            var clearBpm = Model.FilterRoutes();
+            clearBpm.Remove("bpmBucket");
+            clearBpm.Remove("bpmMin");
+            clearBpm.Remove("bpmMax");
+            clearBpm["p"] = "1";
+        }
+        <a class="btn btn-sm btn-outline-secondary" asp-page="/Recent" asp-all-route-data="clearBpm">Clear BPM</a>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.AudioKey))
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>
+            Filtered to key
+            <strong>@Model.AudioKey</strong>
+        </span>
+        @{
+            var clearKey = Model.FilterRoutes();
+            clearKey.Remove("audioKey");
+            clearKey["p"] = "1";
+        }
+        <a class="btn btn-sm btn-outline-secondary" asp-page="/Recent" asp-all-route-data="clearKey">Clear key</a>
     </div>
 }
 
@@ -244,6 +306,10 @@
                     <input type="hidden" name="hasAudio" value="@Model.HasAudio" />
                     <input type="hidden" name="audioKind" value="@Model.AudioKind" />
                     <input type="hidden" name="audioLabel" value="@Model.AudioLabel" />
+                    <input type="hidden" name="bpmMin" value="@Model.BpmMin" />
+                    <input type="hidden" name="bpmMax" value="@Model.BpmMax" />
+                    <input type="hidden" name="bpmBucket" value="@Model.BpmBucket" />
+                    <input type="hidden" name="audioKey" value="@Model.AudioKey" />
                     <input type="hidden" name="source" value="@Model.Source" />
                     <input type="hidden" name="sort" value="@Model.Sort" />
                     <div class="row g-2">

@@ -97,7 +97,9 @@
           maintainAspectRatio: false,
           plugins: {
             legend: { position: "bottom" }
-          }
+          },
+          onClick: chartNavigate(payload),
+          onHover: chartHover(payload)
         }
       });
     } else if (kind === "audio-bars") {
@@ -114,9 +116,34 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true } }
+          scales: { y: { beginAtZero: true } },
+          onClick: chartNavigate(payload),
+          onHover: chartHover(payload)
         }
       });
     }
+  }
+
+  function chartNavigate(payload) {
+    return (_, elements) => {
+      if (!elements.length) {
+        return;
+      }
+      const href = payload[elements[0].index]?.href;
+      if (href) {
+        window.location.assign(href);
+      }
+    };
+  }
+
+  function chartHover(payload) {
+    return (event, elements) => {
+      const target = event.native?.target;
+      if (!target) {
+        return;
+      }
+      const href = elements.length ? payload[elements[0].index]?.href : null;
+      target.style.cursor = href ? "pointer" : "default";
+    };
   }
 })();

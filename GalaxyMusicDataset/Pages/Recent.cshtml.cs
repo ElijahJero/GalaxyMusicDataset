@@ -54,6 +54,18 @@ public class RecentModel(
     public string? AudioLabel { get; set; }
 
     [BindProperty(SupportsGet = true)]
+    public double? BpmMin { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public double? BpmMax { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? BpmBucket { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? AudioKey { get; set; }
+
+    [BindProperty(SupportsGet = true)]
     public string? Source { get; set; }
 
     [BindProperty(SupportsGet = true)]
@@ -84,7 +96,9 @@ public class RecentModel(
             await search.EnsureCurrentAsync(db, cancellationToken);
         }
 
-        query = LibraryFilters.Apply(query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status, HasAudio, AudioKind, AudioLabel);
+        query = LibraryFilters.Apply(
+            query, db, search, Q, Artist, Title, Album, HasMbid, HasTags, Source, Status,
+            HasAudio, AudioKind, AudioLabel, BpmMin, BpmMax, BpmBucket, AudioKey);
         query = LibraryListQuery.ApplySort(query, Sort);
 
         var page = await LibraryListQuery.LoadPageAsync(db, query, P, PageSize, cancellationToken);
@@ -128,6 +142,10 @@ public class RecentModel(
             ["hasAudio"] = HasAudio,
             ["audioKind"] = AudioKind,
             ["audioLabel"] = AudioLabel,
+            ["bpmMin"] = BpmMin?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["bpmMax"] = BpmMax?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["bpmBucket"] = BpmBucket,
+            ["audioKey"] = AudioKey,
             ["source"] = Source,
             ["sort"] = Sort
         };
@@ -137,6 +155,34 @@ public class RecentModel(
         }
 
         return d;
+    }
+
+    public string BpmFilterLabel
+    {
+        get
+        {
+            if (AudioBpm.TryResolve(BpmBucket, out var bucket))
+            {
+                return bucket.Name;
+            }
+
+            if (BpmMin is not null && BpmMax is not null)
+            {
+                return $"{BpmMin:0}–{BpmMax:0}";
+            }
+
+            if (BpmMin is not null)
+            {
+                return $"{BpmMin:0}+";
+            }
+
+            if (BpmMax is not null)
+            {
+                return $"≤{BpmMax:0}";
+            }
+
+            return "any";
+        }
     }
 
     public object FilterRoute(long? edit = null) => FilterRoutes(edit);
@@ -172,7 +218,11 @@ public static class LibraryFilters
         string? status,
         string? hasAudio = null,
         string? audioKind = null,
-        string? audioLabel = null)
+        string? audioLabel = null,
+        double? bpmMin = null,
+        double? bpmMax = null,
+        string? bpmBucket = null,
+        string? audioKey = null)
     {
         if (HasTextFilter(q, artist, title, album))
         {
@@ -213,6 +263,9 @@ public static class LibraryFilters
             query = ApplyAudioLabel(query, parsedKind, audioLabel);
         }
 
+        query = ApplyBpm(query, bpmMin, bpmMax, bpmBucket);
+        query = ApplyAudioKey(query, audioKey);
+
         if (!string.IsNullOrWhiteSpace(source) && Enum.TryParse<EnrichmentSource>(source, out var parsedSource))
         {
             query = query.Where(t => t.SourcePayloads.Any(p =>
@@ -245,5 +298,76 @@ public static class LibraryFilters
 
         return query.Where(t => t.AudioProfile != null && t.AudioProfile.Labels.Any(l =>
             l.Kind == kind && l.Name.ToLower() == lower));
+    }
+
+    public static IQueryable<Track> ApplyBpm(
+        IQueryable<Track> query,
+        double? bpmMin,
+        double? bpmMax,
+        string? bpmBucket)
+    {
+        if (AudioBpm.TryResolve(bpmBucket, out var bucket))
+        {
+            var min = bucket.MinInclusive;
+            var maxExclusive = bucket.MaxExclusive;
+            if (min is not null && maxExclusive is not null)
+            {
+                query = query.Where(t => t.AudioProfile != null && t.AudioProfile.Bpm != null &&
+                    t.AudioProfile.Bpm >= min && t.AudioProfile.Bpm < maxExclusive);
+            }
+            else if (min is not null)
+            {
+                query = query.Where(t => t.AudioProfile != null && t.AudioProfile.Bpm != null &&
+                    t.AudioProfile.Bpm >= min);
+            }
+            else if (maxExclusive is not null)
+            {
+                query = query.Where(t => t.AudioProfile != null && t.AudioProfile.Bpm != null &&
+                    t.AudioProfile.Bpm < maxExclusive);
+            }
+        }
+
+        if (bpmMin is double minInclusive)
+        {
+            query = query.Where(t => t.AudioProfile != null && t.AudioProfile.Bpm != null &&
+                t.AudioProfile.Bpm >= minInclusive);
+        }
+
+        if (bpmMax is double maxInclusive)
+        {
+            query = query.Where(t => t.AudioProfile != null && t.AudioProfile.Bpm != null &&
+                t.AudioProfile.Bpm <= maxInclusive);
+        }
+
+        return query;
+    }
+
+    public static IQueryable<Track> ApplyAudioKey(IQueryable<Track> query, string? audioKey)
+    {
+        if (string.IsNullOrWhiteSpace(audioKey))
+        {
+            return query;
+        }
+
+        var (key, scale) = AudioProfileMapper.SplitKey(audioKey, null);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return query;
+        }
+
+        var keyLower = key.ToLower();
+        if (string.IsNullOrWhiteSpace(scale))
+        {
+            return query.Where(t => t.AudioProfile != null &&
+                t.AudioProfile.Key != null &&
+                t.AudioProfile.Key.ToLower() == keyLower);
+        }
+
+        var scaleLower = scale.ToLower();
+        return query.Where(t => t.AudioProfile != null &&
+            t.AudioProfile.Key != null &&
+            t.AudioProfile.Key.ToLower() == keyLower &&
+            t.AudioProfile.Scale != null &&
+            t.AudioProfile.Scale.ToLower() == scaleLower);
     }
 }
