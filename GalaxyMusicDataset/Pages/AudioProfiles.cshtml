@@ -1,7 +1,7 @@
 @page "/Audio"
 @model AudioProfilesModel
 @{
-    ViewData["Title"] = Model.Detail is null ? "Audio profile" : Model.Detail.Path;
+    ViewData["Title"] = Model.Detail is null ? "Audio profile" : Model.Detail.Name;
 }
 
 <h1 class="h3 mb-1">@(Model.Detail?.Name ?? "Audio profile")</h1>

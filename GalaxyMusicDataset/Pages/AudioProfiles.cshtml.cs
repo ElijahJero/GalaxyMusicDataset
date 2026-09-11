@@ -92,7 +92,7 @@ public class AudioProfilesModel(AnalyticsQueries analytics) : AnalyticsPageModel
     public string DetailKindLabel => Detail?.Kind switch
     {
         "bpm" => "range",
-        "key" => "key",
+        "key" => "scale",
         _ when Detail?.IsFolder == true => "folder",
         _ => "tag"
     };
