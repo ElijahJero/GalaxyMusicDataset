@@ -110,7 +110,7 @@ Artist detail for the selected window: aliases, tags, plays, timeline, top track
 
 ### `GET /api/v1/tracks/{id}`
 
-Track detail: album, MBIDs, duration, tags by source, source payloads, play timestamps, Essentia `audio` profile when uploaded.
+Track detail: album, MBIDs, duration, tags by source, source payloads, play timestamps, Essentia `audio` profile when uploaded. Includes `youtubeMusicUrl`: a `music.youtube.com/watch?v=` link when `musicVideoUrl` is a YouTube video, otherwise a Music search for artist + title.
 
 ### `GET /api/v1/tracks/pending-audio`
 
@@ -177,7 +177,7 @@ Paged unique tracks. Query:
 | `source` | Enrichment source that succeeded (`LastFm`, `MusicBrainz`, …) |
 | `sort` | `recent` (default), `plays`, `artist`, `title` |
 
-List items include source **status** only (`sources[].json` is omitted). Full payloads are on `GET /api/v1/tracks/{id}`.
+List items include source **status** only (`sources[].json` is omitted). Full payloads are on `GET /api/v1/tracks/{id}`. Each item also has `youtubeMusicUrl` (watch link when `musicVideoUrl` is a YouTube video, otherwise a Music search).
 
 ### `PUT /api/v1/library/{id}` (write)
 

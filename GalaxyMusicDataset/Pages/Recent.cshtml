@@ -280,10 +280,13 @@
                     {
                         <p class="small text-muted mt-2 mb-0">@t.Summary</p>
                     }
-                    @if (!string.IsNullOrWhiteSpace(t.MusicVideoUrl))
-                    {
-                        <div class="small mt-1"><a href="@t.MusicVideoUrl" target="_blank" rel="noopener">Music video</a></div>
-                    }
+                    <div class="small mt-1">
+                        <a href="@YouTubeMusicLinks.OpenUrl(t.Artist.Name, t.Title, t.MusicVideoUrl)" target="_blank" rel="noopener">Open in YouTube Music</a>
+                        @if (!string.IsNullOrWhiteSpace(t.MusicVideoUrl))
+                        {
+                            <text> · <a href="@t.MusicVideoUrl" target="_blank" rel="noopener">Music video</a></text>
+                        }
+                    </div>
                     <div class="mt-2 d-flex gap-2">
                         <a class="btn btn-sm btn-outline-secondary" asp-page="/Tracks" asp-route-id="@t.Id">Analytics</a>
                         <a class="btn btn-sm btn-outline-primary" asp-page="/Recent" asp-all-route-data="Model.FilterRoutes(t.Id)">Edit</a>
