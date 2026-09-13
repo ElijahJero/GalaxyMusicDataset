@@ -157,6 +157,7 @@ public class RestApiTests
         var detail = await write.GetAsync($"/api/v1/tracks/{trackId}");
         detail.EnsureSuccessStatusCode();
         var json = await detail.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.StartsWith("https://music.youtube.com/", json.GetProperty("youtubeMusicUrl").GetString());
         Assert.Equal(85, json.GetProperty("audio").GetProperty("bpm").GetDouble());
         Assert.Equal("G", json.GetProperty("audio").GetProperty("key").GetString());
         Assert.DoesNotContain(json.GetProperty("tags").EnumerateArray(), t => t.GetProperty("name").GetString() == "Pop/J-pop");

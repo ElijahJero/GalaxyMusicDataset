@@ -169,6 +169,9 @@ public class AnalyticsQueriesTests
         Assert.NotNull(trackDetail);
         Assert.Equal(4, trackDetail.PlayCount);
         Assert.Equal(4, trackDetail.PlayedAt.Count);
+        Assert.Equal(
+            "https://music.youtube.com/search?q=Mori%20Calliope%20Lose-Lose%20Days",
+            trackDetail.YoutubeMusicUrl);
     }
 
     [Fact]

@@ -119,6 +119,7 @@ public sealed record TrackDetail(
     double? LookupScore,
     string? Isrc,
     string? MusicVideoUrl,
+    string? YoutubeMusicUrl,
     string? Summary,
     int PlayCount,
     DateTimeOffset? FirstPlayed,

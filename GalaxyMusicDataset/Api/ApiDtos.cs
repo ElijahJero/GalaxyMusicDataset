@@ -60,7 +60,8 @@ public sealed record LibraryTrackDto(
     string? LookupError,
     IReadOnlyList<string> Tags,
     IReadOnlyList<SourcePayloadInfo> Sources,
-    AudioProfileView? Audio)
+    AudioProfileView? Audio,
+    string YoutubeMusicUrl)
 {
     public bool HasAudio => Audio is not null;
 }

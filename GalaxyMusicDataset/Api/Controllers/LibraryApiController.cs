@@ -4,6 +4,7 @@ using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Analytics;
 using GalaxyMusicDataset.Services.Api;
 using GalaxyMusicDataset.Services.Search;
+using GalaxyMusicDataset.Services.YouTube;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -128,6 +129,7 @@ public sealed class LibraryApiController(
             item.Lookup?.ErrorMessage,
             track.Tags.Select(t => t.Tag.Name).Distinct().OrderBy(n => n).ToList(),
             item.Sources,
-            item.Audio);
+            item.Audio,
+            YouTubeMusicLinks.OpenUrl(track.Artist.Name, track.Title, track.MusicVideoUrl));
     }
 }

@@ -2,6 +2,7 @@ using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Normalization;
+using GalaxyMusicDataset.Services.YouTube;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaxyMusicDataset.Services.Analytics;
@@ -409,6 +410,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             lookup?.BestScore,
             track.Isrc,
             track.MusicVideoUrl,
+            YouTubeMusicLinks.OpenUrl(track.Artist.Name, track.Title, track.MusicVideoUrl),
             track.Summary,
             stamps.Count,
             playedAt.FirstOrDefault() is var first && stamps.Count > 0 ? first : null,
