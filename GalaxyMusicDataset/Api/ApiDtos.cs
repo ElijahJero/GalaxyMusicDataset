@@ -51,6 +51,7 @@ public sealed record LibraryTrackDto(
     string? VocaDbSongId,
     string? UtaiteDbSongId,
     string? TouhouDbSongId,
+    string? VgmdbAlbumId,
     int? DurationMs,
     string Fingerprint,
     int PlayCount,
@@ -102,6 +103,8 @@ public sealed record AggregationSettingsResponse(
     bool EnableVocaDb,
     bool EnableUtaiteDb,
     bool EnableTouhouDb,
+    bool EnableVgmdb,
+    string? VgmdbBaseUrl,
     int IncrementalIntervalMinutes,
     bool SeedSampleData);
 
@@ -169,6 +172,7 @@ public sealed record StatusResponse(
     bool EnableVocaDb,
     bool EnableUtaiteDb,
     bool EnableTouhouDb,
+    bool EnableVgmdb,
     int ScrobbleCount,
     int TrackCount,
     int ArtistCount,
@@ -223,6 +227,7 @@ public static class ApiMapping
             s.EnableVocaDb,
             s.EnableUtaiteDb,
             s.EnableTouhouDb,
+            s.EnableVgmdb,
             s.ScrobbleCount,
             s.TrackCount,
             s.ArtistCount,

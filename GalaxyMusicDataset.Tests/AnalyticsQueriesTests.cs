@@ -184,6 +184,7 @@ public class AnalyticsQueriesTests
         track.DiscogsReleaseId = "99";
         track.TheAudioDbTrackId = "441122";
         track.VocaDbSongId = "48";
+        track.VgmdbAlbumId = "79";
         track.Album!.Mbid = "rel-mbid";
         harness.Db.TrackSourcePayloads.Add(new TrackSourcePayload
         {
@@ -211,6 +212,7 @@ public class AnalyticsQueriesTests
         Assert.Contains(detail.ExternalLinks, l => l.Label == "MusicBrainz" && l.Url.EndsWith("/recording/rec-mbid"));
         Assert.Contains(detail.ExternalLinks, l => l.Label == "MusicBrainz release" && l.Url.EndsWith("/release/rel-mbid"));
         Assert.Contains(detail.ExternalLinks, l => l.Label == "Discogs" && l.Url == "https://www.discogs.com/release/99");
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "VGMdb" && l.Url == "https://vgmdb.net/album/79");
         Assert.Contains(detail.ExternalLinks, l => l.Label == "VocaDB" && l.Url == "https://vocadb.net/S/48");
         Assert.Contains(detail.ExternalLinks, l => l.Label == "Last.fm" && l.Url == "https://www.last.fm/music/Mori+Calliope/_/Lose-Lose+Days");
         Assert.Contains(detail.ExternalLinks, l => l.Label == "TheAudioDB" && l.Url == "https://www.theaudiodb.com/track/441122");

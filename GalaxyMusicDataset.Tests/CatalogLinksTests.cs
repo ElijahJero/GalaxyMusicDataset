@@ -26,9 +26,11 @@ public class CatalogLinksTests
             "https://musicbrainz.org/release/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             CatalogLinks.MusicBrainzRelease("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
         Assert.Equal("https://www.discogs.com/release/99", CatalogLinks.DiscogsRelease("99"));
+        Assert.Equal("https://vgmdb.net/album/79", CatalogLinks.VgmdbAlbum("79"));
         Assert.Equal("https://www.theaudiodb.com/track/441122", CatalogLinks.TheAudioDbTrack("441122"));
         Assert.Null(CatalogLinks.MusicBrainzRecording(" "));
         Assert.Null(CatalogLinks.DiscogsRelease(null));
+        Assert.Null(CatalogLinks.VgmdbAlbum(" "));
     }
 
     [Fact]
@@ -55,6 +57,7 @@ public class CatalogLinksTests
             "7",
             "3",
             "441122",
+            "79",
             LastFmJson,
             "Kyasu",
             "Lilac");
@@ -64,6 +67,7 @@ public class CatalogLinksTests
                 new ExternalLink("MusicBrainz", "https://musicbrainz.org/recording/rec-1"),
                 new ExternalLink("MusicBrainz release", "https://musicbrainz.org/release/rel-1"),
                 new ExternalLink("Discogs", "https://www.discogs.com/release/99"),
+                new ExternalLink("VGMdb", "https://vgmdb.net/album/79"),
                 new ExternalLink("VocaDB", VocaDbFamily.SongPageUrl(EnrichmentSource.VocaDb, "48")),
                 new ExternalLink("UtaiteDB", VocaDbFamily.SongPageUrl(EnrichmentSource.UtaiteDb, "7")),
                 new ExternalLink("TouhouDB", VocaDbFamily.SongPageUrl(EnrichmentSource.TouhouDb, "3")),
@@ -77,14 +81,14 @@ public class CatalogLinksTests
     public void ForTrack_is_empty_without_ids_or_lastfm_payload()
     {
         Assert.Empty(CatalogLinks.ForTrack(
-            null, null, null, null, null, null, null, null, "Kyasu", "Lilac"));
+            null, null, null, null, null, null, null, null, null, "Kyasu", "Lilac"));
     }
 
     [Fact]
     public void ForTrack_uses_lastfm_slug_when_payload_has_no_url()
     {
         var links = CatalogLinks.ForTrack(
-            null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null,
             """{ "track": { "name": "Lilac" } }""",
             "Kyasu",
             "Lilac");

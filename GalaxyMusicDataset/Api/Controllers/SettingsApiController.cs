@@ -16,6 +16,7 @@ public sealed class SettingsApiController(
     IOptionsMonitor<DiscogsOptions> discogs,
     IOptionsMonitor<TheAudioDbOptions> audioDb,
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
+    IOptionsMonitor<VgmdbOptions> vgmdb,
     IOptionsMonitor<AggregationOptions> aggregation,
     UserSettingsStore store,
     ApiKeyStore keys) : ControllerBase
@@ -94,6 +95,10 @@ public sealed class SettingsApiController(
             agg.EnableVocaDb,
             agg.EnableUtaiteDb,
             agg.EnableTouhouDb,
+            agg.EnableVgmdb,
+            string.Equals(vgmdb.CurrentValue.ResolvedBaseUrl, VgmdbOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : vgmdb.CurrentValue.ResolvedBaseUrl,
             agg.IncrementalIntervalMinutes,
             agg.SeedSampleData);
     }

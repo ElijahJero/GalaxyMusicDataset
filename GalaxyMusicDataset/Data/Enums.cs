@@ -20,7 +20,8 @@ public enum EnrichmentSource
     TheAudioDb = 3,
     VocaDb = 4,
     UtaiteDb = 5,
-    TouhouDb = 6
+    TouhouDb = 6,
+    Vgmdb = 7
 }
 
 public enum SourceFetchStatus
@@ -43,7 +44,8 @@ public enum JobKind
     SeedSample = 6,
     VocaDb = 7,
     UtaiteDb = 8,
-    TouhouDb = 9
+    TouhouDb = 9,
+    Vgmdb = 10
 }
 
 public enum JobStatus

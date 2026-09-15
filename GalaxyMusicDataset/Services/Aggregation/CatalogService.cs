@@ -502,6 +502,7 @@ public sealed class CatalogService(AppDbContext db)
         keep.VocaDbSongId ??= drop.VocaDbSongId;
         keep.UtaiteDbSongId ??= drop.UtaiteDbSongId;
         keep.TouhouDbSongId ??= drop.TouhouDbSongId;
+        keep.VgmdbAlbumId ??= drop.VgmdbAlbumId;
         keep.UpdatedAt = DateTimeOffset.UtcNow;
 
         foreach (var entry in db.ChangeTracker.Entries<Scrobble>()

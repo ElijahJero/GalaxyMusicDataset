@@ -260,6 +260,10 @@
                         {
                             <text>· <a href="@VocaDbFamily.SongPageUrl(EnrichmentSource.TouhouDb, t.TouhouDbSongId)" target="_blank" rel="noopener">TouhouDB @t.TouhouDbSongId</a></text>
                         }
+                        @if (!string.IsNullOrWhiteSpace(t.VgmdbAlbumId))
+                        {
+                            <text>· <a href="@CatalogLinks.VgmdbAlbum(t.VgmdbAlbumId)" target="_blank" rel="noopener">VGMdb @t.VgmdbAlbumId</a></text>
+                        }
                     </div>
                     @if (t.Tags.Count > 0)
                     {
@@ -367,6 +371,18 @@
                         <div class="col-md-3">
                             <label class="form-label">TouhouDB song ID</label>
                             <input class="form-control" name="Input.TouhouDbSongId" value="@t.TouhouDbSongId" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">VGMdb album ID</label>
+                            <input class="form-control" name="Input.VgmdbAlbumId" value="@t.VgmdbAlbumId" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Catalog number</label>
+                            <input class="form-control" name="Input.CatalogNumber" value="@t.Album?.CatalogNumber" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Classification</label>
+                            <input class="form-control" name="Input.Classification" value="@t.Album?.Classification" />
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Cover URL</label>

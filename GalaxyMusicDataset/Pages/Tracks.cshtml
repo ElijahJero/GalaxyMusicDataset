@@ -84,6 +84,11 @@
                 <dt class="col-sm-3">TouhouDB</dt>
                 <dd class="col-sm-9"><a href="@VocaDbFamily.SongPageUrl(EnrichmentSource.TouhouDb, t.TouhouDbSongId)" target="_blank" rel="noopener">@t.TouhouDbSongId</a></dd>
             }
+            @if (!string.IsNullOrEmpty(t.VgmdbAlbumId))
+            {
+                <dt class="col-sm-3">VGMdb</dt>
+                <dd class="col-sm-9"><a href="@CatalogLinks.VgmdbAlbum(t.VgmdbAlbumId)" target="_blank" rel="noopener">@t.VgmdbAlbumId</a></dd>
+            }
             <dt class="col-sm-3">Fingerprint</dt>
             <dd class="col-sm-9"><code>@t.Fingerprint</code></dd>
             <dt class="col-sm-3">Lookup</dt>

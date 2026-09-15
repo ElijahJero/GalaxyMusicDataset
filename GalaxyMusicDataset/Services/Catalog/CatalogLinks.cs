@@ -26,6 +26,12 @@ public static class CatalogLinks
         return releaseId is null ? null : $"https://www.discogs.com/release/{Uri.EscapeDataString(releaseId)}";
     }
 
+    public static string? VgmdbAlbum(string? id)
+    {
+        var albumId = NullIfEmpty(id);
+        return albumId is null ? null : $"https://vgmdb.net/album/{Uri.EscapeDataString(albumId)}";
+    }
+
     public static string? TheAudioDbTrack(string? id)
     {
         var trackId = NullIfEmpty(id);
@@ -73,6 +79,7 @@ public static class CatalogLinks
         string? utaiteDbSongId,
         string? touhouDbSongId,
         string? theAudioDbTrackId,
+        string? vgmdbAlbumId,
         string? lastFmPayloadJson,
         string artistName,
         string title)
@@ -81,6 +88,7 @@ public static class CatalogLinks
         Add(links, "MusicBrainz", MusicBrainzRecording(recordingMbid));
         Add(links, "MusicBrainz release", MusicBrainzRelease(releaseMbid));
         Add(links, "Discogs", DiscogsRelease(discogsReleaseId));
+        Add(links, "VGMdb", VgmdbAlbum(vgmdbAlbumId));
         Add(links, "VocaDB", VocaDbFamilySong(EnrichmentSource.VocaDb, vocaDbSongId));
         Add(links, "UtaiteDB", VocaDbFamilySong(EnrichmentSource.UtaiteDb, utaiteDbSongId));
         Add(links, "TouhouDB", VocaDbFamilySong(EnrichmentSource.TouhouDb, touhouDbSongId));

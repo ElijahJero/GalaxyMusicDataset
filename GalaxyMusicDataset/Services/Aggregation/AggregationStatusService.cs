@@ -88,6 +88,7 @@ public sealed class AggregationStatusService(
             EnableVocaDb = agg.EnableVocaDb,
             EnableUtaiteDb = agg.EnableUtaiteDb,
             EnableTouhouDb = agg.EnableTouhouDb,
+            EnableVgmdb = agg.EnableVgmdb,
             ScrobbleCount = scrobbles,
             TrackCount = tracks,
             ArtistCount = artists,
@@ -148,6 +149,7 @@ public sealed class AggregationStatusDto
     public bool EnableVocaDb { get; set; }
     public bool EnableUtaiteDb { get; set; }
     public bool EnableTouhouDb { get; set; }
+    public bool EnableVgmdb { get; set; }
     public int ScrobbleCount { get; set; }
     public int TrackCount { get; set; }
     public int ArtistCount { get; set; }

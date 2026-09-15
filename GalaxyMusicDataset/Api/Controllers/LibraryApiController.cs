@@ -120,6 +120,7 @@ public sealed class LibraryApiController(
             track.VocaDbSongId,
             track.UtaiteDbSongId,
             track.TouhouDbSongId,
+            track.VgmdbAlbumId,
             track.DurationMs,
             track.Fingerprint,
             item.PlayCount,

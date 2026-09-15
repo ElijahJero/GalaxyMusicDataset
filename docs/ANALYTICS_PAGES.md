@@ -108,7 +108,7 @@ Name, aliases, MBID, tags rolled up from tracks. Plays, unique tracks, first/las
 
 ### 7. Track detail (`/Tracks/{id}`)
 
-Artist, album, MBID, duration, fingerprint, lookup status. Buttons open MusicBrainz, Discogs, VocaDB-family, Last.fm, and TheAudioDB when those IDs (or a Last.fm payload URL) are already stored — no extra API lookup. Play count, first/last, timestamp strip, tags by source, **Essentia audio profile** (when uploaded), collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
+Artist, album, MBID, duration, fingerprint, lookup status. Buttons open MusicBrainz, Discogs, VGMdb, VocaDB-family, Last.fm, and TheAudioDB when those IDs (or a Last.fm payload URL) are already stored — no extra API lookup. Play count, first/last, timestamp strip, tags by source, **Essentia audio profile** (when uploaded), collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
 
 ### 8. Deep cuts (`/DeepCuts`)
 
@@ -153,4 +153,4 @@ Search and labels prefer:
 
 ## Audio extraction (Essentia, client-side)
 
-The server does not run Essentia. A local client uploads `TrackAudioProfiles`. Skip detection beyond timestamp gaps and “true” listening time for untimed tracks remain out of scope. Duration still comes from Last.fm / MusicBrainz / TheAudioDB when those enrichers have run.
+The server does not run Essentia. A local client uploads `TrackAudioProfiles`. Skip detection beyond timestamp gaps and “true” listening time for untimed tracks remain out of scope. Duration still comes from Last.fm / MusicBrainz / TheAudioDB / VGMdb when those enrichers have run.

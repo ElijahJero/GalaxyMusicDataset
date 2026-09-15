@@ -78,6 +78,8 @@ public static class CatalogCoverage
                 aggregation.EnableUtaiteDb, aggregation.EnableUtaiteDb ? null : "off"),
             FromPayloads("TouhouDB", EnrichmentSource.TouhouDb, payloads, tracks,
                 aggregation.EnableTouhouDb, aggregation.EnableTouhouDb ? null : "off"),
+            FromPayloads("VGMdb", EnrichmentSource.Vgmdb, payloads, tracks,
+                aggregation.EnableVgmdb, aggregation.EnableVgmdb ? null : "off"),
             Field("Tags", withTags, tracks, true, null),
             Field("Duration", withDuration, tracks, true, null),
             Field("Essentia (client)", withAudio, tracks, true, "client-side")

@@ -18,6 +18,7 @@ public static class VocaDbFamily
         EnrichmentSource.VocaDb => "VocaDB",
         EnrichmentSource.UtaiteDb => "UtaiteDB",
         EnrichmentSource.TouhouDb => "TouhouDB",
+        EnrichmentSource.Vgmdb => "VGMdb",
         _ => source.ToString()
     };
 
