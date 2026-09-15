@@ -108,7 +108,7 @@ Name, aliases, MBID, tags rolled up from tracks. Plays, unique tracks, first/las
 
 ### 7. Track detail (`/Tracks/{id}`)
 
-Artist, album, MBID, duration, fingerprint, lookup status. Play count, first/last, timestamp strip, tags by source, **Essentia audio profile** (when uploaded), collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
+Artist, album, MBID, duration, fingerprint, lookup status. Buttons open MusicBrainz, Discogs, VocaDB-family, Last.fm, and TheAudioDB when those IDs (or a Last.fm payload URL) are already stored — no extra API lookup. Play count, first/last, timestamp strip, tags by source, **Essentia audio profile** (when uploaded), collapsed source payloads. **Fetch MusicBrainz details** loads recording tags, ISRC, album, and cover when an MBID is present.
 
 ### 8. Deep cuts (`/DeepCuts`)
 

@@ -1,4 +1,5 @@
 using GalaxyMusicDataset.Services.Audio;
+using GalaxyMusicDataset.Services.Catalog;
 
 namespace GalaxyMusicDataset.Services.Analytics;
 
@@ -127,6 +128,10 @@ public sealed record TrackDetail(
     IReadOnlyList<DateTimeOffset> PlayedAt,
     IReadOnlyList<TagRollup> Tags,
     IReadOnlyList<SourcePayloadInfo> Sources,
+    string? DiscogsReleaseId,
+    string? TheAudioDbTrackId,
+    string? AlbumMbid,
+    IReadOnlyList<ExternalLink> ExternalLinks,
     AudioProfileView? Audio);
 
 public sealed record DeepCutsResult(
