@@ -2,6 +2,7 @@ using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Audio;
 using GalaxyMusicDataset.Services.Normalization;
+using GalaxyMusicDataset.Services.Catalog;
 using GalaxyMusicDataset.Services.YouTube;
 using Microsoft.EntityFrameworkCore;
 
@@ -418,6 +419,20 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             playedAt,
             tags,
             sources,
+            track.DiscogsReleaseId,
+            track.TheAudioDbTrackId,
+            track.Album?.Mbid,
+            CatalogLinks.ForTrack(
+                track.Mbid,
+                track.Album?.Mbid,
+                track.DiscogsReleaseId,
+                track.VocaDbSongId,
+                track.UtaiteDbSongId,
+                track.TouhouDbSongId,
+                track.TheAudioDbTrackId,
+                track.SourcePayloads.FirstOrDefault(p => p.Source == EnrichmentSource.LastFm)?.PayloadJson,
+                track.Artist.Name,
+                track.Title),
             track.AudioProfile is null ? null : AudioProfileService.ToView(track.AudioProfile));
     }
 

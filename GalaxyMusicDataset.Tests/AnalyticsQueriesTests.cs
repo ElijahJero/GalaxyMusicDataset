@@ -172,6 +172,48 @@ public class AnalyticsQueriesTests
         Assert.Equal(
             "https://music.youtube.com/search?q=Mori%20Calliope%20Lose-Lose%20Days",
             trackDetail.YoutubeMusicUrl);
+        Assert.Empty(trackDetail.ExternalLinks);
+    }
+
+    [Fact]
+    public async Task Track_detail_builds_catalog_links_from_stored_ids_and_lastfm_payload()
+    {
+        await using var harness = await SeedAsync();
+        var track = await harness.Db.Tracks.Include(t => t.Album).SingleAsync(t => t.Title == "Lose-Lose Days");
+        track.Mbid = "rec-mbid";
+        track.DiscogsReleaseId = "99";
+        track.TheAudioDbTrackId = "441122";
+        track.VocaDbSongId = "48";
+        track.Album!.Mbid = "rel-mbid";
+        harness.Db.TrackSourcePayloads.Add(new TrackSourcePayload
+        {
+            TrackId = track.Id,
+            Source = EnrichmentSource.LastFm,
+            Status = SourceFetchStatus.Success,
+            PayloadJson = """
+                {
+                  "track": {
+                    "name": "Lose-Lose Days",
+                    "url": "https://www.last.fm/music/Mori+Calliope/_/Lose-Lose+Days"
+                  }
+                }
+                """,
+            FetchedAt = Now
+        });
+        await harness.Db.SaveChangesAsync();
+
+        var queries = new AnalyticsQueries(harness.Db);
+        var detail = await queries.GetTrackDetail(track.Id, CancellationToken.None);
+        Assert.NotNull(detail);
+        Assert.Equal("99", detail.DiscogsReleaseId);
+        Assert.Equal("441122", detail.TheAudioDbTrackId);
+        Assert.Equal("rel-mbid", detail.AlbumMbid);
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "MusicBrainz" && l.Url.EndsWith("/recording/rec-mbid"));
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "MusicBrainz release" && l.Url.EndsWith("/release/rel-mbid"));
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "Discogs" && l.Url == "https://www.discogs.com/release/99");
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "VocaDB" && l.Url == "https://vocadb.net/S/48");
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "Last.fm" && l.Url == "https://www.last.fm/music/Mori+Calliope/_/Lose-Lose+Days");
+        Assert.Contains(detail.ExternalLinks, l => l.Label == "TheAudioDB" && l.Url == "https://www.theaudiodb.com/track/441122");
     }
 
     [Fact]
