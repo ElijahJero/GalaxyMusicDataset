@@ -8,6 +8,7 @@ using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.Normalization;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.Vgmdb;
 using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -66,6 +67,15 @@ public sealed class MetadataEnrichmentService(
         if (settings.EnableTouhouDb)
         {
             var n = await EnrichVocaDbFamilyAsync(EnrichmentSource.TouhouDb, cancellationToken);
+            if (n > 0)
+            {
+                return n;
+            }
+        }
+
+        if (settings.EnableVgmdb)
+        {
+            var n = await EnrichVgmdbAsync(cancellationToken);
             if (n > 0)
             {
                 return n;
@@ -586,6 +596,162 @@ public sealed class MetadataEnrichmentService(
         if (extraTags.Count > 0)
         {
             await tags.ApplyTagsAsync(track.Id, source, extraTags, cancellationToken);
+        }
+
+        track.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private async Task<int> EnrichVgmdbAsync(CancellationToken cancellationToken)
+    {
+        if (sourceHealth.IsPaused(EnrichmentSource.Vgmdb))
+        {
+            return 0;
+        }
+
+        var track = await NextTrackNeedingAsync(EnrichmentSource.Vgmdb, cancellationToken);
+        if (track is null)
+        {
+            return 0;
+        }
+
+        var client = clients.CreateVgmdb();
+        progress.SetPhase("VGMdb search", $"{track.Artist.Name} – {track.Title}");
+        var payload = await EnsurePayloadAsync(track.Id, EnrichmentSource.Vgmdb, cancellationToken);
+        try
+        {
+            var query = VgmdbAlbumMatcher.SearchQuery(track.Artist.Name, track.Title, track.Album?.Title);
+            if (query is null)
+            {
+                payload.Status = SourceFetchStatus.NotFound;
+                payload.ErrorMessage = "VGMdb search query was empty.";
+                payload.FetchedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+                sourceHealth.RecordSuccess(EnrichmentSource.Vgmdb);
+                return 1;
+            }
+
+            var search = await client.SearchAlbumsAsync(query, cancellationToken);
+            var hit = VgmdbAlbumMatcher.PickBestAlbum(
+                track.Artist.Name, track.Title, track.Album?.Title, search.Items);
+            if (hit is null)
+            {
+                payload.Status = SourceFetchStatus.NotFound;
+                payload.PayloadJson = search.RawJson;
+                payload.FetchedAt = DateTimeOffset.UtcNow;
+                payload.ErrorMessage = search.Items.Count == 0
+                    ? "VGMdb album search returned no albums."
+                    : "No VGMdb album match passed the auto-match threshold.";
+                await db.SaveChangesAsync(cancellationToken);
+                sourceHealth.RecordSuccess(EnrichmentSource.Vgmdb);
+                return 1;
+            }
+
+            var album = await client.GetAlbumAsync(hit.Id, cancellationToken);
+            if (album is null)
+            {
+                payload.Status = SourceFetchStatus.NotFound;
+                payload.PayloadJson = search.RawJson;
+                payload.ExternalId = hit.Id;
+                payload.FetchedAt = DateTimeOffset.UtcNow;
+                payload.ErrorMessage = $"VGMdb album {hit.Id} returned no data.";
+                await db.SaveChangesAsync(cancellationToken);
+                sourceHealth.RecordSuccess(EnrichmentSource.Vgmdb);
+                return 1;
+            }
+
+            var matchedTrack = VgmdbAlbumMatcher.PickBestTrack(track.Title, album);
+            if (matchedTrack is null)
+            {
+                payload.Status = SourceFetchStatus.NotFound;
+                payload.PayloadJson = album.RawJson;
+                payload.ExternalId = album.Id;
+                payload.FetchedAt = DateTimeOffset.UtcNow;
+                payload.ErrorMessage = "No VGMdb track match passed the auto-match threshold.";
+                await db.SaveChangesAsync(cancellationToken);
+                sourceHealth.RecordSuccess(EnrichmentSource.Vgmdb);
+                return 1;
+            }
+
+            payload.Status = SourceFetchStatus.Success;
+            payload.ExternalId = album.Id;
+            payload.PayloadJson = album.RawJson;
+            payload.FetchedAt = DateTimeOffset.UtcNow;
+            payload.ErrorMessage = null;
+            await ApplyVgmdbAsync(track, album, matchedTrack, cancellationToken);
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
+            sourceHealth.RecordSuccess(EnrichmentSource.Vgmdb);
+            progress.Log($"VGMdb: {track.Artist.Name} – {track.Title}");
+            return 1;
+        }
+        catch (Exception ex) when (
+            ex is not OperationCanceledException
+            || HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken))
+        {
+            payload.Status = SourceFetchStatus.Error;
+            payload.FetchedAt = DateTimeOffset.UtcNow;
+            catalog.DiscardConflictingCatalogInserts();
+            if (EnrichmentRetryHelpers.IsTransientFailure(ex)
+                || HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken))
+            {
+                var status = ex is JsonApiException api ? api.StatusCode : null;
+                payload.ErrorMessage = EnrichmentRetryHelpers.BusyMessage("VGMdb", status);
+                var opened = sourceHealth.RecordTransientFailure(EnrichmentSource.Vgmdb, VgmdbClient.RateLimiter);
+                if (opened)
+                {
+                    progress.Log(
+                        $"VGMdb paused for {EnrichmentSourceHealth.PauseDuration.TotalMinutes:0} minutes after repeated API errors.");
+                }
+                else
+                {
+                    progress.Log($"VGMdb busy for {track.Artist.Name} – {track.Title}; backing off.");
+                }
+            }
+            else
+            {
+                payload.ErrorMessage = ex.Message;
+                progress.Error($"VGMdb failed: {ex.Message}");
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return 1;
+        }
+    }
+
+    internal async Task ApplyVgmdbAsync(
+        Track track,
+        VgmdbAlbum album,
+        VgmdbDiscTrack matchedTrack,
+        CancellationToken cancellationToken)
+    {
+        track.VgmdbAlbumId = CatalogService.Coalesce(track.VgmdbAlbumId, album.Id);
+        if (track.DurationMs is null && matchedTrack.DurationMs is > 0)
+        {
+            track.DurationMs = matchedTrack.DurationMs;
+        }
+
+        if (track.AlbumId is null && !string.IsNullOrWhiteSpace(album.Name))
+        {
+            var created = await catalog.GetOrCreateAlbumAsync(track.Artist, album.Name, null, cancellationToken);
+            track.AlbumId = created?.Id;
+            track.Album = created;
+        }
+
+        if (track.Album is not null)
+        {
+            track.Album.CatalogNumber = CatalogService.Coalesce(track.Album.CatalogNumber, album.Catalog);
+            track.Album.Classification = CatalogService.Coalesce(track.Album.Classification, album.Classification);
+            if (track.Album.ReleaseYear is null && album.ReleaseYear is > 0)
+            {
+                track.Album.ReleaseYear = album.ReleaseYear;
+            }
+
+            CatalogService.SetCoverIfEmpty(track.Album, album.CoverUrl);
+        }
+
+        var extraTags = VgmdbClient.TagPairs(album);
+        if (extraTags.Count > 0)
+        {
+            await tags.ApplyTagsAsync(track.Id, EnrichmentSource.Vgmdb, extraTags, cancellationToken);
         }
 
         track.UpdatedAt = DateTimeOffset.UtcNow;

@@ -10,6 +10,7 @@ using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.Search;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.Vgmdb;
 using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.Configure<VocaDbOptions>(configuration.GetSection(VocaDbOptions.SectionName));
         services.Configure<UtaiteDbOptions>(configuration.GetSection(UtaiteDbOptions.SectionName));
         services.Configure<TouhouDbOptions>(configuration.GetSection(TouhouDbOptions.SectionName));
+        services.Configure<VgmdbOptions>(configuration.GetSection(VgmdbOptions.SectionName));
         services.Configure<AggregationOptions>(configuration.GetSection(AggregationOptions.SectionName));
         services.Configure<AnalyticsOptions>(configuration.GetSection(AnalyticsOptions.SectionName));
         services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
@@ -51,6 +53,8 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient(nameof(DiscogsClient));
         services.AddHttpClient(nameof(TheAudioDbClient));
         services.AddHttpClient(nameof(VocaDbClient))
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(25));
+        services.AddHttpClient(nameof(VgmdbClient))
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(25));
         services.AddSingleton<ExternalClientFactory>();
         services.AddScoped<CatalogService>();

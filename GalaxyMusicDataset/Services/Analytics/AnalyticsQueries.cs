@@ -421,6 +421,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             sources,
             track.DiscogsReleaseId,
             track.TheAudioDbTrackId,
+            track.VgmdbAlbumId,
             track.Album?.Mbid,
             CatalogLinks.ForTrack(
                 track.Mbid,
@@ -430,6 +431,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
                 track.UtaiteDbSongId,
                 track.TouhouDbSongId,
                 track.TheAudioDbTrackId,
+                track.VgmdbAlbumId,
                 track.SourcePayloads.FirstOrDefault(p => p.Source == EnrichmentSource.LastFm)?.PayloadJson,
                 track.Artist.Name,
                 track.Title),

@@ -110,11 +110,25 @@
                 <label class="form-check-label" asp-for="Input.EnableTouhouDb">TouhouDB</label>
             </div>
             <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableVgmdb" />
+                <label class="form-check-label" asp-for="Input.EnableVgmdb">VGMdb</label>
+            </div>
+            <div class="form-check">
                 <input class="form-check-input" asp-for="Input.SeedSampleData" />
                 <label class="form-check-label" asp-for="Input.SeedSampleData">Seed sample scrobbles when empty</label>
             </div>
         </div>
-        <div class="form-text">VocaDB, UtaiteDB, and TouhouDB use public APIs (no keys). They fill Japanese vocaloid, utaite, and Touhou metadata when MusicBrainz coverage is thin.</div>
+        <div class="form-text">VocaDB, UtaiteDB, and TouhouDB use public APIs (no keys). VGMdb uses the unofficial <a href="https://github.com/hufman/vgmdb">hufman/vgmdb</a> JSON proxy (default <code>https://vgmdb.info</code>, no key). They fill Japanese vocaloid, utaite, Touhou, and video-game soundtrack metadata when MusicBrainz coverage is thin.</div>
+    </div>
+
+    <h2 class="h5">VGMdb proxy</h2>
+    <p class="text-muted small">Leave the server URL blank (or <code>https://vgmdb.info</code>) for the public unofficial API. To self-host, run <a href="https://github.com/hufman/vgmdb">hufman/vgmdb</a> separately (it needs a VGMdb login cookie on that proxy because of Cloudflare) and point this at that origin. This app does not start Docker for you.</p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.VgmdbBaseUrl">Proxy URL</label>
+            <input class="form-control" asp-for="Input.VgmdbBaseUrl" placeholder="https://vgmdb.info" />
+            <div class="form-text">Origin of the JSON proxy. Album pages are still linked to <code>vgmdb.net</code>.</div>
+        </div>
     </div>
     <button class="btn btn-primary" type="submit">Save</button>
 </form>

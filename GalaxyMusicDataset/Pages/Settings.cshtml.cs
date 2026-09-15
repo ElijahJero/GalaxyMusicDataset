@@ -14,6 +14,7 @@ public class SettingsModel(
     IOptionsMonitor<DiscogsOptions> discogs,
     IOptionsMonitor<TheAudioDbOptions> audioDb,
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
+    IOptionsMonitor<VgmdbOptions> vgmdb,
     IOptionsMonitor<AggregationOptions> aggregation,
     UserSettingsStore store,
     ApiKeyStore apiKeys) : PageModel
@@ -121,6 +122,10 @@ public class SettingsModel(
             EnableVocaDb = agg.EnableVocaDb,
             EnableUtaiteDb = agg.EnableUtaiteDb,
             EnableTouhouDb = agg.EnableTouhouDb,
+            EnableVgmdb = agg.EnableVgmdb,
+            VgmdbBaseUrl = string.Equals(vgmdb.CurrentValue.ResolvedBaseUrl, VgmdbOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : vgmdb.CurrentValue.ResolvedBaseUrl,
             IncrementalIntervalMinutes = agg.IncrementalIntervalMinutes,
             SeedSampleData = agg.SeedSampleData
         };

@@ -206,6 +206,34 @@ public sealed class TouhouDbOptions : VocaDbSiteOptions
     public override string DefaultBaseUrl => "https://touhoudb.com";
 }
 
+public sealed class VgmdbOptions
+{
+    public const string SectionName = "Vgmdb";
+    public const string DefaultBaseUrl = "https://vgmdb.info";
+    public const int DefaultMinIntervalMs = 1100;
+    public const string DefaultUserAgent = "GalaxyMusicDataset/0.1 (https://github.com/elijahjero/galaxymusicdataset)";
+
+    /// <summary>
+    /// Origin of the unofficial VGMdb JSON proxy
+    /// (<see href="https://github.com/hufman/vgmdb">hufman/vgmdb</see>).
+    /// Default is the public <c>https://vgmdb.info</c> instance. Point this at a
+    /// proxy you already host — this app does not run Docker for you.
+    /// </summary>
+    public string? BaseUrl { get; set; }
+
+    public string UserAgent { get; set; } = DefaultUserAgent;
+
+    /// <summary>
+    /// Minimum milliseconds between proxy calls. Null = 1100. <c>0</c> = no extra delay.
+    /// </summary>
+    public int? MinIntervalMs { get; set; }
+
+    public string ResolvedBaseUrl => MusicBrainzEndpoints.NormalizeBaseUrl(BaseUrl, DefaultBaseUrl);
+
+    public TimeSpan MinInterval =>
+        TimeSpan.FromMilliseconds(Math.Max(0, MinIntervalMs ?? DefaultMinIntervalMs));
+}
+
 public sealed class AggregationOptions
 {
     public const string SectionName = "Aggregation";
@@ -221,6 +249,7 @@ public sealed class AggregationOptions
     public bool EnableVocaDb { get; set; } = true;
     public bool EnableUtaiteDb { get; set; } = true;
     public bool EnableTouhouDb { get; set; } = true;
+    public bool EnableVgmdb { get; set; } = true;
     public double AutoMatchThreshold { get; set; } = 0.92;
     public double ReviewThreshold { get; set; } = 0.55;
     public int ApiLogRetention { get; set; } = 500;

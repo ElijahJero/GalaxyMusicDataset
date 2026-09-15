@@ -16,6 +16,7 @@ services:
       Discogs__Token: ${DISCOGS_TOKEN:-}
       TheAudioDb__ApiKey: ${THEAUDIODB_API_KEY:-}
       MusicBrainz__BaseUrl: ${MUSICBRAINZ_BASE_URL:-https://musicbrainz.org}
+      Vgmdb__BaseUrl: ${VGMDB_BASE_URL:-https://vgmdb.info}
       Auth__Username: ${AUTH_USERNAME:-admin}
       Auth__Password: ${AUTH_PASSWORD:-}
       Analytics__TimeZone: ${ANALYTICS_TIMEZONE:-America/New_York}

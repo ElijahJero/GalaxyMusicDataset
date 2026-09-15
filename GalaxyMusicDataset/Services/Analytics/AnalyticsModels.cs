@@ -130,6 +130,7 @@ public sealed record TrackDetail(
     IReadOnlyList<SourcePayloadInfo> Sources,
     string? DiscogsReleaseId,
     string? TheAudioDbTrackId,
+    string? VgmdbAlbumId,
     string? AlbumMbid,
     IReadOnlyList<ExternalLink> ExternalLinks,
     AudioProfileView? Audio);

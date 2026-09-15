@@ -8,6 +8,8 @@ public sealed class Album
     public string? Mbid { get; set; }
     public int? ReleaseYear { get; set; }
     public string? CoverUrl { get; set; }
+    public string? CatalogNumber { get; set; }
+    public string? Classification { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

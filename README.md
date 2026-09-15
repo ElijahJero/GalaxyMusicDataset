@@ -34,7 +34,7 @@ Or build locally:
 docker compose up -d --build
 ```
 
-Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`). Analytics use Eastern Time by default; set `ANALYTICS_TIMEZONE` (IANA id or `EST` / `UTC`) in docker compose to change it.
+Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`, `VGMDB_BASE_URL`). Analytics use Eastern Time by default; set `ANALYTICS_TIMEZONE` (IANA id or `EST` / `UTC`) in docker compose to change it.
 
 Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, sessions, wrapped, artist/track detail) are public — anyone who can reach the host can browse them. Progress, Library, Lookups, Review, and Settings require an admin cookie. Set `AUTH_USERNAME` (default `admin`) and `AUTH_PASSWORD`. If the password is empty, analytics stay public and nobody can sign in. Locally: `dotnet user-secrets set Auth:Password "your-password"` (or `Auth__Username` / `Auth__Password` env vars). Anonymous visits to `/` redirect to `/Dashboard`.
 
@@ -60,6 +60,7 @@ Development seeds 14 sample scrobbles when the database is empty (`Aggregation:S
 | `LastFm:ApiKey` / `LastFm:Username` | Required for live ingest (`user.getRecentTracks`, `track.getInfo`) |
 | `Discogs:Token` | Optional release search + `/releases/{id}` metadata |
 | `TheAudioDb:ApiKey` | Optional track metadata (duration, genre, cover, video) |
+| `Vgmdb:BaseUrl` | Unofficial VGMdb JSON proxy origin. Default `https://vgmdb.info` ([hufman/vgmdb](https://github.com/hufman/vgmdb)). Point this at a proxy you already host. This app does not run Docker for you. |
 | `MusicBrainz:Contact` | Included in the MusicBrainz User-Agent |
 | `MusicBrainz:BaseUrl` | MusicBrainz Server origin. Default `https://musicbrainz.org`. Point this at a mirror you already host (e.g. [musicbrainz-docker](https://github.com/metabrainz/musicbrainz-docker) at `http://localhost:5000`) for much faster lookups. This app does not run Docker for you. |
 | `MusicBrainz:CoverArtBaseUrl` | Cover Art Archive origin. Default `https://coverartarchive.org`. musicbrainz-docker’s website is not CAA — leave this unless you host a CAA mirror. |
@@ -67,7 +68,7 @@ Development seeds 14 sample scrobbles when the database is empty (`Aggregation:S
 | `Auth:Username` / `Auth:Password` | Cookie login for admin pages. Default username `admin`. Leave password empty to disable sign-in (analytics remain public). |
 | `Analytics:TimeZone` | Zone for day/hour aggregations and timestamps. Default `America/New_York` (EST/EDT). Aliases: `EST`, `ET`, `UTC`. |
 
-User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Auth__Username`, `Auth__Password`, `Analytics__TimeZone`.
+User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Vgmdb__BaseUrl`, `Auth__Username`, `Auth__Password`, `Analytics__TimeZone`.
 
 Get a Last.fm API key at https://www.last.fm/api/account/create. History export needs “Hide recent listening information” **off** on Last.fm.
 
@@ -77,6 +78,10 @@ The public `musicbrainz.org` web service is rate-limited to about 1 request/seco
 
 Cover art still uses `https://coverartarchive.org` unless you also host a Cover Art Archive mirror and set `MusicBrainz:CoverArtBaseUrl`.
 
+## Self-hosted VGMdb proxy
+
+VGMdb.net has no official API. This app talks to the unofficial JSON proxy from [hufman/vgmdb](https://github.com/hufman/vgmdb) (public default `https://vgmdb.info`). That proxy scrapes VGMdb and, because of Cloudflare, needs a logged-in VGMdb cookie (`USER_COOKIE`) **on the proxy**. Host it separately if the public instance is down or too slow, then set **Proxy URL** on Settings (or `Vgmdb__BaseUrl`). This app does not vendor or start that Docker stack.
+
 ## How ingest works
 
 1. **Incremental** (hourly, and on startup): `user.getRecentTracks` from the newest stored timestamp minus a small overlap. Unique `UnixTimestamp` drops duplicates.
@@ -84,6 +89,6 @@ Cover art still uses `https://coverartarchive.org` unless you also host a Cover 
 3. Each play attaches to a **Track** keyed by fingerprint (`normalized artist + title`). Ten plays of one song are ten scrobbles and one track row.
 4. If Last.fm already sent an MBID, identity is done. Otherwise a **TrackLookup** row is queued once per fingerprint.
 5. MusicBrainz search auto-links high-confidence hits and caches the rest for Review. The public API is about 1 req/s; a self-hosted `MusicBrainz:BaseUrl` uses a much smaller gap (50ms by default, or `MinIntervalMs`). After an MBID exists, a second pass loads recording tags, ISRCs, genres, and Cover Art Archive front images.
-6. Then Last.fm `track.getInfo` (duration, crowd tags, wiki, album art, artist URL — by MBID when present), VocaDB / UtaiteDB / TouhouDB (song search: tags, duration, PVs, aliases, optional MBID), Discogs (search + release detail: year, cover, genres/styles), and TheAudioDB (duration, genre/mood, biography, thumb, music video) fill catalog fields, `TrackSourcePayloads`, and `TrackTags`.
+6. Then Last.fm `track.getInfo` (duration, crowd tags, wiki, album art, artist URL — by MBID when present), VocaDB / UtaiteDB / TouhouDB (song search: tags, duration, PVs, aliases, optional MBID), VGMdb via the unofficial JSON proxy (album search + album detail: catalog number, classification, year, cover, duration, game/platform tags), Discogs (search + release detail: year, cover, genres/styles), and TheAudioDB (duration, genre/mood, biography, thumb, music video) fill catalog fields, `TrackSourcePayloads`, and `TrackTags`.
 
 SQLite file: `GalaxyMusicDataset/App_Data/galaxy.db`.

@@ -5,6 +5,7 @@ using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.TheAudioDb;
+using GalaxyMusicDataset.Services.Vgmdb;
 using GalaxyMusicDataset.Services.VocaDb;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +20,8 @@ public sealed class ExternalClientFactory(
     IOptionsMonitor<TheAudioDbOptions> audioDbOptions,
     IOptionsMonitor<VocaDbOptions> vocaDbOptions,
     IOptionsMonitor<UtaiteDbOptions> utaiteDbOptions,
-    IOptionsMonitor<TouhouDbOptions> touhouDbOptions)
+    IOptionsMonitor<TouhouDbOptions> touhouDbOptions,
+    IOptionsMonitor<VgmdbOptions> vgmdbOptions)
 {
     public LastFmClient? TryCreateLastFm()
     {
@@ -103,6 +105,17 @@ public sealed class ExternalClientFactory(
             SourceName = VocaDbFamily.DisplayName(source),
             UserAgent = options.UserAgent,
             RateLimiter = limiter
+        };
+    }
+
+    public VgmdbClient CreateVgmdb()
+    {
+        var options = vgmdbOptions.CurrentValue;
+        VgmdbClient.RateLimiter.SetMinInterval(options.MinInterval);
+        return new VgmdbClient(httpClientFactory.CreateClient(nameof(VgmdbClient)), recorder)
+        {
+            BaseUrl = options.ResolvedBaseUrl,
+            UserAgent = options.UserAgent
         };
     }
 }

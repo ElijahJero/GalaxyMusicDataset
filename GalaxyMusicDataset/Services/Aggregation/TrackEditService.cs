@@ -24,6 +24,9 @@ public sealed class TrackEditInput
     public string? VocaDbSongId { get; set; }
     public string? UtaiteDbSongId { get; set; }
     public string? TouhouDbSongId { get; set; }
+    public string? VgmdbAlbumId { get; set; }
+    public string? CatalogNumber { get; set; }
+    public string? Classification { get; set; }
     public bool ResetEnrichment { get; set; }
     public bool LookupFromMbid { get; set; }
 }
@@ -68,6 +71,9 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
                 {
                     album.CoverUrl = input.CoverUrl.Trim();
                 }
+
+                album.CatalogNumber = EmptyToNull(input.CatalogNumber);
+                album.Classification = EmptyToNull(input.Classification);
             }
 
             track.AlbumId = album?.Id;
@@ -85,6 +91,7 @@ public sealed class TrackEditService(AppDbContext db, CatalogService catalog)
         track.VocaDbSongId = EmptyToNull(input.VocaDbSongId);
         track.UtaiteDbSongId = EmptyToNull(input.UtaiteDbSongId);
         track.TouhouDbSongId = EmptyToNull(input.TouhouDbSongId);
+        track.VgmdbAlbumId = EmptyToNull(input.VgmdbAlbumId);
         track.DurationMs = input.DurationSeconds is > 0
             ? (int)Math.Round(input.DurationSeconds.Value * 1000)
             : null;

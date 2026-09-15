@@ -16,6 +16,7 @@ public sealed class Track
     public string? VocaDbSongId { get; set; }
     public string? UtaiteDbSongId { get; set; }
     public string? TouhouDbSongId { get; set; }
+    public string? VgmdbAlbumId { get; set; }
     public string Fingerprint { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

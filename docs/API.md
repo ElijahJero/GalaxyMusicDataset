@@ -201,6 +201,9 @@ Body matches the library edit form:
   "vocaDbSongId": null,
   "utaiteDbSongId": null,
   "touhouDbSongId": null,
+  "vgmdbAlbumId": null,
+  "catalogNumber": null,
+  "classification": null,
   "resetEnrichment": false,
   "lookupFromMbid": false
 }
@@ -288,6 +291,8 @@ Secret values are never returned. `GET` reports whether a Last.fm / Discogs / Th
   "enableVocaDb": true,
   "enableUtaiteDb": true,
   "enableTouhouDb": true,
+  "enableVgmdb": true,
+  "vgmdbBaseUrl": "",
   "incrementalIntervalMinutes": 60,
   "seedSampleData": false
 }

@@ -29,6 +29,12 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
                 ["ApiKey"] = audioDb
             },
             ["MusicBrainz"] = BuildMusicBrainzSection(posted),
+            ["Vgmdb"] = new Dictionary<string, object?>
+            {
+                ["BaseUrl"] = string.IsNullOrWhiteSpace(posted.VgmdbBaseUrl)
+                    ? ""
+                    : posted.VgmdbBaseUrl.Trim()
+            },
             ["Aggregation"] = new Dictionary<string, object?>
             {
                 ["EnableMusicBrainz"] = posted.EnableMusicBrainz,
@@ -38,6 +44,7 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
                 ["EnableVocaDb"] = posted.EnableVocaDb,
                 ["EnableUtaiteDb"] = posted.EnableUtaiteDb,
                 ["EnableTouhouDb"] = posted.EnableTouhouDb,
+                ["EnableVgmdb"] = posted.EnableVgmdb,
                 ["IncrementalIntervalMinutes"] = posted.IncrementalIntervalMinutes,
                 ["SeedSampleData"] = posted.SeedSampleData
             }
@@ -94,6 +101,8 @@ public sealed class UserSettingsModel
     public bool EnableVocaDb { get; set; } = true;
     public bool EnableUtaiteDb { get; set; } = true;
     public bool EnableTouhouDb { get; set; } = true;
+    public bool EnableVgmdb { get; set; } = true;
+    public string? VgmdbBaseUrl { get; set; }
     public int IncrementalIntervalMinutes { get; set; } = 60;
     public bool SeedSampleData { get; set; }
 }
