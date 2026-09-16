@@ -216,8 +216,10 @@ public sealed class VgmdbOptions
     /// <summary>
     /// Origin of the unofficial VGMdb JSON proxy
     /// (<see href="https://github.com/hufman/vgmdb">hufman/vgmdb</see>).
-    /// Default is the public <c>https://vgmdb.info</c> instance. Point this at a
-    /// proxy you already host — this app does not run Docker for you.
+    /// Default is the public <c>https://vgmdb.info</c> instance, which is often
+    /// unreachable. Point this at a proxy you already host (for example the
+    /// optional <c>vgmdb</c> Docker Compose profile) — this app does not run
+    /// that stack unless you start it.
     /// </summary>
     public string? BaseUrl { get; set; }
 

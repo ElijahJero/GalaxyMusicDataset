@@ -87,6 +87,11 @@ public sealed class ApiCallRecorder(IServiceScopeFactory scopeFactory)
                     throw new JsonApiException(source, $"{source} {message}.", statusCode: null);
                 }
 
+                if (EnrichmentRetryHelpers.IsUnreachableFailure(ex))
+                {
+                    throw new JsonApiException(source, $"{source} {message}", statusCode: null);
+                }
+
                 if (attempt == maxAttempts)
                 {
                     throw;
