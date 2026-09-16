@@ -80,7 +80,18 @@ Cover art still uses `https://coverartarchive.org` unless you also host a Cover 
 
 ## Self-hosted VGMdb proxy
 
-VGMdb.net has no official API. This app talks to the unofficial JSON proxy from [hufman/vgmdb](https://github.com/hufman/vgmdb) (public default `https://vgmdb.info`). That proxy scrapes VGMdb and, because of Cloudflare, needs a logged-in VGMdb cookie (`USER_COOKIE`) **on the proxy**. Host it separately if the public instance is down or too slow, then set **Proxy URL** on Settings (or `Vgmdb__BaseUrl`). This app does not vendor or start that Docker stack.
+VGMdb.net has no official API. This app talks to the unofficial JSON proxy from [hufman/vgmdb](https://github.com/hufman/vgmdb). The public default `https://vgmdb.info` is often unreachable (`No route to host`, failed TLS, HTTP 502). When that happens, VGMdb enrichment pauses for 30 minutes instead of retrying every track.
+
+Self-host the proxy (it needs a logged-in VGMdb `Cookie` header because of Cloudflare), then set **Proxy URL** on Settings (or `Vgmdb__BaseUrl`):
+
+```bash
+# Cookie value from a logged-in vgmdb.net request (includes cf_clearance and vgmsessionhash)
+export VGMDB_USER_COOKIE='cf_clearance=...; vgmsessionhash=...'
+export VGMDB_BASE_URL=http://vgmdb
+docker compose --profile vgmdb up -d
+```
+
+For `dotnet run` on the host, start the proxy on port 8731 and set Proxy URL to `http://localhost:8731`. Album links in the UI still go to `vgmdb.net`.
 
 ## How ingest works
 

@@ -45,6 +45,28 @@ public sealed class EnrichmentSourceHealth
         }
     }
 
+    /// <summary>
+    /// Pause immediately (host down / no route). Retrying other tracks cannot help.
+    /// </summary>
+    /// <returns>True when this call opened the circuit.</returns>
+    public bool PauseNow(EnrichmentSource source, ApiRateLimiter? limiter)
+    {
+        var state = _states.GetOrAdd(source, _ => new SourceState());
+        lock (state.Lock)
+        {
+            ClearExpiredPause(state);
+            state.ConsecutiveTransientFailures = ConsecutiveFailuresBeforePause;
+            var opened = state.PausedUntil is null;
+            state.PausedUntil = DateTimeOffset.UtcNow + PauseDuration;
+            if (limiter is not null)
+            {
+                limiter.Postpone(PauseDuration);
+            }
+
+            return opened;
+        }
+    }
+
     /// <returns>True when this failure opened the circuit (source just paused).</returns>
     public bool RecordTransientFailure(EnrichmentSource source, ApiRateLimiter? limiter)
     {

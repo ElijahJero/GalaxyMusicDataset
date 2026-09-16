@@ -55,7 +55,8 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient(nameof(VocaDbClient))
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(25));
         services.AddHttpClient(nameof(VgmdbClient))
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(25));
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(25))
+            .ConfigurePrimaryHttpMessageHandler(VgmdbClient.CreateSocketsHandler);
         services.AddSingleton<ExternalClientFactory>();
         services.AddScoped<CatalogService>();
         services.AddScoped<ScrobbleIngestService>();

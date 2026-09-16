@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using GalaxyMusicDataset.Services.Http;
@@ -43,6 +45,50 @@ public sealed record VgmdbAlbum(
 public sealed class VgmdbClient(HttpClient http, ApiCallRecorder recorder)
 {
     public static readonly ApiRateLimiter RateLimiter = new(TimeSpan.FromMilliseconds(1100));
+
+    public static SocketsHttpHandler CreateSocketsHandler() =>
+        new()
+        {
+            ConnectCallback = ConnectIPv4PreferredAsync
+        };
+
+    /// <summary>
+    /// Prefer A records. Dual-stack stacks often fail with "No route to host"
+    /// when a useless AAAA is tried first.
+    /// </summary>
+    internal static async ValueTask<Stream> ConnectIPv4PreferredAsync(
+        SocketsHttpConnectionContext context,
+        CancellationToken cancellationToken)
+    {
+        var host = context.DnsEndPoint.Host;
+        var port = context.DnsEndPoint.Port;
+        var addresses = await Dns.GetHostAddressesAsync(host, AddressFamily.InterNetwork, cancellationToken);
+        if (addresses.Length == 0)
+        {
+            addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
+        }
+
+        Exception? last = null;
+        foreach (var address in addresses)
+        {
+            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+            {
+                NoDelay = true
+            };
+            try
+            {
+                await socket.ConnectAsync(new IPEndPoint(address, port), cancellationToken);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                last = ex;
+                socket.Dispose();
+            }
+        }
+
+        throw last ?? new SocketException((int)SocketError.HostUnreachable);
+    }
 
     private static readonly Regex YearRegex = new(@"\b((?:19|20)\d{2})\b", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
