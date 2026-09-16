@@ -118,11 +118,11 @@
                 <label class="form-check-label" asp-for="Input.SeedSampleData">Seed sample scrobbles when empty</label>
             </div>
         </div>
-        <div class="form-text">VocaDB, UtaiteDB, and TouhouDB use public APIs (no keys). VGMdb uses the unofficial <a href="https://github.com/hufman/vgmdb">hufman/vgmdb</a> JSON proxy (default <code>https://vgmdb.info</code>, no key). They fill Japanese vocaloid, utaite, Touhou, and video-game soundtrack metadata when MusicBrainz coverage is thin.</div>
+        <div class="form-text">VocaDB, UtaiteDB, and TouhouDB use public APIs (no keys). VGMdb uses the unofficial <a href="https://github.com/hufman/vgmdb">hufman/vgmdb</a> JSON proxy. The public <code>vgmdb.info</code> host is often down — self-host the proxy and set the URL below.</div>
     </div>
 
     <h2 class="h5">VGMdb proxy</h2>
-    <p class="text-muted small">Leave the server URL blank (or <code>https://vgmdb.info</code>) for the public unofficial API. To self-host, run <a href="https://github.com/hufman/vgmdb">hufman/vgmdb</a> separately (it needs a VGMdb login cookie on that proxy because of Cloudflare) and point this at that origin. This app does not start Docker for you.</p>
+    <p class="text-muted small">The public unofficial API at <code>https://vgmdb.info</code> is often down (<code>No route to host</code> / failed TLS). Self-host <a href="https://github.com/hufman/vgmdb">hufman/vgmdb</a> (optional Compose profile <code>vgmdb</code> on port 8731) with a VGMdb login cookie because of Cloudflare, then set Proxy URL to that origin (<code>http://localhost:8731</code>, or <code>http://vgmdb</code> when both containers share a Compose network).</p>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
             <label class="form-label" asp-for="Input.VgmdbBaseUrl">Proxy URL</label>

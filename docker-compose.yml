@@ -23,5 +23,17 @@ services:
       TZ: ${TZ:-America/New_York}
     restart: unless-stopped
 
+  # Optional unofficial VGMdb JSON proxy. Public vgmdb.info is often unreachable.
+  # docker compose --profile vgmdb up -d
+  # Then set VGMDB_BASE_URL=http://vgmdb and VGMDB_USER_COOKIE to a logged-in vgmdb.net Cookie header.
+  vgmdb:
+    profiles: ["vgmdb"]
+    image: hufman/vgmdb:latest
+    ports:
+      - "8731:80"
+    environment:
+      USER_COOKIE: ${VGMDB_USER_COOKIE:-}
+    restart: unless-stopped
+
 volumes:
   galaxy-data:

@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Http;
@@ -19,6 +20,33 @@ public class EnrichmentBackoffTests
     public void Ordinary_errors_keep_short_cooldown()
     {
         Assert.Equal(TimeSpan.FromMinutes(5), EnrichmentRetryHelpers.ErrorRetryCooldown("No match found."));
+    }
+
+    [Fact]
+    public void No_route_to_host_is_unreachable_and_pauses_immediately()
+    {
+        var socket = new SocketException((int)SocketError.HostUnreachable);
+        var http = new HttpRequestException("No route to host (vgmdb.info:443)", socket);
+        Assert.True(EnrichmentRetryHelpers.IsUnreachableFailure(http));
+        Assert.True(EnrichmentRetryHelpers.IsUnreachableFailure(
+            new JsonApiException("VGMdb", "VGMdb No route to host (vgmdb.info:443)")));
+        Assert.True(EnrichmentRetryHelpers.IsTransientFailure(http));
+        Assert.Equal(
+            TimeSpan.FromMinutes(30),
+            EnrichmentRetryHelpers.ErrorRetryCooldown("No route to host (vgmdb.info:443)"));
+
+        var health = new EnrichmentSourceHealth();
+        Assert.True(health.PauseNow(EnrichmentSource.Vgmdb, null));
+        Assert.True(health.IsPaused(EnrichmentSource.Vgmdb));
+        Assert.False(health.PauseNow(EnrichmentSource.Vgmdb, null));
+    }
+
+    [Fact]
+    public void Connection_refused_is_unreachable()
+    {
+        Assert.True(EnrichmentRetryHelpers.IsUnreachableFailure(
+            new SocketException((int)SocketError.ConnectionRefused)));
+        Assert.True(EnrichmentRetryHelpers.IsUnreachableFailureMessage("Connection refused"));
     }
 
     [Fact]

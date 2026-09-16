@@ -690,7 +690,18 @@ public sealed class MetadataEnrichmentService(
             payload.Status = SourceFetchStatus.Error;
             payload.FetchedAt = DateTimeOffset.UtcNow;
             catalog.DiscardConflictingCatalogInserts();
-            if (EnrichmentRetryHelpers.IsTransientFailure(ex)
+            if (EnrichmentRetryHelpers.IsUnreachableFailure(ex))
+            {
+                payload.ErrorMessage = EnrichmentRetryHelpers.UnreachableMessage("VGMdb");
+                if (sourceHealth.PauseNow(EnrichmentSource.Vgmdb, VgmdbClient.RateLimiter))
+                {
+                    progress.Error(
+                        "VGMdb proxy is unreachable (no route to vgmdb.info). Paused for " +
+                        $"{EnrichmentSourceHealth.PauseDuration.TotalMinutes:0} minutes. " +
+                        "Point Proxy URL at a self-hosted hufman/vgmdb instance.");
+                }
+            }
+            else if (EnrichmentRetryHelpers.IsTransientFailure(ex)
                 || HttpResponseHelpers.IsHttpClientTimeout(ex, cancellationToken))
             {
                 var status = ex is JsonApiException api ? api.StatusCode : null;
