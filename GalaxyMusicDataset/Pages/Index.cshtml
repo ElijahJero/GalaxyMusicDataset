@@ -22,6 +22,14 @@
         {
             <button class="btn btn-outline-secondary" asp-page-handler="Pause">Pause enrichment</button>
         }
+        @if (s.DeletionCheckPaused)
+        {
+            <button class="btn btn-success" asp-page-handler="ResumeDeletionCheck">Resume 7-day check</button>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" asp-page-handler="PauseDeletionCheck">Pause 7-day check</button>
+        }
         <button class="btn btn-outline-warning" asp-page-handler="RetryLookups">Retry failed lookups</button>
         <button class="btn btn-outline-secondary" asp-page-handler="Seed">Seed sample</button>
     </form>
@@ -65,7 +73,12 @@
                 <div class="small text-truncate" title="@s.Progress.CurrentItem">@(s.Progress.CurrentItem ?? "—")</div>
                 <div class="small">
                     Sync @(s.Progress.SyncRunning ? "running" : "idle") ·
-                    Enrich @(s.Progress.EnrichmentPaused ? "paused" : s.Progress.EnrichmentRunning ? "running" : "idle")
+                    Enrich @(s.Progress.EnrichmentPaused ? "paused" : s.Progress.EnrichmentRunning ? "running" : "idle") ·
+                    7-day check @(s.DeletionCheckPaused ? "paused" : "on")
+                    @if (s.LastDeletionCheckUtc is DateTimeOffset lastCheck)
+                    {
+                        <text> · last @lastCheck.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</text>
+                    }
                 </div>
             </div>
         </div>

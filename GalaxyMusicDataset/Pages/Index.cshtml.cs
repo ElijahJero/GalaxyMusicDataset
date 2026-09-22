@@ -43,6 +43,18 @@ public class IndexModel(
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostPauseDeletionCheckAsync(CancellationToken cancellationToken)
+    {
+        await coordinator.SetDeletionCheckPausedAsync(scopes, true, cancellationToken);
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostResumeDeletionCheckAsync(CancellationToken cancellationToken)
+    {
+        await coordinator.SetDeletionCheckPausedAsync(scopes, false, cancellationToken);
+        return RedirectToPage();
+    }
+
     public IActionResult OnPostRetryLookups()
     {
         coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.RetryFailedLookups));

@@ -12,6 +12,14 @@
     <div class="alert alert-success">@Model.Saved</div>
 }
 
+<form method="post" asp-page-handler="ReconcileFull" class="card card-body mb-4" onsubmit="return confirm('Re-fetch your full Last.fm history? This adds missing scrobbles and removes ones you deleted on Last.fm. It can take a long time.');">
+    <h2 class="h5">Last.fm library check</h2>
+    <p class="text-muted mb-3">Walks every UTC day back to your Last.fm registration date. Missing scrobbles are added and scrobbles you deleted on Last.fm are removed. A day whose Last.fm response is incomplete is left unchanged.</p>
+    <div>
+        <button class="btn btn-outline-danger" disabled="@(!Model.LastFmConfigured)">Full Last.fm resync</button>
+    </div>
+</form>
+
 <form method="post" class="card card-body" autocomplete="off">
     <h2 class="h5">Last.fm</h2>
     <div class="row g-3 mb-3">

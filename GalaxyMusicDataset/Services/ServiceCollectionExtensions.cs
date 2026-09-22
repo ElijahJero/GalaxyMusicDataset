@@ -60,6 +60,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ExternalClientFactory>();
         services.AddScoped<CatalogService>();
         services.AddScoped<ScrobbleIngestService>();
+        services.AddScoped<ScrobbleReconcileService>();
         services.AddScoped<ScrobbleSyncService>();
         services.AddScoped<MusicBrainzLookupService>();
         services.AddScoped<TagService>();

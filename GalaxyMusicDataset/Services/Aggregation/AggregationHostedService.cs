@@ -15,10 +15,14 @@ public sealed class AggregationHostedService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var deletionCheckPaused = false;
+        DateTimeOffset? lastDeletionCheckUtc = null;
         await using (var boot = scopes.CreateAsyncScope())
         {
             var db = boot.ServiceProvider.GetRequiredService<AppDbContext>();
             var state = await db.GetSyncStateAsync(stoppingToken);
+            deletionCheckPaused = state.DeletionCheckPaused;
+            lastDeletionCheckUtc = state.LastDeletionCheckUtc;
             progress.SetEnrichmentPaused(state.EnrichmentPaused);
             var lookups = boot.ServiceProvider.GetRequiredService<MusicBrainzLookupService>();
             var requeued = await lookups.RequeueTransientFailuresAsync(stoppingToken);
@@ -40,6 +44,10 @@ public sealed class AggregationHostedService(
         {
             coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.SyncIncremental));
             coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.Backfill, 3));
+            if (ScrobbleReconcile.NightlyCheckDue(lastDeletionCheckUtc, DateTimeOffset.UtcNow, deletionCheckPaused))
+            {
+                coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.ReconcileRecent));
+            }
         }
         else
         {
@@ -72,6 +80,12 @@ public sealed class AggregationHostedService(
                 {
                     coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.Backfill, 7));
                 }
+
+                if (!progress.SyncRunning &&
+                    ScrobbleReconcile.NightlyCheckDue(state.LastDeletionCheckUtc, DateTimeOffset.UtcNow, state.DeletionCheckPaused))
+                {
+                    coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.ReconcileRecent));
+                }
             }
         }
         catch (OperationCanceledException)
@@ -100,6 +114,12 @@ public sealed class AggregationHostedService(
                     case AggregationCommandKind.RetryFailedLookups:
                         await lookups.RetryFailedAsync(stoppingToken);
                         progress.Log("Queued failed/not-found lookups for retry.");
+                        break;
+                    case AggregationCommandKind.ReconcileRecent:
+                        await sync.ReconcileRecentAsync(stoppingToken);
+                        break;
+                    case AggregationCommandKind.ReconcileFull:
+                        await sync.ReconcileFullAsync(stoppingToken);
                         break;
                 }
             }
