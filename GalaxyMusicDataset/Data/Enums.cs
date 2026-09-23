@@ -45,7 +45,8 @@ public enum JobKind
     VocaDb = 7,
     UtaiteDb = 8,
     TouhouDb = 9,
-    Vgmdb = 10
+    Vgmdb = 10,
+    LastFmReconcile = 11
 }
 
 public enum JobStatus

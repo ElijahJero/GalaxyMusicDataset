@@ -56,6 +56,38 @@ public sealed class StatusApiController(
     }
 
     [Authorize(Policy = ApiPolicies.Write)]
+    [HttpPost("jobs/reconcile-recent")]
+    public ActionResult<JobQueuedResponse> ReconcileRecent()
+    {
+        coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.ReconcileRecent));
+        return Accepted(new JobQueuedResponse(true, "reconcile-recent"));
+    }
+
+    [Authorize(Policy = ApiPolicies.Write)]
+    [HttpPost("jobs/reconcile-full")]
+    public ActionResult<JobQueuedResponse> ReconcileFull()
+    {
+        coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.ReconcileFull));
+        return Accepted(new JobQueuedResponse(true, "reconcile-full"));
+    }
+
+    [Authorize(Policy = ApiPolicies.Write)]
+    [HttpPost("jobs/pause-deletion-check")]
+    public async Task<ActionResult<JobQueuedResponse>> PauseDeletionCheck(CancellationToken cancellationToken)
+    {
+        await coordinator.SetDeletionCheckPausedAsync(scopes, true, cancellationToken);
+        return Ok(new JobQueuedResponse(true, "pause-deletion-check"));
+    }
+
+    [Authorize(Policy = ApiPolicies.Write)]
+    [HttpPost("jobs/resume-deletion-check")]
+    public async Task<ActionResult<JobQueuedResponse>> ResumeDeletionCheck(CancellationToken cancellationToken)
+    {
+        await coordinator.SetDeletionCheckPausedAsync(scopes, false, cancellationToken);
+        return Ok(new JobQueuedResponse(true, "resume-deletion-check"));
+    }
+
+    [Authorize(Policy = ApiPolicies.Write)]
     [HttpPost("jobs/retry-lookups")]
     public ActionResult<JobQueuedResponse> RetryLookups()
     {

@@ -10,6 +10,7 @@ namespace GalaxyMusicDataset.Services.Aggregation;
 public sealed class ScrobbleSyncService(
     AppDbContext db,
     ScrobbleIngestService ingest,
+    ScrobbleReconcileService reconcile,
     CatalogService catalog,
     ExternalClientFactory clients,
     AggregationProgress progress,
@@ -170,6 +171,12 @@ public sealed class ScrobbleSyncService(
         }
     }
 
+    public Task<AggregationJob> ReconcileRecentAsync(CancellationToken cancellationToken) =>
+        ReconcileAsync(fullHistory: false, cancellationToken);
+
+    public Task<AggregationJob> ReconcileFullAsync(CancellationToken cancellationToken) =>
+        ReconcileAsync(fullHistory: true, cancellationToken);
+
     public async Task RefreshUserInfoAsync(CancellationToken cancellationToken)
     {
         var lastFm = clients.TryCreateLastFm();
@@ -184,6 +191,102 @@ public sealed class ScrobbleSyncService(
         state.AccountRegisteredUtc = info.RegisteredUtc;
         state.LastFmUsername = info.Name;
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<AggregationJob> ReconcileAsync(bool fullHistory, CancellationToken cancellationToken)
+    {
+        var job = await StartJobAsync(JobKind.LastFmReconcile, cancellationToken);
+        progress.SetSyncRunning(true);
+        progress.SetPhase(fullHistory ? "Last.fm full resync" : "Last.fm 7-day check");
+        try
+        {
+            var lastFm = clients.TryCreateLastFm()
+                ?? throw new InvalidOperationException("Last.fm API key and username are not configured.");
+            var state = await GetStateAsync(cancellationToken);
+            var today = DateTime.UtcNow.Date;
+            DateTime oldest;
+            if (fullHistory)
+            {
+                await EnsureUserBoundsAsync(lastFm, state, cancellationToken);
+                oldest = state.AccountRegisteredUtc?.UtcDateTime.Date ?? today.AddYears(-20);
+                if (state.AccountRegisteredUtc is null)
+                {
+                    progress.Log("Last.fm did not return a registration date. Full resync will walk back 20 years.");
+                }
+            }
+            else
+            {
+                oldest = today.AddDays(-(ScrobbleReconcile.NightlyDays - 1));
+            }
+
+            if (oldest > today)
+            {
+                oldest = today;
+            }
+
+            var removed = 0;
+            var incomplete = 0;
+            var daysDone = 0;
+            for (var day = today; day >= oldest && !cancellationToken.IsCancellationRequested; day = day.AddDays(-1))
+            {
+                var (fromInclusive, toExclusive) = ScrobbleReconcile.UtcDayRange(day);
+                var (apiFrom, apiTo) = ScrobbleReconcile.LastFmWindow(fromInclusive, toExclusive);
+                progress.SetCurrentItem($"Reconcile {day:yyyy-MM-dd}");
+                progress.Log($"Reconciling {day:yyyy-MM-dd}.");
+
+                var pageSize = aggregationOptions.CurrentValue.LastFmPageSize;
+                var window = await lastFm.GetRecentTracksWindowAsync(apiFrom, apiTo, pageSize, cancellationToken);
+                if (!window.Ok && window.Warning is not null)
+                {
+                    progress.Log(window.Warning);
+                }
+
+                var dayResult = await reconcile.ApplyWindowAsync(fromInclusive, toExclusive, window, cancellationToken);
+                await UpdateWatermarksAsync(state, window.Tracks, cancellationToken);
+                job.ItemsProcessed += window.Tracks.Count;
+                job.ItemsSucceeded += dayResult.Inserted;
+                job.ItemsSkipped += dayResult.Duplicates + dayResult.Skipped;
+                removed += dayResult.Removed;
+                if (dayResult.DeletesSkipped)
+                {
+                    incomplete++;
+                }
+
+                daysDone++;
+                progress.SetJobCounts(job.ItemsProcessed, job.ItemsSucceeded, incomplete);
+                state.LastAttemptUtc = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            state.LastDeletionCheckUtc = DateTimeOffset.UtcNow;
+            state.LastFmUsername = lastFmOptions.CurrentValue.Username;
+            job.Status = incomplete == 0 ? JobStatus.Succeeded : JobStatus.Partial;
+            job.Message = incomplete == 0
+                ? $"Reconciled {daysDone} day(s): +{job.ItemsSucceeded} missing, -{removed} deleted."
+                : $"Reconciled {daysDone} day(s): +{job.ItemsSucceeded} missing, -{removed} deleted. Skipped deletes on {incomplete} incomplete day(s).";
+            progress.Log(job.Message);
+            await db.SaveChangesAsync(cancellationToken);
+            return await FinishJobAsync(job, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            progress.Error(ex.Message);
+            job.Status = JobStatus.Failed;
+            job.Message = ex.Message;
+            catalog.DiscardConflictingCatalogInserts();
+            var state = await GetStateAsync(cancellationToken);
+            state.LastAttemptUtc = DateTimeOffset.UtcNow;
+            state.LastSyncError = ex.Message;
+            await db.SaveChangesAsync(cancellationToken);
+            return await FinishJobAsync(job, cancellationToken);
+        }
+        finally
+        {
+            progress.SetSyncRunning(false);
+            progress.SetPhase("Idle");
+            progress.SetCurrentItem(null);
+        }
     }
 
     private async Task EnsureUserBoundsAsync(LastFmClient lastFm, SyncState state, CancellationToken cancellationToken)

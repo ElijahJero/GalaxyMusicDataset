@@ -123,6 +123,8 @@ public sealed class AggregationStatusService(
             AccountRegisteredUtc = state.AccountRegisteredUtc,
             IncrementalRuns = state.IncrementalRuns,
             EnrichmentPaused = state.EnrichmentPaused,
+            DeletionCheckPaused = state.DeletionCheckPaused,
+            LastDeletionCheckUtc = state.LastDeletionCheckUtc,
             Lookups = lookups.ToDictionary(x => x.Key.ToString(), x => x.Count),
             SourcePayloads = payloadCounts,
             Jobs = jobs,
@@ -174,6 +176,8 @@ public sealed class AggregationStatusDto
     public DateTimeOffset? AccountRegisteredUtc { get; set; }
     public int IncrementalRuns { get; set; }
     public bool EnrichmentPaused { get; set; }
+    public bool DeletionCheckPaused { get; set; }
+    public DateTimeOffset? LastDeletionCheckUtc { get; set; }
     public Dictionary<string, int> Lookups { get; set; } = [];
     public List<SourcePayloadCount> SourcePayloads { get; set; } = [];
     public List<Data.Entities.AggregationJob> Jobs { get; set; } = [];

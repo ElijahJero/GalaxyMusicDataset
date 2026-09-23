@@ -197,6 +197,8 @@ public sealed record StatusResponse(
     DateTimeOffset? AccountRegisteredUtc,
     int IncrementalRuns,
     bool EnrichmentPaused,
+    bool DeletionCheckPaused,
+    DateTimeOffset? LastDeletionCheckUtc,
     Dictionary<string, int> Lookups,
     IReadOnlyList<SourcePayloadCount> SourcePayloads,
     IReadOnlyList<JobDto> Jobs,
@@ -252,6 +254,8 @@ public static class ApiMapping
             s.AccountRegisteredUtc,
             s.IncrementalRuns,
             s.EnrichmentPaused,
+            s.DeletionCheckPaused,
+            s.LastDeletionCheckUtc,
             s.Lookups,
             s.SourcePayloads,
             s.Jobs.Select(j => new JobDto(

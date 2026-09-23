@@ -259,10 +259,14 @@ Ingest/enrichment status, coverage, job log, worker progress, recent outbound AP
 | POST | `/api/v1/jobs/backfill` | Body `{ "days": 14 }` (1–365, default 14) |
 | POST | `/api/v1/jobs/pause` | Pause enrichment |
 | POST | `/api/v1/jobs/resume` | Resume enrichment |
+| POST | `/api/v1/jobs/reconcile-recent` | Re-check the last 7 UTC days for missing and deleted scrobbles |
+| POST | `/api/v1/jobs/reconcile-full` | Re-check every day back to Last.fm registration for missing and deleted scrobbles |
+| POST | `/api/v1/jobs/pause-deletion-check` | Pause the nightly 7-day check |
+| POST | `/api/v1/jobs/resume-deletion-check` | Resume the nightly 7-day check |
 | POST | `/api/v1/jobs/retry-lookups` | Retry failed lookups |
 | POST | `/api/v1/jobs/seed` | Seed sample scrobbles if the database is empty |
 
-Sync / backfill / retry-lookups return `202`. Pause / resume / seed return `200`. Body: `{ "queued": true, "command": "…" }`.
+Sync / backfill / reconcile / retry-lookups return `202`. Pause / resume / seed return `200`. Body: `{ "queued": true, "command": "…" }`. `status.deletionCheckPaused` and `status.lastDeletionCheckUtc` report the nightly check.
 
 ---
 

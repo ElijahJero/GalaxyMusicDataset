@@ -17,7 +17,8 @@ public class SettingsModel(
     IOptionsMonitor<VgmdbOptions> vgmdb,
     IOptionsMonitor<AggregationOptions> aggregation,
     UserSettingsStore store,
-    ApiKeyStore apiKeys) : PageModel
+    ApiKeyStore apiKeys,
+    AggregationCoordinator coordinator) : PageModel
 {
     [BindProperty]
     public UserSettingsModel Input { get; set; } = new();
@@ -38,6 +39,7 @@ public class SettingsModel(
     public bool LastFmKeySaved { get; set; }
     public bool DiscogsTokenSaved { get; set; }
     public bool TheAudioDbKeySaved { get; set; }
+    public bool LastFmConfigured { get; set; }
     public IReadOnlyList<ApiKeyInfo> ApiKeys { get; private set; } = [];
 
     public void OnGet() => LoadForm();
@@ -58,6 +60,19 @@ public class SettingsModel(
         DiscogsTokenSaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedDiscogs, existing.DiscogsToken));
         TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedAudioDb, existing.TheAudioDbApiKey));
         return Page();
+    }
+
+    public IActionResult OnPostReconcileFull()
+    {
+        if (!lastFm.CurrentValue.IsConfigured)
+        {
+            Saved = "Last.fm is not configured.";
+            LoadForm();
+            return Page();
+        }
+
+        coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.ReconcileFull));
+        return RedirectToPage("/Index");
     }
 
     public IActionResult OnPostCreateApiKey()
@@ -101,6 +116,7 @@ public class SettingsModel(
         var mb = musicBrainz.CurrentValue;
         var agg = aggregation.CurrentValue;
         LastFmKeySaved = !string.IsNullOrWhiteSpace(lf.ApiKey);
+        LastFmConfigured = lf.IsConfigured;
         DiscogsTokenSaved = !string.IsNullOrWhiteSpace(d.Token);
         TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(a.ApiKey);
         ApiKeys = apiKeys.List();

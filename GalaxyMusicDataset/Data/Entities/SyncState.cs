@@ -14,6 +14,8 @@ public sealed class SyncState
     public long? LastFmPlaycount { get; set; }
     public string? LastFmUsername { get; set; }
     public bool EnrichmentPaused { get; set; }
+    public bool DeletionCheckPaused { get; set; }
+    public DateTimeOffset? LastDeletionCheckUtc { get; set; }
     public int IncrementalRuns { get; set; }
     public int BackfillDaysCompleted { get; set; }
 }
