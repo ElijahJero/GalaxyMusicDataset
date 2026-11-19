@@ -54,7 +54,8 @@ public static class CatalogCoverage
         AggregationOptions aggregation,
         bool lastFmConfigured,
         bool discogsConfigured,
-        bool audioDbConfigured)
+        bool audioDbConfigured,
+        bool malojaConfigured = false)
     {
         string? Flag(bool enabled, string? missing) =>
             enabled ? (missing is null ? null : missing) : (missing is null ? "off" : $"off, {missing}");
@@ -63,6 +64,9 @@ public static class CatalogCoverage
         [
             Field("MusicBrainz", withMbid, tracks, aggregation.EnableMusicBrainz,
                 aggregation.EnableMusicBrainz ? null : "off"),
+            FromPayloads("Maloja", EnrichmentSource.Maloja, payloads, tracks,
+                aggregation.EnableMalojaAlbumArt && malojaConfigured,
+                Flag(aggregation.EnableMalojaAlbumArt, malojaConfigured ? null : "no URL")),
             FromPayloads(VocaDbFamily.DisplayName(EnrichmentSource.LastFm), EnrichmentSource.LastFm, payloads, tracks,
                 aggregation.EnableLastFmTrackInfo && lastFmConfigured,
                 Flag(aggregation.EnableLastFmTrackInfo, lastFmConfigured ? null : "no key")),

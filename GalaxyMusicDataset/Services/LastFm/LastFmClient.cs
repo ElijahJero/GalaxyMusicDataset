@@ -1,5 +1,8 @@
 using System.Text.Json;
+using GalaxyMusicDataset.Configuration;
+using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Services.Http;
+using GalaxyMusicDataset.Services.Scrobbling;
 
 namespace GalaxyMusicDataset.Services.LastFm;
 
@@ -40,13 +43,21 @@ public sealed record LastFmTag(string Name, int Weight);
 
 public sealed class LastFmClient(
     HttpClient http,
-    ApiCallRecorder recorder)
+    ApiCallRecorder recorder) : IScrobbleHistoryClient
 {
     public static readonly ApiRateLimiter RateLimiter = new(TimeSpan.FromMilliseconds(250));
+    public static readonly ApiRateLimiter LibreFmRateLimiter = new(TimeSpan.FromMilliseconds(250));
 
     public required string ApiKey { get; init; }
     public required string Username { get; init; }
+    public string BaseUrl { get; init; } = LastFmOptions.DefaultBaseUrl;
     public string UserAgent { get; init; } = "GalaxyMusicDataset/0.1";
+    public ScrobbleProvider Provider { get; init; } = ScrobbleProvider.LastFm;
+    public string DisplayName { get; init; } = "Last.fm";
+    public bool SupportsDeletionReconcile => true;
+
+    ApiRateLimiter ActiveLimiter =>
+        Provider == ScrobbleProvider.LibreFm ? LibreFmRateLimiter : RateLimiter;
 
     public async Task<LastFmUserInfo> GetUserInfoAsync(CancellationToken cancellationToken)
     {
@@ -68,6 +79,12 @@ public sealed class LastFmClient(
         }
 
         return new LastFmUserInfo(user.GetPropertyString("name") ?? Username, playcount, registered);
+    }
+
+    async Task<ScrobbleUserInfo> IScrobbleHistoryClient.GetUserInfoAsync(CancellationToken cancellationToken)
+    {
+        var info = await GetUserInfoAsync(cancellationToken);
+        return new ScrobbleUserInfo(info.Name, info.Playcount, info.RegisteredUtc);
     }
 
     public async Task<LastFmWindowResult> GetRecentTracksWindowAsync(
@@ -132,10 +149,25 @@ public sealed class LastFmClient(
         if (reportedTotal > 0 && Math.Abs(dated.Count - reportedTotal) > 1)
         {
             ok = false;
-            warning = $"Last.fm reported {reportedTotal} tracks but parsed {dated.Count} (plus {tracks.Count - dated.Count} now-playing/undated).";
+            warning = $"{DisplayName} reported {reportedTotal} tracks but parsed {dated.Count} (plus {tracks.Count - dated.Count} now-playing/undated).";
         }
 
         return new LastFmWindowResult(tracks, reportedTotal, totalPages, ok, warning);
+    }
+
+    async Task<PlayWindowResult> IScrobbleHistoryClient.GetPlaysWindowAsync(
+        long? fromUnix,
+        long? toUnix,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var window = await GetRecentTracksWindowAsync(fromUnix, toUnix, pageSize, cancellationToken);
+        return new PlayWindowResult(
+            IncomingPlayMapper.FromLastFm(window.Tracks, Provider).ToList(),
+            window.ReportedTotal,
+            window.PageCount,
+            window.Ok,
+            window.Warning);
     }
 
     public async Task<LastFmTrackInfo?> GetTrackInfoAsync(string artist, string track, string? mbid, CancellationToken cancellationToken)
@@ -344,7 +376,7 @@ public sealed class LastFmClient(
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
-        return await recorder.SendAsync(http, request, "Last.fm", RateLimiter, cancellationToken);
+        return await recorder.SendAsync(http, request, DisplayName, ActiveLimiter, cancellationToken);
     }
 
     private string Build(string method, Dictionary<string, string?> extra)
@@ -363,15 +395,16 @@ public sealed class LastFmClient(
             }
         }
 
-        return "https://ws.audioscrobbler.com/2.0/?" + string.Join("&", pairs);
+        // Audioscrobbler 2.0 expects ".../2.0/?method=..."
+        return BaseUrl.TrimEnd('/') + "/?" + string.Join("&", pairs);
     }
 
-    private static void ThrowIfError(JsonElement root)
+    private void ThrowIfError(JsonElement root)
     {
         if (root.TryGetProperty("error", out var error))
         {
             var message = root.GetPropertyString("message") ?? error.ToString();
-            throw new JsonApiException("Last.fm", message);
+            throw new JsonApiException(DisplayName, message);
         }
     }
 

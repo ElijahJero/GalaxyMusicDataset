@@ -1,17 +1,29 @@
+using GalaxyMusicDataset.Configuration;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.LastFm;
 using GalaxyMusicDataset.Services.Normalization;
+using GalaxyMusicDataset.Services.Scrobbling;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace GalaxyMusicDataset.Services.Aggregation;
 
-public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalog)
+public sealed class ScrobbleIngestService(
+    AppDbContext db,
+    CatalogService catalog,
+    IOptionsMonitor<AggregationOptions>? aggregationOptions = null)
 {
-    public async Task<IngestBatchResult> IngestAsync(
+    public Task<IngestBatchResult> IngestAsync(
         IEnumerable<LastFmRecentTrack> tracks,
+        CancellationToken cancellationToken) =>
+        IngestAsync(IncomingPlayMapper.FromLastFm(tracks), cancellationToken);
+
+    public async Task<IngestBatchResult> IngestAsync(
+        IEnumerable<IncomingPlay> tracks,
         CancellationToken cancellationToken)
     {
+        var matchSeconds = Math.Max(0, aggregationOptions?.CurrentValue.CrossProviderMatchSeconds ?? 2);
         var result = new IngestBatchResult();
         foreach (var incoming in tracks)
         {
@@ -27,15 +39,20 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
                 continue;
             }
 
-            var exists = db.Scrobbles.Local.Any(s => s.UnixTimestamp == incoming.TimestampUnix)
-                         || await db.Scrobbles.AnyAsync(s => s.UnixTimestamp == incoming.TimestampUnix, cancellationToken);
-            if (exists)
+            var unix = incoming.TimestampUnix.Value;
+            if (await ExistsExactAsync(unix, cancellationToken))
             {
                 result.Duplicates++;
                 continue;
             }
 
             var fingerprint = TrackFingerprint.Compute(incoming.ArtistName, incoming.TrackName);
+            if (matchSeconds > 0 && await ExistsSoftMatchAsync(fingerprint, unix, matchSeconds, cancellationToken))
+            {
+                result.Duplicates++;
+                continue;
+            }
+
             var artist = await catalog.GetOrCreateArtistAsync(incoming.ArtistName, incoming.ArtistMbid, cancellationToken);
             var album = await catalog.GetOrCreateAlbumAsync(artist, incoming.AlbumName, incoming.AlbumMbid, cancellationToken);
 
@@ -47,11 +64,20 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
                 fingerprint,
                 cancellationToken);
 
+            // Soft-match again after track resolution (same listen, different provider timestamp).
+            if (matchSeconds > 0 &&
+                await ExistsSoftMatchForTrackAsync(track.Id, unix, matchSeconds, cancellationToken))
+            {
+                result.Duplicates++;
+                continue;
+            }
+
             db.Scrobbles.Add(new Scrobble
             {
                 TrackId = track.Id,
-                PlayedAt = DateTimeOffset.FromUnixTimeSeconds(incoming.TimestampUnix.Value),
-                UnixTimestamp = incoming.TimestampUnix.Value,
+                PlayedAt = DateTimeOffset.FromUnixTimeSeconds(unix),
+                UnixTimestamp = unix,
+                Source = incoming.Source,
                 OriginalArtist = incoming.ArtistName,
                 OriginalTitle = incoming.TrackName,
                 OriginalAlbum = incoming.AlbumName,
@@ -70,6 +96,50 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
         }
 
         return result;
+    }
+
+    private async Task<bool> ExistsExactAsync(long unix, CancellationToken cancellationToken) =>
+        db.Scrobbles.Local.Any(s => s.UnixTimestamp == unix)
+        || await db.Scrobbles.AnyAsync(s => s.UnixTimestamp == unix, cancellationToken);
+
+    private async Task<bool> ExistsSoftMatchAsync(
+        string fingerprint,
+        long unix,
+        int matchSeconds,
+        CancellationToken cancellationToken)
+    {
+        var from = unix - matchSeconds;
+        var to = unix + matchSeconds;
+        return await db.Scrobbles
+            .AsNoTracking()
+            .AnyAsync(
+                s => s.UnixTimestamp >= from &&
+                     s.UnixTimestamp <= to &&
+                     s.Track.Fingerprint == fingerprint,
+                cancellationToken);
+    }
+
+    private async Task<bool> ExistsSoftMatchForTrackAsync(
+        long trackId,
+        long unix,
+        int matchSeconds,
+        CancellationToken cancellationToken)
+    {
+        var from = unix - matchSeconds;
+        var to = unix + matchSeconds;
+        if (db.Scrobbles.Local.Any(s =>
+                s.TrackId == trackId &&
+                s.UnixTimestamp >= from &&
+                s.UnixTimestamp <= to))
+        {
+            return true;
+        }
+
+        return await db.Scrobbles.AnyAsync(
+            s => s.TrackId == trackId &&
+                 s.UnixTimestamp >= from &&
+                 s.UnixTimestamp <= to,
+            cancellationToken);
     }
 
     private async Task<Track> FindOrCreateTrackAsync(
@@ -155,12 +225,20 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
 
     private async Task EnsureLookupAsync(
         Track track,
-        LastFmRecentTrack incoming,
+        IncomingPlay incoming,
         string fingerprint,
         CancellationToken cancellationToken)
     {
         var lookup = db.TrackLookups.Local.FirstOrDefault(l => l.Fingerprint == fingerprint)
                      ?? await db.TrackLookups.FirstOrDefaultAsync(l => l.Fingerprint == fingerprint, cancellationToken);
+        var sourceLabel = incoming.Source switch
+        {
+            ScrobbleProvider.LastFm => "last.fm",
+            ScrobbleProvider.LibreFm => "libre.fm",
+            ScrobbleProvider.Maloja => "maloja",
+            ScrobbleProvider.ListenBrainz => "listenbrainz",
+            _ => "scrobble"
+        };
         if (lookup is null)
         {
             lookup = new TrackLookup
@@ -174,7 +252,7 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
                 CreatedAt = DateTimeOffset.UtcNow,
                 MatchedMbid = track.Mbid,
                 BestScore = string.IsNullOrWhiteSpace(track.Mbid) ? null : 1,
-                QueryUsed = string.IsNullOrWhiteSpace(track.Mbid) ? null : "last.fm scrobble mbid"
+                QueryUsed = string.IsNullOrWhiteSpace(track.Mbid) ? null : $"{sourceLabel} scrobble mbid"
             };
             db.TrackLookups.Add(lookup);
             return;
@@ -186,7 +264,7 @@ public sealed class ScrobbleIngestService(AppDbContext db, CatalogService catalo
             lookup.Status = LookupStatus.AutoMatched;
             lookup.MatchedMbid = track.Mbid;
             lookup.BestScore = 1;
-            lookup.QueryUsed = "last.fm scrobble mbid";
+            lookup.QueryUsed = $"{sourceLabel} scrobble mbid";
         }
     }
 }

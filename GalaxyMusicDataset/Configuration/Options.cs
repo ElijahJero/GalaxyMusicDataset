@@ -1,3 +1,5 @@
+using GalaxyMusicDataset.Data;
+
 namespace GalaxyMusicDataset.Configuration;
 
 public sealed class AuthOptions
@@ -11,13 +13,113 @@ public sealed class AuthOptions
 public sealed class LastFmOptions
 {
     public const string SectionName = "LastFm";
+    public const string DefaultBaseUrl = "https://ws.audioscrobbler.com/2.0/";
 
     public string? ApiKey { get; set; }
     public string? Username { get; set; }
+    public string? BaseUrl { get; set; }
     public string UserAgent { get; set; } = "GalaxyMusicDataset/0.1 (https://github.com/elijahjero/galaxymusicdataset)";
+
+    public string ResolvedBaseUrl => MusicBrainzEndpoints.NormalizeBaseUrl(BaseUrl, DefaultBaseUrl);
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(Username);
+}
+
+public sealed class LibreFmOptions
+{
+    public const string SectionName = "LibreFm";
+    public const string DefaultBaseUrl = "https://libre.fm/2.0/";
+
+    public string? ApiKey { get; set; }
+    public string? Username { get; set; }
+    public string? BaseUrl { get; set; }
+    public string UserAgent { get; set; } = "GalaxyMusicDataset/0.1 (https://github.com/elijahjero/galaxymusicdataset)";
+
+    public string ResolvedBaseUrl => MusicBrainzEndpoints.NormalizeBaseUrl(BaseUrl, DefaultBaseUrl);
+
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(Username);
+}
+
+public sealed class MalojaOptions
+{
+    public const string SectionName = "Maloja";
+    public const int DefaultMinIntervalMs = 50;
+    public const int PublicMinIntervalMs = 250;
+
+    /// <summary>Origin of the Maloja instance (e.g. <c>http://localhost:42010</c>).</summary>
+    public string? BaseUrl { get; set; }
+
+    /// <summary>Optional API key (needed for some write endpoints; reads usually work without).</summary>
+    public string? ApiKey { get; set; }
+
+    public string UserAgent { get; set; } = "GalaxyMusicDataset/0.1 (https://github.com/elijahjero/galaxymusicdataset)";
+
+    /// <summary>
+    /// Minimum milliseconds between Maloja calls. Null = auto (50ms for localhost/private hosts, 250ms otherwise).
+    /// <c>0</c> = no extra delay.
+    /// </summary>
+    public int? MinIntervalMs { get; set; }
+
+    public string ResolvedBaseUrl =>
+        string.IsNullOrWhiteSpace(BaseUrl)
+            ? ""
+            : MusicBrainzEndpoints.NormalizeBaseUrl(BaseUrl, "http://localhost:42010");
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl);
+
+    public bool LooksLocal
+    {
+        get
+        {
+            if (!Uri.TryCreate(ResolvedBaseUrl, UriKind.Absolute, out var uri))
+            {
+                return true;
+            }
+
+            var host = uri.Host;
+            return host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                   || host is "127.0.0.1" or "::1"
+                   || host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)
+                   || host.StartsWith("10.", StringComparison.Ordinal)
+                   || host.StartsWith("192.168.", StringComparison.Ordinal)
+                   || host.StartsWith("172.", StringComparison.Ordinal);
+        }
+    }
+
+    public TimeSpan MinInterval =>
+        TimeSpan.FromMilliseconds(Math.Max(0, MinIntervalMs ?? (LooksLocal ? DefaultMinIntervalMs : PublicMinIntervalMs)));
+}
+
+public sealed class ListenBrainzOptions
+{
+    public const string SectionName = "ListenBrainz";
+    public const string DefaultBaseUrl = "https://api.listenbrainz.org";
+    public const int DefaultMinIntervalMs = 1000;
+    public const int AuthedMinIntervalMs = 250;
+
+    public string? Username { get; set; }
+
+    /// <summary>Optional user token. Auth is not required to read public listens, but raises rate limits.</summary>
+    public string? Token { get; set; }
+
+    public string? BaseUrl { get; set; }
+    public string UserAgent { get; set; } = "GalaxyMusicDataset/0.1 (https://github.com/elijahjero/galaxymusicdataset)";
+
+    /// <summary>Minimum milliseconds between calls. Null = auto (1000ms anonymous, 250ms with token).</summary>
+    public int? MinIntervalMs { get; set; }
+
+    public string ResolvedBaseUrl => MusicBrainzEndpoints.NormalizeBaseUrl(BaseUrl, DefaultBaseUrl);
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(Username);
+
+    public bool HasToken => !string.IsNullOrWhiteSpace(Token);
+
+    public TimeSpan MinInterval =>
+        TimeSpan.FromMilliseconds(Math.Max(
+            0,
+            MinIntervalMs ?? (HasToken ? AuthedMinIntervalMs : DefaultMinIntervalMs)));
 }
 
 public sealed class MusicBrainzOptions
@@ -243,9 +345,24 @@ public sealed class AggregationOptions
     public int IncrementalIntervalMinutes { get; set; } = 60;
     public int OverlapSeconds { get; set; } = 300;
     public int LastFmPageSize { get; set; } = 200;
+    public int ScrobblePageSize { get; set; } = 200;
+
+    /// <summary>
+    /// Active history source for incremental sync, backfill, and reconcile:
+    /// <c>LastFm</c>, <c>Maloja</c>, <c>ListenBrainz</c>, or <c>LibreFm</c>.
+    /// </summary>
+    public string PrimaryScrobbleSource { get; set; } = "LastFm";
+
+    /// <summary>
+    /// When ingesting from a new provider, treat an existing play of the same track
+    /// within this many seconds as the same listen (covers Last.fm → Maloja imports).
+    /// </summary>
+    public int CrossProviderMatchSeconds { get; set; } = 2;
+
     public bool SeedSampleData { get; set; }
     public bool EnableMusicBrainz { get; set; } = true;
     public bool EnableLastFmTrackInfo { get; set; } = true;
+    public bool EnableMalojaAlbumArt { get; set; } = true;
     public bool EnableDiscogs { get; set; } = true;
     public bool EnableTheAudioDb { get; set; } = true;
     public bool EnableVocaDb { get; set; } = true;
@@ -255,6 +372,27 @@ public sealed class AggregationOptions
     public double AutoMatchThreshold { get; set; } = 0.92;
     public double ReviewThreshold { get; set; } = 0.55;
     public int ApiLogRetention { get; set; } = 500;
+
+    public ScrobbleProvider ResolvedPrimaryScrobbleSource =>
+        ParseScrobbleProvider(PrimaryScrobbleSource) ?? ScrobbleProvider.LastFm;
+
+    public static ScrobbleProvider? ParseScrobbleProvider(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "lastfm" or "last.fm" or "last_fm" => ScrobbleProvider.LastFm,
+            "maloja" => ScrobbleProvider.Maloja,
+            "listenbrainz" or "listen_brainz" or "lb" => ScrobbleProvider.ListenBrainz,
+            "librefm" or "libre.fm" or "libre_fm" or "gnufm" or "gnu.fm" => ScrobbleProvider.LibreFm,
+            _ when Enum.TryParse<ScrobbleProvider>(value, ignoreCase: true, out var parsed) => parsed,
+            _ => null
+        };
+    }
 }
 
 public sealed class AnalyticsOptions

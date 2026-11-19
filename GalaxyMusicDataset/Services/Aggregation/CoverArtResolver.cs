@@ -2,7 +2,9 @@ using System.Text.Json;
 using GalaxyMusicDataset.Data;
 using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Discogs;
+using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
+using GalaxyMusicDataset.Services.Maloja;
 using GalaxyMusicDataset.Services.TheAudioDb;
 using GalaxyMusicDataset.Services.Vgmdb;
 using GalaxyMusicDataset.Services.VocaDb;
@@ -18,6 +20,7 @@ public static class CoverArtResolver
 
     public static readonly EnrichmentSource[] FallbackOrder =
     [
+        EnrichmentSource.Maloja,
         EnrichmentSource.Vgmdb,
         EnrichmentSource.Discogs,
         EnrichmentSource.VocaDb,
@@ -34,7 +37,8 @@ public static class CoverArtResolver
             return true;
         }
 
-        return url.Contains(LastFmPlaceholderToken, StringComparison.OrdinalIgnoreCase);
+        return url.Contains(LastFmPlaceholderToken, StringComparison.OrdinalIgnoreCase)
+               || MalojaClient.IsPlaceholder(url);
     }
 
     public static bool NeedsFallback(string? url) => IsPlaceholder(url);
@@ -72,6 +76,7 @@ public static class CoverArtResolver
             var raw = source switch
             {
                 EnrichmentSource.LastFm => LastFmClient.ParseTrackInfo(json)?.AlbumImageUrl,
+                EnrichmentSource.Maloja => CoverFromMaloja(json),
                 EnrichmentSource.Discogs => CoverFromDiscogs(json),
                 EnrichmentSource.TheAudioDb => TheAudioDbClient.ParseSearch(json).Best?.ThumbUrl,
                 EnrichmentSource.VocaDb or EnrichmentSource.UtaiteDb or EnrichmentSource.TouhouDb
@@ -133,5 +138,22 @@ public static class CoverArtResolver
         }
 
         return DiscogsClient.ParseSearch(json).Best?.CoverUrl;
+    }
+
+    private static string? CoverFromMaloja(string json)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            return UsableOrNull(
+                root.GetPropertyString("imageUrl")
+                ?? root.GetPropertyString("image")
+                ?? root.GetPropertyString("url"));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 }

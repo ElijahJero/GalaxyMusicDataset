@@ -13,6 +13,13 @@ services:
       ASPNETCORE_HTTP_PORTS: "8080"
       LastFm__ApiKey: ${LASTFM_API_KEY:-}
       LastFm__Username: ${LASTFM_USERNAME:-}
+      LibreFm__ApiKey: ${LIBREFM_API_KEY:-}
+      LibreFm__Username: ${LIBREFM_USERNAME:-}
+      Maloja__BaseUrl: ${MALOJA_BASE_URL:-}
+      Maloja__ApiKey: ${MALOJA_API_KEY:-}
+      ListenBrainz__Username: ${LISTENBRAINZ_USERNAME:-}
+      ListenBrainz__Token: ${LISTENBRAINZ_TOKEN:-}
+      Aggregation__PrimaryScrobbleSource: ${PRIMARY_SCROBBLE_SOURCE:-LastFm}
       Discogs__Token: ${DISCOGS_TOKEN:-}
       TheAudioDb__ApiKey: ${THEAUDIODB_API_KEY:-}
       MusicBrainz__BaseUrl: ${MUSICBRAINZ_BASE_URL:-https://musicbrainz.org}

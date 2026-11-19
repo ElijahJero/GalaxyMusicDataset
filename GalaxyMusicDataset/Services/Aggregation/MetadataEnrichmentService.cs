@@ -5,6 +5,7 @@ using GalaxyMusicDataset.Data.Entities;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
+using GalaxyMusicDataset.Services.Maloja;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.Normalization;
 using GalaxyMusicDataset.Services.TheAudioDb;
@@ -31,6 +32,15 @@ public sealed class MetadataEnrichmentService(
         if (settings.EnableMusicBrainz)
         {
             var n = await EnrichMusicBrainzDetailsAsync(cancellationToken);
+            if (n > 0)
+            {
+                return n;
+            }
+        }
+
+        if (settings.EnableMalojaAlbumArt && clients.TryCreateMaloja() is not null)
+        {
+            var n = await EnrichMalojaAsync(cancellationToken);
             if (n > 0)
             {
                 return n;
@@ -364,6 +374,73 @@ public sealed class MetadataEnrichmentService(
         }
 
         return 0;
+    }
+
+    private async Task<int> EnrichMalojaAsync(CancellationToken cancellationToken)
+    {
+        var client = clients.TryCreateMaloja();
+        if (client is null)
+        {
+            return 0;
+        }
+
+        var track = await NextTrackNeedingAsync(EnrichmentSource.Maloja, cancellationToken);
+        if (track is null)
+        {
+            return 0;
+        }
+
+        if (track.Album is null || string.IsNullOrWhiteSpace(track.Album.Title))
+        {
+            await SkipAsync(track.Id, EnrichmentSource.Maloja, "No album title for Maloja cover lookup.", cancellationToken);
+            return 1;
+        }
+
+        if (!CoverArtResolver.NeedsFallback(track.Album.CoverUrl))
+        {
+            await SkipAsync(track.Id, EnrichmentSource.Maloja, "Album already has cover art.", cancellationToken);
+            return 1;
+        }
+
+        progress.SetPhase("Maloja album art", $"{track.Artist?.Name} – {track.Album.Title}");
+        var payload = await EnsurePayloadAsync(track.Id, EnrichmentSource.Maloja, cancellationToken);
+        try
+        {
+            var art = await client.FindAlbumArtAsync(track.Artist?.Name, track.Album.Title, cancellationToken);
+            if (art?.ImageUrl is null)
+            {
+                payload.Status = SourceFetchStatus.NotFound;
+                payload.ErrorMessage = "Maloja had no album image.";
+                payload.FetchedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+                return 1;
+            }
+
+            payload.Status = SourceFetchStatus.Success;
+            payload.PayloadJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                imageUrl = art.ImageUrl,
+                albumId = art.AlbumId,
+                match = art.RawJson
+            });
+            payload.ExternalId = art.AlbumId?.ToString();
+            payload.ErrorMessage = null;
+            payload.FetchedAt = DateTimeOffset.UtcNow;
+            CatalogService.SetCoverIfEmpty(track.Album, art.ImageUrl);
+            track.UpdatedAt = DateTimeOffset.UtcNow;
+            await catalog.SaveChangesIgnoringDuplicateCatalogKeysAsync(cancellationToken);
+            progress.Log($"Maloja cover: {track.Artist?.Name} – {track.Album.Title}");
+            return 1;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            payload.Status = SourceFetchStatus.Error;
+            payload.ErrorMessage = ex.Message;
+            payload.FetchedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            progress.Log($"Maloja cover failed for {track.Artist?.Name} – {track.Album.Title}: {ex.Message}");
+            return 1;
+        }
     }
 
     private async Task<int> EnrichLastFmAsync(CancellationToken cancellationToken)
