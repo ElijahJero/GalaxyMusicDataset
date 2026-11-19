@@ -1,4 +1,5 @@
 using GalaxyMusicDataset.Configuration;
+using GalaxyMusicDataset.Services;
 using GalaxyMusicDataset.Services.Aggregation;
 using GalaxyMusicDataset.Services.Api;
 using Microsoft.AspNetCore.Authorization;
@@ -11,11 +12,15 @@ namespace GalaxyMusicDataset.Pages;
 [Authorize]
 public class SettingsModel(
     IOptionsMonitor<LastFmOptions> lastFm,
+    IOptionsMonitor<LibreFmOptions> libreFm,
+    IOptionsMonitor<MalojaOptions> maloja,
+    IOptionsMonitor<ListenBrainzOptions> listenBrainz,
     IOptionsMonitor<DiscogsOptions> discogs,
     IOptionsMonitor<TheAudioDbOptions> audioDb,
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
     IOptionsMonitor<VgmdbOptions> vgmdb,
     IOptionsMonitor<AggregationOptions> aggregation,
+    ExternalClientFactory clients,
     UserSettingsStore store,
     ApiKeyStore apiKeys,
     AggregationCoordinator coordinator) : PageModel
@@ -37,9 +42,13 @@ public class SettingsModel(
     public string? CreatedApiKey { get; set; }
     public string? CreatedApiKeyName { get; set; }
     public bool LastFmKeySaved { get; set; }
+    public bool LibreFmKeySaved { get; set; }
+    public bool MalojaKeySaved { get; set; }
+    public bool ListenBrainzTokenSaved { get; set; }
     public bool DiscogsTokenSaved { get; set; }
     public bool TheAudioDbKeySaved { get; set; }
-    public bool LastFmConfigured { get; set; }
+    public bool PrimaryConfigured { get; set; }
+    public string PrimarySourceName { get; set; } = "Last.fm";
     public IReadOnlyList<ApiKeyInfo> ApiKeys { get; private set; } = [];
 
     public void OnGet() => LoadForm();
@@ -49,14 +58,23 @@ public class SettingsModel(
         var existing = new StoredSecrets(
             lastFm.CurrentValue.ApiKey,
             discogs.CurrentValue.Token,
-            audioDb.CurrentValue.ApiKey);
+            audioDb.CurrentValue.ApiKey,
+            libreFm.CurrentValue.ApiKey,
+            maloja.CurrentValue.ApiKey,
+            listenBrainz.CurrentValue.Token);
         await store.SaveAsync(Input, existing, cancellationToken);
         Saved = "Saved. Blank secret fields were left unchanged.";
         var postedKey = Input.LastFmApiKey;
+        var postedLibre = Input.LibreFmApiKey;
+        var postedMaloja = Input.MalojaApiKey;
+        var postedLb = Input.ListenBrainzToken;
         var postedDiscogs = Input.DiscogsToken;
         var postedAudioDb = Input.TheAudioDbApiKey;
         LoadForm();
         LastFmKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedKey, existing.LastFmApiKey));
+        LibreFmKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedLibre, existing.LibreFmApiKey));
+        MalojaKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedMaloja, existing.MalojaApiKey));
+        ListenBrainzTokenSaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedLb, existing.ListenBrainzToken));
         DiscogsTokenSaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedDiscogs, existing.DiscogsToken));
         TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(UserSettingsStore.KeepIfBlank(postedAudioDb, existing.TheAudioDbApiKey));
         return Page();
@@ -64,9 +82,10 @@ public class SettingsModel(
 
     public IActionResult OnPostReconcileFull()
     {
-        if (!lastFm.CurrentValue.IsConfigured)
+        var primary = aggregation.CurrentValue.ResolvedPrimaryScrobbleSource;
+        if (!clients.IsScrobbleProviderConfigured(primary))
         {
-            Saved = "Last.fm is not configured.";
+            Saved = $"Primary scrobble source '{primary}' is not configured.";
             LoadForm();
             return Page();
         }
@@ -111,18 +130,38 @@ public class SettingsModel(
     private void LoadForm()
     {
         var lf = lastFm.CurrentValue;
+        var libre = libreFm.CurrentValue;
+        var mj = maloja.CurrentValue;
+        var lb = listenBrainz.CurrentValue;
         var d = discogs.CurrentValue;
         var a = audioDb.CurrentValue;
         var mb = musicBrainz.CurrentValue;
         var agg = aggregation.CurrentValue;
+        var primary = agg.ResolvedPrimaryScrobbleSource;
         LastFmKeySaved = !string.IsNullOrWhiteSpace(lf.ApiKey);
-        LastFmConfigured = lf.IsConfigured;
+        LibreFmKeySaved = !string.IsNullOrWhiteSpace(libre.ApiKey);
+        MalojaKeySaved = !string.IsNullOrWhiteSpace(mj.ApiKey);
+        ListenBrainzTokenSaved = !string.IsNullOrWhiteSpace(lb.Token);
+        PrimaryConfigured = clients.IsScrobbleProviderConfigured(primary);
+        PrimarySourceName = primary.ToString();
         DiscogsTokenSaved = !string.IsNullOrWhiteSpace(d.Token);
         TheAudioDbKeySaved = !string.IsNullOrWhiteSpace(a.ApiKey);
         ApiKeys = apiKeys.List();
         Input = new UserSettingsModel
         {
+            PrimaryScrobbleSource = primary.ToString(),
+            CrossProviderMatchSeconds = agg.CrossProviderMatchSeconds,
             LastFmUsername = lf.Username,
+            LibreFmUsername = libre.Username,
+            LibreFmBaseUrl = string.Equals(libre.ResolvedBaseUrl, LibreFmOptions.DefaultBaseUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : libre.ResolvedBaseUrl,
+            MalojaBaseUrl = mj.IsConfigured ? mj.ResolvedBaseUrl : "",
+            MalojaMinIntervalMs = mj.MinIntervalMs,
+            ListenBrainzUsername = lb.Username,
+            ListenBrainzBaseUrl = string.Equals(lb.ResolvedBaseUrl, ListenBrainzOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : lb.ResolvedBaseUrl,
             MusicBrainzContact = mb.Contact,
             MusicBrainzBaseUrl = string.Equals(mb.ResolvedBaseUrl, MusicBrainzOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
                 ? ""
@@ -133,6 +172,7 @@ public class SettingsModel(
             MusicBrainzMinIntervalMs = mb.MinIntervalMs,
             EnableMusicBrainz = agg.EnableMusicBrainz,
             EnableLastFmTrackInfo = agg.EnableLastFmTrackInfo,
+            EnableMalojaAlbumArt = agg.EnableMalojaAlbumArt,
             EnableDiscogs = agg.EnableDiscogs,
             EnableTheAudioDb = agg.EnableTheAudioDb,
             EnableVocaDb = agg.EnableVocaDb,

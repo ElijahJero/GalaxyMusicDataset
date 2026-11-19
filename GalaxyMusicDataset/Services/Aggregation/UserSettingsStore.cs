@@ -11,6 +11,9 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         var lastFmKey = KeepIfBlank(posted.LastFmApiKey, existing.LastFmApiKey);
+        var libreFmKey = KeepIfBlank(posted.LibreFmApiKey, existing.LibreFmApiKey);
+        var malojaKey = KeepIfBlank(posted.MalojaApiKey, existing.MalojaApiKey);
+        var listenBrainzToken = KeepIfBlank(posted.ListenBrainzToken, existing.ListenBrainzToken);
         var discogs = KeepIfBlank(posted.DiscogsToken, existing.DiscogsToken);
         var audioDb = KeepIfBlank(posted.TheAudioDbApiKey, existing.TheAudioDbApiKey);
         var payload = new Dictionary<string, object?>
@@ -19,6 +22,30 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
             {
                 ["ApiKey"] = lastFmKey,
                 ["Username"] = posted.LastFmUsername
+            },
+            ["LibreFm"] = new Dictionary<string, string?>
+            {
+                ["ApiKey"] = libreFmKey,
+                ["Username"] = posted.LibreFmUsername,
+                ["BaseUrl"] = string.IsNullOrWhiteSpace(posted.LibreFmBaseUrl)
+                    ? ""
+                    : posted.LibreFmBaseUrl.Trim()
+            },
+            ["Maloja"] = new Dictionary<string, object?>
+            {
+                ["BaseUrl"] = string.IsNullOrWhiteSpace(posted.MalojaBaseUrl)
+                    ? ""
+                    : posted.MalojaBaseUrl.Trim(),
+                ["ApiKey"] = malojaKey,
+                ["MinIntervalMs"] = posted.MalojaMinIntervalMs
+            },
+            ["ListenBrainz"] = new Dictionary<string, string?>
+            {
+                ["Username"] = posted.ListenBrainzUsername,
+                ["Token"] = listenBrainzToken,
+                ["BaseUrl"] = string.IsNullOrWhiteSpace(posted.ListenBrainzBaseUrl)
+                    ? ""
+                    : posted.ListenBrainzBaseUrl.Trim()
             },
             ["Discogs"] = new Dictionary<string, string?>
             {
@@ -37,8 +64,13 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
             },
             ["Aggregation"] = new Dictionary<string, object?>
             {
+                ["PrimaryScrobbleSource"] = string.IsNullOrWhiteSpace(posted.PrimaryScrobbleSource)
+                    ? "LastFm"
+                    : posted.PrimaryScrobbleSource.Trim(),
+                ["CrossProviderMatchSeconds"] = Math.Max(0, posted.CrossProviderMatchSeconds),
                 ["EnableMusicBrainz"] = posted.EnableMusicBrainz,
                 ["EnableLastFmTrackInfo"] = posted.EnableLastFmTrackInfo,
+                ["EnableMalojaAlbumArt"] = posted.EnableMalojaAlbumArt,
                 ["EnableDiscogs"] = posted.EnableDiscogs,
                 ["EnableTheAudioDb"] = posted.EnableTheAudioDb,
                 ["EnableVocaDb"] = posted.EnableVocaDb,
@@ -82,12 +114,29 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
     }
 }
 
-public readonly record struct StoredSecrets(string? LastFmApiKey, string? DiscogsToken, string? TheAudioDbApiKey);
+public readonly record struct StoredSecrets(
+    string? LastFmApiKey,
+    string? DiscogsToken,
+    string? TheAudioDbApiKey,
+    string? LibreFmApiKey = null,
+    string? MalojaApiKey = null,
+    string? ListenBrainzToken = null);
 
 public sealed class UserSettingsModel
 {
+    public string? PrimaryScrobbleSource { get; set; } = "LastFm";
+    public int CrossProviderMatchSeconds { get; set; } = 2;
     public string? LastFmApiKey { get; set; }
     public string? LastFmUsername { get; set; }
+    public string? LibreFmApiKey { get; set; }
+    public string? LibreFmUsername { get; set; }
+    public string? LibreFmBaseUrl { get; set; }
+    public string? MalojaBaseUrl { get; set; }
+    public string? MalojaApiKey { get; set; }
+    public int? MalojaMinIntervalMs { get; set; }
+    public string? ListenBrainzUsername { get; set; }
+    public string? ListenBrainzToken { get; set; }
+    public string? ListenBrainzBaseUrl { get; set; }
     public string? DiscogsToken { get; set; }
     public string? TheAudioDbApiKey { get; set; }
     public string? MusicBrainzContact { get; set; }
@@ -96,6 +145,7 @@ public sealed class UserSettingsModel
     public int? MusicBrainzMinIntervalMs { get; set; }
     public bool EnableMusicBrainz { get; set; } = true;
     public bool EnableLastFmTrackInfo { get; set; } = true;
+    public bool EnableMalojaAlbumArt { get; set; } = true;
     public bool EnableDiscogs { get; set; } = true;
     public bool EnableTheAudioDb { get; set; } = true;
     public bool EnableVocaDb { get; set; } = true;

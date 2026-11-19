@@ -10,7 +10,7 @@ public sealed class AggregationHostedService(
     AggregationCoordinator coordinator,
     AggregationProgress progress,
     IOptionsMonitor<AggregationOptions> options,
-    IOptionsMonitor<LastFmOptions> lastFmOptions,
+    ExternalClientFactory clients,
     ILogger<AggregationHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,7 +40,8 @@ public sealed class AggregationHostedService(
         }
 
         progress.Log("Aggregation worker started.");
-        if (lastFmOptions.CurrentValue.IsConfigured)
+        var primary = options.CurrentValue.ResolvedPrimaryScrobbleSource;
+        if (clients.IsScrobbleProviderConfigured(primary))
         {
             coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.SyncIncremental));
             coordinator.TryEnqueue(new AggregationCommand(AggregationCommandKind.Backfill, 3));
@@ -51,7 +52,8 @@ public sealed class AggregationHostedService(
         }
         else
         {
-            progress.Log("Last.fm is not configured. Set API key and username on Settings.");
+            progress.Log(
+                $"Primary scrobble source '{primary}' is not configured. Set it on Settings (Last.fm, Maloja, ListenBrainz, or Libre.fm).");
         }
 
         var incrementalTimer = new PeriodicTimer(TimeSpan.FromMinutes(Math.Max(5, options.CurrentValue.IncrementalIntervalMinutes)));
@@ -67,7 +69,7 @@ public sealed class AggregationHostedService(
         {
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                if (!lastFmOptions.CurrentValue.IsConfigured)
+                if (!clients.IsScrobbleProviderConfigured(options.CurrentValue.ResolvedPrimaryScrobbleSource))
                 {
                     continue;
                 }

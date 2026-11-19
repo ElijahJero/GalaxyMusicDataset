@@ -21,7 +21,20 @@ public enum EnrichmentSource
     VocaDb = 4,
     UtaiteDb = 5,
     TouhouDb = 6,
-    Vgmdb = 7
+    Vgmdb = 7,
+    Maloja = 8
+}
+
+/// <summary>
+/// Where a scrobble row was ingested from. Used for multi-provider sync and
+/// reconcile deletes that must not erase history imported from another service.
+/// </summary>
+public enum ScrobbleProvider
+{
+    LastFm = 0,
+    Maloja = 1,
+    ListenBrainz = 2,
+    LibreFm = 3
 }
 
 public enum SourceFetchStatus
@@ -46,7 +59,10 @@ public enum JobKind
     UtaiteDb = 8,
     TouhouDb = 9,
     Vgmdb = 10,
-    LastFmReconcile = 11
+    LastFmReconcile = 11,
+    ScrobbleIncremental = 12,
+    ScrobbleBackfill = 13,
+    ScrobbleReconcile = 14
 }
 
 public enum JobStatus

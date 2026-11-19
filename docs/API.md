@@ -272,7 +272,7 @@ Sync / backfill / reconcile / retry-lookups return `202`. Pause / resume / seed 
 
 ## Settings & keys
 
-Secret values are never returned. `GET` reports whether a Last.fm / Discogs / TheAudioDB secret is already saved. `PUT` uses the same blank-means-keep rule as the Settings form.
+Secret values are never returned. `GET` reports whether secrets are already saved. `PUT` uses the same blank-means-keep rule as the Settings form.
 
 ### `GET /api/v1/settings`
 
@@ -280,8 +280,20 @@ Secret values are never returned. `GET` reports whether a Last.fm / Discogs / Th
 
 ```json
 {
+  "primaryScrobbleSource": "Maloja",
+  "crossProviderMatchSeconds": 2,
   "lastFmUsername": "user",
   "lastFmApiKey": "",
+  "malojaBaseUrl": "http://localhost:42010",
+  "malojaApiKey": "",
+  "malojaMinIntervalMs": null,
+  "enableMalojaAlbumArt": true,
+  "listenBrainzUsername": "",
+  "listenBrainzToken": "",
+  "listenBrainzBaseUrl": "",
+  "libreFmUsername": "",
+  "libreFmApiKey": "",
+  "libreFmBaseUrl": "",
   "discogsToken": "",
   "theAudioDbApiKey": "",
   "musicBrainzContact": "https://example",
@@ -301,6 +313,8 @@ Secret values are never returned. `GET` reports whether a Last.fm / Discogs / Th
   "seedSampleData": false
 }
 ```
+
+`primaryScrobbleSource`: `LastFm` | `Maloja` | `ListenBrainz` | `LibreFm`.
 
 ### `GET /api/v1/keys`
 

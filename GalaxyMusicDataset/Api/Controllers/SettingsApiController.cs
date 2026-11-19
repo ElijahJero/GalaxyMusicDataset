@@ -13,6 +13,9 @@ namespace GalaxyMusicDataset.Api.Controllers;
 [Produces("application/json")]
 public sealed class SettingsApiController(
     IOptionsMonitor<LastFmOptions> lastFm,
+    IOptionsMonitor<LibreFmOptions> libreFm,
+    IOptionsMonitor<MalojaOptions> maloja,
+    IOptionsMonitor<ListenBrainzOptions> listenBrainz,
     IOptionsMonitor<DiscogsOptions> discogs,
     IOptionsMonitor<TheAudioDbOptions> audioDb,
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
@@ -33,7 +36,10 @@ public sealed class SettingsApiController(
         var existing = new StoredSecrets(
             lastFm.CurrentValue.ApiKey,
             discogs.CurrentValue.Token,
-            audioDb.CurrentValue.ApiKey);
+            audioDb.CurrentValue.ApiKey,
+            libreFm.CurrentValue.ApiKey,
+            maloja.CurrentValue.ApiKey,
+            listenBrainz.CurrentValue.Token);
         await store.SaveAsync(input, existing, cancellationToken);
         return Ok(ReadSettings());
     }
@@ -71,6 +77,9 @@ public sealed class SettingsApiController(
     private AggregationSettingsResponse ReadSettings()
     {
         var lf = lastFm.CurrentValue;
+        var libre = libreFm.CurrentValue;
+        var mj = maloja.CurrentValue;
+        var lb = listenBrainz.CurrentValue;
         var d = discogs.CurrentValue;
         var a = audioDb.CurrentValue;
         var mb = musicBrainz.CurrentValue;
@@ -100,6 +109,22 @@ public sealed class SettingsApiController(
                 ? ""
                 : vgmdb.CurrentValue.ResolvedBaseUrl,
             agg.IncrementalIntervalMinutes,
-            agg.SeedSampleData);
+            agg.SeedSampleData,
+            agg.ResolvedPrimaryScrobbleSource.ToString(),
+            agg.CrossProviderMatchSeconds,
+            mj.IsConfigured ? mj.ResolvedBaseUrl : "",
+            !string.IsNullOrWhiteSpace(mj.ApiKey),
+            mj.MinIntervalMs,
+            agg.EnableMalojaAlbumArt,
+            libre.Username,
+            !string.IsNullOrWhiteSpace(libre.ApiKey),
+            string.Equals(libre.ResolvedBaseUrl, LibreFmOptions.DefaultBaseUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : libre.ResolvedBaseUrl,
+            lb.Username,
+            !string.IsNullOrWhiteSpace(lb.Token),
+            string.Equals(lb.ResolvedBaseUrl, ListenBrainzOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : lb.ResolvedBaseUrl);
     }
 }

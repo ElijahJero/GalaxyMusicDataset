@@ -262,6 +262,9 @@ namespace GalaxyMusicDataset.Data.Migrations
                     b.Property<DateTimeOffset>("PlayedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Source")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("TrackId")
                         .HasColumnType("INTEGER");
 
@@ -276,6 +279,8 @@ namespace GalaxyMusicDataset.Data.Migrations
 
                     b.HasIndex("UnixTimestamp")
                         .IsUnique();
+
+                    b.HasIndex("Source", "UnixTimestamp");
 
                     b.HasIndex("TrackId", "UnixTimestamp");
 

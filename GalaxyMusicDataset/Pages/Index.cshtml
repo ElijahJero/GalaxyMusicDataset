@@ -9,11 +9,11 @@
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
     <div>
         <h1 class="h3 mb-1">Data aggregation</h1>
-        <p class="text-muted mb-0">Last.fm ingest, MusicBrainz identity, and metadata enrichment. Open the <a asp-page="/Dashboard">dashboard</a> for listening stats.</p>
+        <p class="text-muted mb-0">Scrobble ingest (@s.PrimaryScrobbleSource), MusicBrainz identity, and metadata enrichment. Open the <a asp-page="/Dashboard">dashboard</a> for listening stats.</p>
     </div>
     <form method="post" class="d-flex flex-wrap gap-2">
-        <button class="btn btn-primary" asp-page-handler="Sync" disabled="@(!s.LastFmConfigured)">Sync now</button>
-        <button class="btn btn-outline-primary" asp-page-handler="Backfill" disabled="@(!s.LastFmConfigured)">Backfill 14 days</button>
+        <button class="btn btn-primary" asp-page-handler="Sync" disabled="@(!s.PrimaryScrobbleConfigured)">Sync now</button>
+        <button class="btn btn-outline-primary" asp-page-handler="Backfill" disabled="@(!s.PrimaryScrobbleConfigured)">Backfill 14 days</button>
         @if (s.EnrichmentPaused)
         {
             <button class="btn btn-success" asp-page-handler="Resume">Resume enrichment</button>
@@ -35,11 +35,11 @@
     </form>
 </div>
 
-@if (!s.LastFmConfigured)
+@if (!s.PrimaryScrobbleConfigured)
 {
     <div class="alert alert-warning">
-        Last.fm is not configured. Add an API key and username on <a asp-page="/Settings">Settings</a>.
-        Until then you can seed sample scrobbles and inspect the recent-tracks debug view.
+        Primary scrobble source <strong>@s.PrimaryScrobbleSource</strong> is not configured. Set it on <a asp-page="/Settings">Settings</a>
+        (Last.fm, Maloja, ListenBrainz, or Libre.fm). Until then you can seed sample scrobbles.
     </div>
 }
 
@@ -119,11 +119,13 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header">Last.fm sync</div>
+            <div class="card-header">Scrobble sync</div>
             <div class="card-body">
                 <dl class="row mb-0 small">
-                    <dt class="col-sm-4">Username</dt>
-                    <dd class="col-sm-8">@(s.LastFmUsername ?? "—") @(s.LastFmConfigured ? "" : "(not configured)")</dd>
+                    <dt class="col-sm-4">Primary source</dt>
+                    <dd class="col-sm-8">@s.PrimaryScrobbleSource @(s.PrimaryScrobbleConfigured ? "" : "(not configured)")</dd>
+                    <dt class="col-sm-4">Account</dt>
+                    <dd class="col-sm-8">@(s.LastFmUsername ?? "—")</dd>
                     <dt class="col-sm-4">Last success</dt>
                     <dd class="col-sm-8">@(s.LastSuccessfulSyncUtc?.UtcDateTime.ToString("u") ?? "never")</dd>
                     <dt class="col-sm-4">Last attempt</dt>
@@ -199,7 +201,8 @@
                 </table>
             </div>
             <div class="card-footer small text-muted">
-                Last.fm @(s.EnableLastFmTrackInfo ? "on" : "off")@(s.LastFmConfigured ? "" : ", no key")
+                Maloja art @(s.EnableMalojaAlbumArt ? "on" : "off")@(s.MalojaConfigured ? "" : ", no URL")
+                · Last.fm @(s.EnableLastFmTrackInfo ? "on" : "off")@(s.LastFmConfigured ? "" : ", no key")
                 · MusicBrainz @(s.EnableMusicBrainz ? "on" : "off") @(s.MusicBrainzUsesPublicApi ? "" : "(self-hosted)")
                 · Discogs @(s.EnableDiscogs ? "on" : "off")@(s.DiscogsConfigured ? "" : ", no token")
                 · TheAudioDB @(s.EnableTheAudioDb ? "on" : "off")@(s.TheAudioDbConfigured ? "" : ", no key")

@@ -106,7 +106,19 @@ public sealed record AggregationSettingsResponse(
     bool EnableVgmdb,
     string? VgmdbBaseUrl,
     int IncrementalIntervalMinutes,
-    bool SeedSampleData);
+    bool SeedSampleData,
+    string PrimaryScrobbleSource = "LastFm",
+    int CrossProviderMatchSeconds = 2,
+    string? MalojaBaseUrl = null,
+    bool MalojaKeySaved = false,
+    int? MalojaMinIntervalMs = null,
+    bool EnableMalojaAlbumArt = true,
+    string? LibreFmUsername = null,
+    bool LibreFmKeySaved = false,
+    string? LibreFmBaseUrl = null,
+    string? ListenBrainzUsername = null,
+    bool ListenBrainzTokenSaved = false,
+    string? ListenBrainzBaseUrl = null);
 
 public sealed record ProgressSnapshotDto(
     string Phase,
@@ -204,7 +216,11 @@ public sealed record StatusResponse(
     IReadOnlyList<JobDto> Jobs,
     IReadOnlyList<ExternalApiCallDto> RecentApiCalls,
     IReadOnlyList<LiveApiStatsDto> LiveApiStats,
-    ProgressSnapshotDto Progress);
+    ProgressSnapshotDto Progress,
+    string PrimaryScrobbleSource = "LastFm",
+    bool PrimaryScrobbleConfigured = false,
+    bool MalojaConfigured = false,
+    bool EnableMalojaAlbumArt = true);
 
 public static class ApiMapping
 {
@@ -269,7 +285,11 @@ public static class ApiMapping
             new ProgressSnapshotDto(
                 p.Phase, p.CurrentItem, p.LastError, p.LastUpdatedUtc, p.SyncRunning, p.EnrichmentRunning,
                 p.EnrichmentPaused, p.BackfillDay, p.BackfillDaysCompleted, p.CurrentJobProcessed,
-                p.CurrentJobSucceeded, p.CurrentJobFailed, p.RecentLog));
+                p.CurrentJobSucceeded, p.CurrentJobFailed, p.RecentLog),
+            s.PrimaryScrobbleSource,
+            s.PrimaryScrobbleConfigured,
+            s.MalojaConfigured,
+            s.EnableMalojaAlbumArt);
     }
 
     public static LookupDto Lookup(GalaxyMusicDataset.Data.Entities.TrackLookup lookup) =>

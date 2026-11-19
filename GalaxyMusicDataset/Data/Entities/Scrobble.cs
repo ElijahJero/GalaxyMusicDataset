@@ -6,6 +6,7 @@ public sealed class Scrobble
     public long TrackId { get; set; }
     public DateTimeOffset PlayedAt { get; set; }
     public long UnixTimestamp { get; set; }
+    public ScrobbleProvider Source { get; set; } = ScrobbleProvider.LastFm;
     public string OriginalArtist { get; set; } = "";
     public string OriginalTitle { get; set; } = "";
     public string? OriginalAlbum { get; set; }

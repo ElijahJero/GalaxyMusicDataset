@@ -7,6 +7,8 @@ using GalaxyMusicDataset.Services.Auth;
 using GalaxyMusicDataset.Services.Discogs;
 using GalaxyMusicDataset.Services.Http;
 using GalaxyMusicDataset.Services.LastFm;
+using GalaxyMusicDataset.Services.ListenBrainz;
+using GalaxyMusicDataset.Services.Maloja;
 using GalaxyMusicDataset.Services.MusicBrainz;
 using GalaxyMusicDataset.Services.Search;
 using GalaxyMusicDataset.Services.TheAudioDb;
@@ -22,6 +24,9 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddGalaxyAggregation(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
         services.Configure<LastFmOptions>(configuration.GetSection(LastFmOptions.SectionName));
+        services.Configure<LibreFmOptions>(configuration.GetSection(LibreFmOptions.SectionName));
+        services.Configure<MalojaOptions>(configuration.GetSection(MalojaOptions.SectionName));
+        services.Configure<ListenBrainzOptions>(configuration.GetSection(ListenBrainzOptions.SectionName));
         services.Configure<MusicBrainzOptions>(configuration.GetSection(MusicBrainzOptions.SectionName));
         services.Configure<DiscogsOptions>(configuration.GetSection(DiscogsOptions.SectionName));
         services.Configure<TheAudioDbOptions>(configuration.GetSection(TheAudioDbOptions.SectionName));
@@ -49,6 +54,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AggregationProgress>();
         services.AddSingleton<AggregationCoordinator>();
         services.AddHttpClient(nameof(LastFmClient));
+        services.AddHttpClient(nameof(MalojaClient))
+            .ConfigureHttpClient(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+                // Follow redirects so /image?album_id=… can resolve to the cached art URL.
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json,image/*");
+            });
+        services.AddHttpClient(nameof(ListenBrainzClient));
         services.AddHttpClient(nameof(MusicBrainzClient));
         services.AddHttpClient(nameof(DiscogsClient));
         services.AddHttpClient(nameof(TheAudioDbClient));

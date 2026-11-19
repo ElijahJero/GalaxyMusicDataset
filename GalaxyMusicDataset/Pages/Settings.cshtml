@@ -12,15 +12,34 @@
     <div class="alert alert-success">@Model.Saved</div>
 }
 
-<form method="post" asp-page-handler="ReconcileFull" class="card card-body mb-4" onsubmit="return confirm('Re-fetch your full Last.fm history? This adds missing scrobbles and removes ones you deleted on Last.fm. It can take a long time.');">
-    <h2 class="h5">Last.fm library check</h2>
-    <p class="text-muted mb-3">Walks every UTC day back to your Last.fm registration date. Missing scrobbles are added and scrobbles you deleted on Last.fm are removed. A day whose Last.fm response is incomplete is left unchanged.</p>
+<form method="post" asp-page-handler="ReconcileFull" class="card card-body mb-4" onsubmit="return confirm('Re-fetch your full history from the primary scrobble source? Missing plays are added. Deletes only remove plays that came from that same source, so switching from Last.fm to Maloja will not wipe imported history.');">
+    <h2 class="h5">Library check</h2>
+    <p class="text-muted mb-3">Walks UTC days on the <strong>primary</strong> scrobble source (@Model.PrimarySourceName). Missing scrobbles are added. Deletes only affect plays originally ingested from that source, so a Maloja import of Last.fm history will not duplicate or erase existing warehouse rows.</p>
     <div>
-        <button class="btn btn-outline-danger" disabled="@(!Model.LastFmConfigured)">Full Last.fm resync</button>
+        <button class="btn btn-outline-danger" disabled="@(!Model.PrimaryConfigured)">Full history resync</button>
     </div>
 </form>
 
 <form method="post" class="card card-body" autocomplete="off">
+    <h2 class="h5">Primary scrobble source</h2>
+    <p class="text-muted small">Only the primary source runs incremental sync, backfill, and reconcile. Configure credentials for that service below. When you switch (for example Last.fm → Maloja after importing history), existing plays are kept and matching timestamps/fingerprints are treated as the same listen.</p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.PrimaryScrobbleSource">Primary source</label>
+            <select class="form-select" asp-for="Input.PrimaryScrobbleSource">
+                <option value="LastFm">Last.fm</option>
+                <option value="Maloja">Maloja</option>
+                <option value="ListenBrainz">ListenBrainz</option>
+                <option value="LibreFm">Libre.fm</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.CrossProviderMatchSeconds">Cross-provider match window (seconds)</label>
+            <input class="form-control" asp-for="Input.CrossProviderMatchSeconds" type="number" min="0" />
+            <div class="form-text">Same track within this many seconds of an existing play is treated as a duplicate when switching sources. Default 2.</div>
+        </div>
+    </div>
+
     <h2 class="h5">Last.fm</h2>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
@@ -34,6 +53,58 @@
             {
                 <div class="form-text">A Last.fm API key is already saved.</div>
             }
+        </div>
+    </div>
+
+    <h2 class="h5">Maloja</h2>
+    <p class="text-muted small">Self-hosted scrobbler. Point at your instance (often on the same machine). Album art enrichment uses Maloja’s image resolver with a short local rate limit (50ms by default).</p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MalojaBaseUrl">Base URL</label>
+            <input class="form-control" asp-for="Input.MalojaBaseUrl" placeholder="http://localhost:42010" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MalojaApiKey">API key (optional)</label>
+            <input class="form-control" asp-for="Input.MalojaApiKey" type="password" value="" autocomplete="new-password" placeholder="@(Model.MalojaKeySaved ? "Saved — leave blank to keep" : "")" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.MalojaMinIntervalMs">Min interval (ms)</label>
+            <input class="form-control" asp-for="Input.MalojaMinIntervalMs" type="number" min="0" placeholder="Auto" />
+            <div class="form-text">Blank = auto (50ms localhost/LAN, 250ms otherwise). <code>0</code> removes the delay.</div>
+        </div>
+    </div>
+
+    <h2 class="h5">ListenBrainz</h2>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.ListenBrainzUsername">Username (MusicBrainz ID)</label>
+            <input class="form-control" asp-for="Input.ListenBrainzUsername" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.ListenBrainzToken">User token (optional)</label>
+            <input class="form-control" asp-for="Input.ListenBrainzToken" type="password" value="" autocomplete="new-password" placeholder="@(Model.ListenBrainzTokenSaved ? "Saved — leave blank to keep" : "")" />
+            <div class="form-text">Not required to read public listens; with a token the throttle is looser.</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.ListenBrainzBaseUrl">API base URL</label>
+            <input class="form-control" asp-for="Input.ListenBrainzBaseUrl" placeholder="https://api.listenbrainz.org" />
+        </div>
+    </div>
+
+    <h2 class="h5">Libre.fm</h2>
+    <p class="text-muted small">Audioscrobbler 2.0 compatible. Same shape as Last.fm with a different host.</p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.LibreFmUsername">Username</label>
+            <input class="form-control" asp-for="Input.LibreFmUsername" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.LibreFmApiKey">API key</label>
+            <input class="form-control" asp-for="Input.LibreFmApiKey" type="password" value="" autocomplete="new-password" placeholder="@(Model.LibreFmKeySaved ? "Saved — leave blank to keep" : "")" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" asp-for="Input.LibreFmBaseUrl">Base URL</label>
+            <input class="form-control" asp-for="Input.LibreFmBaseUrl" placeholder="https://libre.fm/2.0/" />
         </div>
     </div>
 
@@ -96,6 +167,10 @@
             <div class="form-check">
                 <input class="form-check-input" asp-for="Input.EnableLastFmTrackInfo" />
                 <label class="form-check-label" asp-for="Input.EnableLastFmTrackInfo">Last.fm track.getInfo</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="Input.EnableMalojaAlbumArt" />
+                <label class="form-check-label" asp-for="Input.EnableMalojaAlbumArt">Maloja album art</label>
             </div>
             <div class="form-check">
                 <input class="form-check-input" asp-for="Input.EnableDiscogs" />

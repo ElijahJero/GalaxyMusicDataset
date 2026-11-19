@@ -4,7 +4,7 @@ This project was made with AI for experimentation purposes. It is not intended t
 
 # GalaxyMusicDataset
 
-Personal Last.fm history warehouse: pull scrobbles, resolve MusicBrainz IDs, attach tags and metadata, inspect progress, and browse listening analytics.
+Personal listening-history warehouse: pull scrobbles from Last.fm, Maloja, ListenBrainz, or Libre.fm; resolve MusicBrainz IDs; attach tags and metadata; inspect progress; and browse listening analytics.
 
 ## Run
 
@@ -34,7 +34,7 @@ Or build locally:
 docker compose up -d --build
 ```
 
-Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`, `VGMDB_BASE_URL`). Analytics use Eastern Time by default; set `ANALYTICS_TIMEZONE` (IANA id or `EST` / `UTC`) in docker compose to change it.
+Open http://localhost:8080. SQLite and Settings (`user-settings.json`) live in the `galaxy-data` volume. API keys can also be passed as environment variables (`LASTFM_API_KEY`, `LASTFM_USERNAME`, `MALOJA_BASE_URL`, `MALOJA_API_KEY`, `LISTENBRAINZ_USERNAME`, `LISTENBRAINZ_TOKEN`, `LIBREFM_API_KEY`, `LIBREFM_USERNAME`, `PRIMARY_SCROBBLE_SOURCE`, `DISCOGS_TOKEN`, `THEAUDIODB_API_KEY`, `MUSICBRAINZ_BASE_URL`, `VGMDB_BASE_URL`). Analytics use Eastern Time by default; set `ANALYTICS_TIMEZONE` (IANA id or `EST` / `UTC`) in docker compose to change it.
 
 Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, sessions, wrapped, artist/track detail) are public — anyone who can reach the host can browse them. Progress, Library, Lookups, Review, and Settings require an admin cookie. Set `AUTH_USERNAME` (default `admin`) and `AUTH_PASSWORD`. If the password is empty, analytics stay public and nobody can sign in. Locally: `dotnet user-secrets set Auth:Password "your-password"` (or `Auth__Username` / `Auth__Password` env vars). Anonymous visits to `/` redirect to `/Dashboard`.
 
@@ -43,7 +43,7 @@ Analytics pages (`/Dashboard`, tops, genres, discovery, patterns, deep cuts, ses
 - **Library** (`/Recent`) — all unique tracks, 50 per page, with Lucene.NET search (case-insensitive, partial tokens, light typo tolerance), filters (including has/missing tags, Essentia genre folders, BPM range, and key), and inline editing
 - **Lookups** — fingerprint cache (one MusicBrainz search per unique song)
 - **Review** — accept/reject low-confidence MusicBrainz matches
-- **Settings** — Last.fm / Discogs / TheAudioDB keys and **REST API keys** for mobile clients (written to `App_Data/user-settings.json` and `App_Data/api-keys.json`, gitignored)
+- **Settings** — primary scrobble source (Last.fm / Maloja / ListenBrainz / Libre.fm), enrichment keys, and **REST API keys** for mobile clients (written to `App_Data/user-settings.json` and `App_Data/api-keys.json`, gitignored)
 
 ## REST API
 
@@ -57,7 +57,13 @@ Development seeds 14 sample scrobbles when the database is empty (`Aggregation:S
 
 | Key | Purpose |
 | --- | --- |
-| `LastFm:ApiKey` / `LastFm:Username` | Required for live ingest (`user.getRecentTracks`, `track.getInfo`) |
+| `Aggregation:PrimaryScrobbleSource` | Active history source: `LastFm` (default), `Maloja`, `ListenBrainz`, or `LibreFm`. Only this source runs incremental sync / backfill / reconcile. |
+| `Aggregation:CrossProviderMatchSeconds` | When switching sources, same track within this many seconds of an existing play is treated as a duplicate (default `2`). Exact Unix timestamps always dedupe. |
+| `LastFm:ApiKey` / `LastFm:Username` | Last.fm ingest + optional `track.getInfo` enrichment |
+| `Maloja:BaseUrl` / `Maloja:ApiKey` | Self-hosted Maloja origin (e.g. `http://localhost:42010`). Optional API key. Also used for local album-art enrichment with a short throttle (50ms on localhost/LAN). |
+| `Maloja:MinIntervalMs` | Optional Maloja throttle. Unset = 50ms local / 250ms remote. `0` = no delay. |
+| `ListenBrainz:Username` / `ListenBrainz:Token` | ListenBrainz username (MusicBrainz ID). Token optional but raises rate limits. |
+| `LibreFm:ApiKey` / `LibreFm:Username` | Libre.fm (Audioscrobbler 2.0). Optional `LibreFm:BaseUrl` (default `https://libre.fm/2.0/`). |
 | `Discogs:Token` | Optional release search + `/releases/{id}` metadata |
 | `TheAudioDb:ApiKey` | Optional track metadata (duration, genre, cover, video) |
 | `Vgmdb:BaseUrl` | Unofficial VGMdb JSON proxy origin. Default `https://vgmdb.info` ([hufman/vgmdb](https://github.com/hufman/vgmdb)). Point this at a proxy you already host. This app does not run Docker for you. |
@@ -68,9 +74,16 @@ Development seeds 14 sample scrobbles when the database is empty (`Aggregation:S
 | `Auth:Username` / `Auth:Password` | Cookie login for admin pages. Default username `admin`. Leave password empty to disable sign-in (analytics remain public). |
 | `Analytics:TimeZone` | Zone for day/hour aggregations and timestamps. Default `America/New_York` (EST/EDT). Aliases: `EST`, `ET`, `UTC`. |
 
-User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Vgmdb__BaseUrl`, `Auth__Username`, `Auth__Password`, `Analytics__TimeZone`.
+User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Maloja__BaseUrl`, `ListenBrainz__Username`, `Aggregation__PrimaryScrobbleSource`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Vgmdb__BaseUrl`, `Auth__Username`, `Auth__Password`, `Analytics__TimeZone`.
 
 Get a Last.fm API key at https://www.last.fm/api/account/create. History export needs “Hide recent listening information” **off** on Last.fm.
+
+### Switching scrobble services (e.g. Last.fm → Maloja)
+
+1. Keep your existing warehouse (do not wipe `galaxy.db`).
+2. Configure Maloja’s base URL and set **Primary scrobble source** to `Maloja` on Settings.
+3. Sync/backfill from Maloja. Plays that share a Unix timestamp (typical when you imported Last.fm history into Maloja) or the same track within the match window are skipped as duplicates.
+4. Reconcile deletes only remove plays that were originally ingested from the current primary source, so Last.fm-era rows are not wiped when Maloja’s day window differs.
 
 ## Self-hosted MusicBrainz
 
@@ -95,13 +108,13 @@ For `dotnet run` on the host, start the proxy on port 8731 and set Proxy URL to 
 
 ## How ingest works
 
-1. **Incremental** (hourly, and on startup): `user.getRecentTracks` from the newest stored timestamp minus a small overlap. Unique `UnixTimestamp` drops duplicates.
-2. **Nightly 7-day check** (pausable on the aggregation page): re-fetches the last 7 UTC days, inserts scrobbles that are missing locally, and deletes local scrobbles Last.fm no longer returns. A day is skipped for deletes when Last.fm's page count does not match.
-3. **Full resync** (Settings): the same check from today back to the Last.fm registration date.
-4. **Backfill**: UTC-day windows walking backward toward the account registration date (same idea as [lastfm-export](https://github.com/Tyainss/lastfm-export) verified mode), so Last.fm page gaps are less likely on a full history pull.
-5. Each play attaches to a **Track** keyed by fingerprint (`normalized artist + title`). Ten plays of one song are ten scrobbles and one track row.
-6. If Last.fm already sent an MBID, identity is done. Otherwise a **TrackLookup** row is queued once per fingerprint.
+1. **Incremental** (hourly, and on startup): pulls from the **primary** scrobble source from the newest stored timestamp minus a small overlap. Unique `UnixTimestamp` drops duplicates; cross-provider soft-match also skips the same track within `CrossProviderMatchSeconds`.
+2. **Nightly 7-day check** (pausable on the aggregation page): re-fetches the last 7 UTC days from the primary source, inserts missing plays, and deletes local plays that came from that same source and are no longer returned (ListenBrainz skips deletes). Incomplete remote windows skip deletes.
+3. **Full resync** (Settings): the same check walking back toward the account registration date (or 20 years when the source has no registration date).
+4. **Backfill**: UTC-day windows walking backward so page gaps are less likely on a full history pull.
+5. Each play attaches to a **Track** keyed by fingerprint (`normalized artist + title`). Ten plays of one song are ten scrobbles and one track row. Each scrobble stores its `Source` provider.
+6. If the source already sent an MBID, identity is done. Otherwise a **TrackLookup** row is queued once per fingerprint.
 7. MusicBrainz search auto-links high-confidence hits and caches the rest for Review. The public API is about 1 req/s; a self-hosted `MusicBrainz:BaseUrl` uses a much smaller gap (50ms by default, or `MinIntervalMs`). After an MBID exists, a second pass loads recording tags, ISRCs, genres, and Cover Art Archive front images.
-8. Then Last.fm `track.getInfo` (duration, crowd tags, wiki, album art, artist URL — by MBID when present), VocaDB / UtaiteDB / TouhouDB (song search: tags, duration, PVs, aliases, optional MBID), VGMdb via the unofficial JSON proxy (album search + album detail: catalog number, classification, year, cover, duration, game/platform tags), Discogs (search + release detail: year, cover, genres/styles), and TheAudioDB (duration, genre/mood, biography, thumb, music video) fill catalog fields, `TrackSourcePayloads`, and `TrackTags`.
+8. Then Maloja album art (when configured — preferred local cover source), Last.fm `track.getInfo`, VocaDB / UtaiteDB / TouhouDB, VGMdb, Discogs, and TheAudioDB fill catalog fields, `TrackSourcePayloads`, and `TrackTags`.
 
 SQLite file: `GalaxyMusicDataset/App_Data/galaxy.db`.

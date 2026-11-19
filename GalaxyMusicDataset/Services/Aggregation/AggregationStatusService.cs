@@ -10,7 +10,9 @@ public sealed class AggregationStatusService(
     AppDbContext db,
     AggregationProgress progress,
     ApiCallRecorder recorder,
+    ExternalClientFactory clients,
     IOptionsMonitor<LastFmOptions> lastFm,
+    IOptionsMonitor<MalojaOptions> maloja,
     IOptionsMonitor<DiscogsOptions> discogs,
     IOptionsMonitor<TheAudioDbOptions> audioDb,
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
@@ -71,11 +73,16 @@ public sealed class AggregationStatusService(
             .Select(p => new SourcePayloadCount(p.Source.ToString(), p.Status.ToString(), p.Count))
             .ToList();
         var agg = aggregation.CurrentValue;
+        var primary = agg.ResolvedPrimaryScrobbleSource;
+        var primaryConfigured = clients.IsScrobbleProviderConfigured(primary);
 
         return new AggregationStatusDto
         {
             LastFmConfigured = lastFm.CurrentValue.IsConfigured,
             LastFmUsername = lastFm.CurrentValue.Username,
+            PrimaryScrobbleSource = primary.ToString(),
+            PrimaryScrobbleConfigured = primaryConfigured,
+            MalojaConfigured = maloja.CurrentValue.IsConfigured,
             DiscogsConfigured = discogs.CurrentValue.IsConfigured,
             TheAudioDbConfigured = audioDb.CurrentValue.IsConfigured,
             EnableMusicBrainz = agg.EnableMusicBrainz,
@@ -83,6 +90,7 @@ public sealed class AggregationStatusService(
             MusicBrainzUsesPublicApi = musicBrainz.CurrentValue.UsesPublicWebService,
             MusicBrainzIntervalMs = (int)musicBrainz.CurrentValue.WebServiceMinInterval.TotalMilliseconds,
             EnableLastFmTrackInfo = agg.EnableLastFmTrackInfo,
+            EnableMalojaAlbumArt = agg.EnableMalojaAlbumArt,
             EnableDiscogs = agg.EnableDiscogs,
             EnableTheAudioDb = agg.EnableTheAudioDb,
             EnableVocaDb = agg.EnableVocaDb,
@@ -109,7 +117,8 @@ public sealed class AggregationStatusService(
                 agg,
                 lastFm.CurrentValue.IsConfigured,
                 discogs.CurrentValue.IsConfigured,
-                audioDb.CurrentValue.IsConfigured),
+                audioDb.CurrentValue.IsConfigured,
+                maloja.CurrentValue.IsConfigured),
             LastFmPlaycount = state.LastFmPlaycount,
             PlaycountGap = playcountGap,
             NewestScrobble = newest,
@@ -139,6 +148,9 @@ public sealed class AggregationStatusDto
 {
     public bool LastFmConfigured { get; set; }
     public string? LastFmUsername { get; set; }
+    public string PrimaryScrobbleSource { get; set; } = "LastFm";
+    public bool PrimaryScrobbleConfigured { get; set; }
+    public bool MalojaConfigured { get; set; }
     public bool DiscogsConfigured { get; set; }
     public bool TheAudioDbConfigured { get; set; }
     public bool EnableMusicBrainz { get; set; }
@@ -146,6 +158,7 @@ public sealed class AggregationStatusDto
     public bool MusicBrainzUsesPublicApi { get; set; }
     public int MusicBrainzIntervalMs { get; set; }
     public bool EnableLastFmTrackInfo { get; set; }
+    public bool EnableMalojaAlbumArt { get; set; }
     public bool EnableDiscogs { get; set; }
     public bool EnableTheAudioDb { get; set; }
     public bool EnableVocaDb { get; set; }
