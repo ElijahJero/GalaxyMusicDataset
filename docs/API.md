@@ -310,11 +310,14 @@ Secret values are never returned. `GET` reports whether secrets are already save
   "enableVgmdb": true,
   "vgmdbBaseUrl": "",
   "incrementalIntervalMinutes": 60,
-  "seedSampleData": false
+  "seedSampleData": false,
+  "defaultTheme": "dark"
 }
 ```
 
 `primaryScrobbleSource`: `LastFm` | `Maloja` | `ListenBrainz` | `LibreFm`.
+
+`defaultTheme`: `dark` (cockpit HUD), `maloja` (lightweight charcoal), or `light`. This is only the fallback for browsers with no local preference — each client still stores its own theme in localStorage.
 
 ### `GET /api/v1/keys`
 

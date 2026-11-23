@@ -405,3 +405,23 @@ public sealed class AnalyticsOptions
     /// </summary>
     public string TimeZone { get; set; } = "America/New_York";
 }
+
+public sealed class UiOptions
+{
+    public const string SectionName = "Ui";
+
+    /// <summary>
+    /// Fallback theme when the browser has no saved preference:
+    /// <c>dark</c> (cockpit), <c>light</c>, or <c>maloja</c> (lightweight charcoal).
+    /// Clients still pick and persist their own theme in localStorage.
+    /// </summary>
+    public string DefaultTheme { get; set; } = "dark";
+
+    public static string NormalizeTheme(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            "light" => "light",
+            "maloja" => "maloja",
+            _ => "dark"
+        };
+}

@@ -21,6 +21,7 @@ public sealed class SettingsApiController(
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
     IOptionsMonitor<VgmdbOptions> vgmdb,
     IOptionsMonitor<AggregationOptions> aggregation,
+    IOptionsMonitor<UiOptions> ui,
     UserSettingsStore store,
     ApiKeyStore keys) : ControllerBase
 {
@@ -125,6 +126,7 @@ public sealed class SettingsApiController(
             !string.IsNullOrWhiteSpace(lb.Token),
             string.Equals(lb.ResolvedBaseUrl, ListenBrainzOptions.DefaultBaseUrl, StringComparison.OrdinalIgnoreCase)
                 ? ""
-                : lb.ResolvedBaseUrl);
+                : lb.ResolvedBaseUrl,
+            UiOptions.NormalizeTheme(ui.CurrentValue.DefaultTheme));
     }
 }

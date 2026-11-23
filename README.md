@@ -73,6 +73,7 @@ Development seeds 14 sample scrobbles when the database is empty (`Aggregation:S
 | `MusicBrainz:MinIntervalMs` | Optional Web Service throttle. Unset = 1200ms on the public API, 50ms on a self-hosted mirror. `0` = no extra delay. Public Cover Art Archive stays at 1200ms. |
 | `Auth:Username` / `Auth:Password` | Cookie login for admin pages. Default username `admin`. Leave password empty to disable sign-in (analytics remain public). |
 | `Analytics:TimeZone` | Zone for day/hour aggregations and timestamps. Default `America/New_York` (EST/EDT). Aliases: `EST`, `ET`, `UTC`. |
+| `Ui:DefaultTheme` | Fallback UI theme when a browser has no local preference: `dark` (cockpit), `maloja` (lightweight), or `light`. Clients still choose and persist their own theme. |
 
 User secrets / env vars: `LastFm__ApiKey`, `LastFm__Username`, `Maloja__BaseUrl`, `ListenBrainz__Username`, `Aggregation__PrimaryScrobbleSource`, `Discogs__Token`, `TheAudioDb__ApiKey`, `MusicBrainz__BaseUrl`, `Vgmdb__BaseUrl`, `Auth__Username`, `Auth__Password`, `Analytics__TimeZone`.
 

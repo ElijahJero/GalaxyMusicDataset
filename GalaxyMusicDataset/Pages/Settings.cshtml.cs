@@ -20,6 +20,7 @@ public class SettingsModel(
     IOptionsMonitor<MusicBrainzOptions> musicBrainz,
     IOptionsMonitor<VgmdbOptions> vgmdb,
     IOptionsMonitor<AggregationOptions> aggregation,
+    IOptionsMonitor<UiOptions> ui,
     ExternalClientFactory clients,
     UserSettingsStore store,
     ApiKeyStore apiKeys,
@@ -183,7 +184,8 @@ public class SettingsModel(
                 ? ""
                 : vgmdb.CurrentValue.ResolvedBaseUrl,
             IncrementalIntervalMinutes = agg.IncrementalIntervalMinutes,
-            SeedSampleData = agg.SeedSampleData
+            SeedSampleData = agg.SeedSampleData,
+            DefaultTheme = UiOptions.NormalizeTheme(ui.CurrentValue.DefaultTheme)
         };
     }
 }

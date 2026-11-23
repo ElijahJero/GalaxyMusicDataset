@@ -1,27 +1,45 @@
 ﻿(() => {
   const key = "galaxy-theme";
+  const allowed = new Set(["dark", "light", "maloja"]);
   const root = document.documentElement;
 
+  const normalize = (value) => {
+    const theme = (value || "").trim().toLowerCase();
+    return allowed.has(theme) ? theme : "dark";
+  };
+
+  const serverDefault = () => {
+    const meta = document.querySelector('meta[name="galaxy-default-theme"]');
+    return normalize(meta?.getAttribute("content") || root.getAttribute("data-bs-theme"));
+  };
+
   const apply = (theme) => {
-    root.setAttribute("data-bs-theme", theme);
+    const next = normalize(theme);
+    root.setAttribute("data-bs-theme", next);
     try {
-      localStorage.setItem(key, theme);
+      localStorage.setItem(key, next);
     } catch {
       /* ignore */
     }
 
-    for (const button of document.querySelectorAll("[data-theme-toggle]")) {
-      const dark = theme === "dark";
-      button.setAttribute("aria-pressed", dark ? "true" : "false");
-      button.textContent = dark ? "Light" : "Dark";
+    for (const select of document.querySelectorAll("[data-theme-select]")) {
+      select.value = next;
     }
   };
 
-  apply(root.getAttribute("data-bs-theme") || "dark");
-  for (const button of document.querySelectorAll("[data-theme-toggle]")) {
-    button.addEventListener("click", () => {
-      const next = root.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
-      apply(next);
-    });
+  let initial = serverDefault();
+  try {
+    const saved = localStorage.getItem(key);
+    if (allowed.has(saved)) {
+      initial = saved;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  apply(initial);
+
+  for (const select of document.querySelectorAll("[data-theme-select]")) {
+    select.addEventListener("change", () => apply(select.value));
   }
 })();

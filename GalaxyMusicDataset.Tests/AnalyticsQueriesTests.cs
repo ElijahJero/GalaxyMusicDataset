@@ -265,6 +265,8 @@ public class AnalyticsQueriesTests
         Assert.Contains("Lose-Lose Days", html, StringComparison.Ordinal);
         Assert.Contains("hip hop", html, StringComparison.Ordinal);
         Assert.Contains("class=\"slide", html, StringComparison.Ordinal);
+        Assert.Contains("finale", html, StringComparison.Ordinal);
+        Assert.Contains("100dvh", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>alert", html, StringComparison.Ordinal);
     }
 
