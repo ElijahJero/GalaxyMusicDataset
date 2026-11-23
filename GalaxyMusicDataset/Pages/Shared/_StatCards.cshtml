@@ -44,7 +44,9 @@
         Card(
             "Listening time",
             AnalyticsDisplay.Duration(Model.ListeningTimeMs),
-            $"{AnalyticsDisplay.Percent(Model.PercentMissingDuration)} of plays missing duration",
+            Model.PlaysMissingDuration > 0
+                ? $"{AnalyticsDisplay.Percent(Model.PercentMissingDuration)} of plays estimated from avg known length"
+                : "all plays have a stored length",
             all is null ? null : $"all-time {AnalyticsDisplay.Duration(all.ListeningTimeMs)}");
         Card(
             "Days tracked",

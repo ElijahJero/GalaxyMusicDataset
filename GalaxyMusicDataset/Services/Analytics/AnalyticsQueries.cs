@@ -612,10 +612,12 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
     {
         var wrapped = await GetWrapped(year, search, cancellationToken);
         const int take = 5;
+        // Keep the discoveries/summary slide short so it fits a phone viewport without scrolling.
+        const int summaryTake = 3;
         var topArtists = wrapped.TopArtists.Take(take).ToList();
         var topTracks = wrapped.TopTracks.Take(take).ToList();
         var topAlbums = wrapped.TopAlbums.Take(take).ToList();
-        var newArtists = wrapped.NewArtists.Take(take).ToList();
+        var newArtists = wrapped.NewArtists.Take(summaryTake).ToList();
 
         var artistIds = topArtists.Select(x => x.Id).Concat(newArtists.Select(x => x.Id)).Distinct().ToList();
         var trackIds = topTracks.Select(x => x.Id).ToList();
@@ -678,7 +680,7 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             wrapped.BusiestHourUtc,
             wrapped.BusiestHourCount,
             newArtists.Select(a => ToMedia(a, artistImages.GetValueOrDefault(a.Id))).ToList(),
-            wrapped.Discoveries.Take(take).ToList());
+            wrapped.Discoveries.Take(summaryTake).ToList());
     }
 
     private static string? BlankToNull(string? value) =>
@@ -846,11 +848,22 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             .Distinct()
             .CountAsync(cancellationToken);
         var playsWithDuration = await query.CountAsync(s => s.Track.DurationMs != null, cancellationToken);
-        var listeningTime = playsWithDuration == 0
-            ? 0
+        var knownListeningTime = playsWithDuration == 0
+            ? 0L
             : await query.Where(s => s.Track.DurationMs != null).SumAsync(s => (long)s.Track.DurationMs!, cancellationToken);
         var missing = scrobbleCount - playsWithDuration;
         var missingPct = scrobbleCount == 0 ? 0 : missing * 100.0 / scrobbleCount;
+        // Estimate missing plays from the average length of tracks that have DurationMs.
+        // Analytics-only — never write this average onto Track.DurationMs.
+        var listeningTime = knownListeningTime;
+        if (missing > 0)
+        {
+            var avgMs = await AverageKnownTrackDurationMs(query, cancellationToken);
+            if (avgMs is > 0)
+            {
+                listeningTime = knownListeningTime + (long)Math.Round(missing * avgMs.Value);
+            }
+        }
 
         var daily = await LoadDaily(query, cancellationToken);
 
@@ -901,6 +914,35 @@ public sealed class AnalyticsQueries(AppDbContext db, AppTimeZone? timeZone = nu
             recent,
             daily,
             null);
+    }
+
+    /// <summary>
+    /// Mean DurationMs of distinct tracks that already have a length, preferring tracks in
+    /// <paramref name="query"/>, then falling back to the whole catalog. Used only to estimate
+    /// listening time for plays whose tracks lack DurationMs — never persisted onto Track rows.
+    /// </summary>
+    private async Task<double?> AverageKnownTrackDurationMs(
+        IQueryable<Scrobble> query,
+        CancellationToken cancellationToken)
+    {
+        var inRange = await query
+            .Where(s => s.Track.DurationMs != null)
+            .GroupBy(s => s.TrackId)
+            .Select(g => (double)g.Max(x => x.Track.DurationMs!.Value))
+            .ToListAsync(cancellationToken);
+        if (inRange.Count > 0)
+        {
+            return inRange.Average();
+        }
+
+        if (!await db.Tracks.AsNoTracking().AnyAsync(t => t.DurationMs != null, cancellationToken))
+        {
+            return null;
+        }
+
+        return await db.Tracks.AsNoTracking()
+            .Where(t => t.DurationMs != null)
+            .AverageAsync(t => (double)t.DurationMs!.Value, cancellationToken);
     }
 
     private async Task<TopListResult> RankRows(

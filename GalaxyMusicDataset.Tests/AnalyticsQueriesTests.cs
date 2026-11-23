@@ -65,7 +65,8 @@ public class AnalyticsQueriesTests
         Assert.Equal(4, overview.UniqueTracks);
         Assert.Equal(2, overview.UniqueArtists);
         Assert.Equal(2, overview.UniqueAlbums);
-        Assert.Equal(180_000L * 6, overview.ListeningTimeMs);
+        // 6 plays with 180s + 2 missing estimated at avg known track length (180s)
+        Assert.Equal(180_000L * 8, overview.ListeningTimeMs);
         Assert.Equal(2, overview.PlaysMissingDuration);
         Assert.Equal(4, overview.DaysTrackedAllTime);
         Assert.NotNull(overview.MostRecent);
@@ -266,8 +267,38 @@ public class AnalyticsQueriesTests
         Assert.Contains("hip hop", html, StringComparison.Ordinal);
         Assert.Contains("class=\"slide", html, StringComparison.Ordinal);
         Assert.Contains("finale", html, StringComparison.Ordinal);
+        Assert.Contains("summary", html, StringComparison.Ordinal);
         Assert.Contains("100dvh", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>alert", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Overview_estimates_listening_time_for_plays_without_duration()
+    {
+        await using var harness = await TestDb.CreateAsync();
+        var catalog = new CatalogService(harness.Db);
+        var artist = await catalog.GetOrCreateArtistAsync("Estimate Act", null, CancellationToken.None);
+        var knownA = await AddTrack(harness.Db, artist, null, "Known A", 120_000);
+        var knownB = await AddTrack(harness.Db, artist, null, "Known B", 180_000);
+        var unknown = await AddTrack(harness.Db, artist, null, "Unknown Length", null);
+        await AddPlay(harness.Db, knownA, Unix(2024, 6, 1, 12, 0));
+        await AddPlay(harness.Db, knownB, Unix(2024, 6, 1, 12, 5));
+        await AddPlay(harness.Db, unknown, Unix(2024, 6, 1, 12, 10));
+        await AddPlay(harness.Db, unknown, Unix(2024, 6, 1, 12, 15));
+        await harness.Db.SaveChangesAsync();
+
+        var queries = new AnalyticsQueries(harness.Db);
+        var overview = await queries.GetOverview(
+            TimeRangeParser.ForCalendarYear(2024),
+            null,
+            CancellationToken.None,
+            includeAllTime: false);
+
+        // Known sum 300_000 + 2 missing × avg(120_000, 180_000)=150_000 → 600_000
+        Assert.Equal(600_000L, overview.ListeningTimeMs);
+        Assert.Equal(2, overview.PlaysWithDuration);
+        Assert.Equal(2, overview.PlaysMissingDuration);
+        Assert.Null(await harness.Db.Tracks.Where(t => t.Title == "Unknown Length").Select(t => t.DurationMs).SingleAsync());
     }
 
     [Fact]
