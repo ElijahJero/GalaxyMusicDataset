@@ -36,6 +36,7 @@ public static class ServiceCollectionExtensions
         services.Configure<VgmdbOptions>(configuration.GetSection(VgmdbOptions.SectionName));
         services.Configure<AggregationOptions>(configuration.GetSection(AggregationOptions.SectionName));
         services.Configure<AnalyticsOptions>(configuration.GetSection(AnalyticsOptions.SectionName));
+        services.Configure<UiOptions>(configuration.GetSection(UiOptions.SectionName));
         services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
         services.AddSingleton(sp =>
         {

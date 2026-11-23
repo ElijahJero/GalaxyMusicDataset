@@ -387,10 +387,6 @@ a:hover {
 .audio-chart canvas {
   display: block;
 }
-  border-radius: 0;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
 
 .audio-chip {
   background: color-mix(in srgb, var(--galaxy-accent) 14%, var(--bs-tertiary-bg));
@@ -512,4 +508,108 @@ a.audio-chip-key:hover {
 [data-bs-theme="light"] .btn-primary,
 [data-bs-theme="light"] .nav-pills .nav-link.active {
   color: #f4fbff;
+}
+
+/* Maloja-inspired lightweight theme: flat charcoal + beige, Ubuntu, no HUD glow. */
+[data-bs-theme="maloja"] {
+  --galaxy-display: "Ubuntu", "Segoe UI", system-ui, sans-serif;
+  --galaxy-ui: "Ubuntu", "Segoe UI", system-ui, sans-serif;
+  --galaxy-mono: "Ubuntu", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --galaxy-accent: #f5f5dc;
+  --galaxy-accent-strong: #e8e8c8;
+  --galaxy-amber: #ffd700;
+  --galaxy-ok: #9acd32;
+  --galaxy-danger: #cd5c5c;
+  --galaxy-void: #232327;
+  --galaxy-panel: #2a2a2e;
+  --galaxy-line: rgba(245, 245, 220, 0.18);
+  --galaxy-glow: transparent;
+  --bs-body-bg: #232327;
+  --bs-body-color: #f5f5dc;
+  --bs-secondary-color: #808080;
+  --bs-tertiary-bg: #2e2e32;
+  --bs-secondary-bg: #343437;
+  --bs-border-color: rgba(245, 245, 220, 0.16);
+  --bs-link-color: #f5f5dc;
+  --bs-link-hover-color: #ffffe0;
+  --bs-emphasis-color: #fffff0;
+  color-scheme: dark;
+}
+
+[data-bs-theme="maloja"] h1,
+[data-bs-theme="maloja"] h2,
+[data-bs-theme="maloja"] h3,
+[data-bs-theme="maloja"] h4,
+[data-bs-theme="maloja"] h5,
+[data-bs-theme="maloja"] h6,
+[data-bs-theme="maloja"] .h1,
+[data-bs-theme="maloja"] .h2,
+[data-bs-theme="maloja"] .h3,
+[data-bs-theme="maloja"] .h4,
+[data-bs-theme="maloja"] .h5,
+[data-bs-theme="maloja"] .h6,
+[data-bs-theme="maloja"] .btn,
+[data-bs-theme="maloja"] .form-label,
+[data-bs-theme="maloja"] .nav-pills .nav-link,
+[data-bs-theme="maloja"] .navbar-nav .nav-link,
+[data-bs-theme="maloja"] .table thead th {
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 500;
+}
+
+[data-bs-theme="maloja"] .fs-3,
+[data-bs-theme="maloja"] .fs-4,
+[data-bs-theme="maloja"] .fs-5,
+[data-bs-theme="maloja"] .fw-bold,
+[data-bs-theme="maloja"] .fw-semibold {
+  font-family: var(--galaxy-ui);
+}
+
+[data-bs-theme="maloja"] .btn-primary,
+[data-bs-theme="maloja"] .nav-pills .nav-link.active {
+  color: #232327;
+  background-color: #f5f5dc;
+  border-color: #f5f5dc;
+  box-shadow: none;
+}
+
+[data-bs-theme="maloja"] .btn-primary:hover,
+[data-bs-theme="maloja"] .btn-primary:focus {
+  color: #232327;
+  background-color: #ffffe0;
+  border-color: #ffffe0;
+  box-shadow: none;
+}
+
+[data-bs-theme="maloja"] .btn-outline-primary {
+  color: #f5f5dc;
+  border-color: rgba(245, 245, 220, 0.45);
+}
+
+[data-bs-theme="maloja"] .btn-outline-primary:hover {
+  color: #232327;
+  background-color: #f5f5dc;
+  border-color: #f5f5dc;
+}
+
+[data-bs-theme="maloja"] .dropdown-menu {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.theme-select {
+  width: auto;
+  min-width: 7.5rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+  font-family: var(--galaxy-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-bs-theme="maloja"] .theme-select {
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-size: 0.85rem;
 }

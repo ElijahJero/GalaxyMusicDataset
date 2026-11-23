@@ -59,7 +59,13 @@
   opacity: 0.55;
 }
 
-header,
+/* Keep the navbar (and its dropdowns) above page content. Equal z-index on
+   header + .hud-stage let the later stage steal clicks from the Analytics menu. */
+header {
+  position: relative;
+  z-index: 1030;
+}
+
 .hud-stage,
 .hud-footer {
   position: relative;
@@ -158,6 +164,44 @@ header,
 [data-bs-theme="light"] .log-box {
   color: var(--bs-body-color);
   text-shadow: none;
+}
+
+/* Flat Maloja skin: no scanlines, stars, or perspective grid. */
+[data-bs-theme="maloja"] .cockpit::before,
+[data-bs-theme="maloja"] .cockpit::after {
+  display: none;
+}
+
+[data-bs-theme="maloja"] .card {
+  background: var(--galaxy-panel);
+  border-color: var(--galaxy-line);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+[data-bs-theme="maloja"] .card::before {
+  display: none;
+}
+
+[data-bs-theme="maloja"] .card-header {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--bs-body-color);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-family: var(--galaxy-ui);
+  font-size: 0.95rem;
+}
+
+[data-bs-theme="maloja"] .btn-primary,
+[data-bs-theme="maloja"] .nav-pills .nav-link.active {
+  box-shadow: none;
+}
+
+[data-bs-theme="maloja"] .log-box {
+  background: #1a1a1d;
+  color: var(--bs-secondary-color);
+  text-shadow: none;
+  border-top-color: var(--galaxy-line);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -46,6 +46,44 @@ a.navbar-brand:hover {
   backdrop-filter: blur(10px);
 }
 
+:root[data-bs-theme="maloja"] a.navbar-brand {
+  font-family: var(--galaxy-ui, "Ubuntu", sans-serif);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--galaxy-accent, #f5f5dc);
+}
+
+:root[data-bs-theme="maloja"] a.navbar-brand:hover {
+  color: #ffffe0;
+}
+
+:root[data-bs-theme="maloja"] .brand-mark {
+  box-shadow: none;
+  animation: none;
+  border-color: rgba(245, 245, 220, 0.45);
+}
+
+:root[data-bs-theme="maloja"] .hud-nav {
+  background: #1c1c1f;
+  border-bottom-color: rgba(245, 245, 220, 0.12);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+:root[data-bs-theme="maloja"] .hud-nav .nav-link:hover,
+:root[data-bs-theme="maloja"] .hud-nav .nav-link.show {
+  color: #ffffe0;
+}
+
+:root[data-bs-theme="maloja"] .footer,
+:root[data-bs-theme="maloja"] .hud-footer {
+  background: #090909;
+  border-top-color: rgba(245, 245, 220, 0.12);
+  font-family: var(--galaxy-ui, "Ubuntu", sans-serif);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
 .hud-nav .nav-link {
   color: var(--bs-secondary-color);
 }

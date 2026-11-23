@@ -118,7 +118,8 @@ public sealed record AggregationSettingsResponse(
     string? LibreFmBaseUrl = null,
     string? ListenBrainzUsername = null,
     bool ListenBrainzTokenSaved = false,
-    string? ListenBrainzBaseUrl = null);
+    string? ListenBrainzBaseUrl = null,
+    string DefaultTheme = "dark");
 
 public sealed record ProgressSnapshotDto(
     string Phase,

@@ -21,6 +21,19 @@
 </form>
 
 <form method="post" class="card card-body" autocomplete="off">
+    <h2 class="h5">Appearance</h2>
+    <p class="text-muted small">Each browser picks its own theme (saved in localStorage). The default below is only used when a browser has no preference yet — it is not forced site-wide.</p>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label class="form-label" asp-for="Input.DefaultTheme">Default theme</label>
+            <select class="form-select" asp-for="Input.DefaultTheme">
+                <option value="dark">Cockpit (dark HUD)</option>
+                <option value="maloja">Maloja (lightweight)</option>
+                <option value="light">Light</option>
+            </select>
+        </div>
+    </div>
+
     <h2 class="h5">Primary scrobble source</h2>
     <p class="text-muted small">Only the primary source runs incremental sync, backfill, and reconcile. Configure credentials for that service below. When you switch (for example Last.fm → Maloja after importing history), existing plays are kept and matching timestamps/fingerprints are treated as the same listen.</p>
     <div class="row g-3 mb-3">

@@ -10,6 +10,18 @@ namespace GalaxyMusicDataset.Tests;
 
 public class UserSettingsTests
 {
+    [Theory]
+    [InlineData(null, "dark")]
+    [InlineData("", "dark")]
+    [InlineData("DARK", "dark")]
+    [InlineData("light", "light")]
+    [InlineData(" Maloja ", "maloja")]
+    [InlineData("neon", "dark")]
+    public void NormalizeTheme_accepts_known_themes(string? input, string expected)
+    {
+        Assert.Equal(expected, UiOptions.NormalizeTheme(input));
+    }
+
     [Fact]
     public void KeepIfBlank_preserves_existing_secret()
     {

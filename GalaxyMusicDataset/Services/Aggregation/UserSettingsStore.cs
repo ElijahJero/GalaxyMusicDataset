@@ -79,6 +79,10 @@ public sealed class UserSettingsStore(IWebHostEnvironment env, IConfiguration co
                 ["EnableVgmdb"] = posted.EnableVgmdb,
                 ["IncrementalIntervalMinutes"] = posted.IncrementalIntervalMinutes,
                 ["SeedSampleData"] = posted.SeedSampleData
+            },
+            ["Ui"] = new Dictionary<string, object?>
+            {
+                ["DefaultTheme"] = UiOptions.NormalizeTheme(posted.DefaultTheme)
             }
         };
 
@@ -155,4 +159,7 @@ public sealed class UserSettingsModel
     public string? VgmdbBaseUrl { get; set; }
     public int IncrementalIntervalMinutes { get; set; } = 60;
     public bool SeedSampleData { get; set; }
+
+    /// <summary>Server default theme for browsers with no local preference: dark, light, or maloja.</summary>
+    public string? DefaultTheme { get; set; } = "dark";
 }
