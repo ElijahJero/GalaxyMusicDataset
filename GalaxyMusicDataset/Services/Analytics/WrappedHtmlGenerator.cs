@@ -191,14 +191,26 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
   .slide {
     justify-content: flex-start;
     padding: max(.85rem, env(safe-area-inset-top, 0px)) .9rem calc(var(--nav-h) + var(--safe-bottom));
+    overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
   }
   .slide.finale {
     justify-content: center;
     overflow: hidden;
+    touch-action: none;
     gap: .25rem;
   }
+  .slide.dense h2 { margin-bottom: .45rem; }
+  .slide.dense .lead { font-size: .9rem; margin-bottom: .35rem !important; }
+  .slide.dense .rank-list { gap: .4rem; }
+  .slide.dense .rank-item { gap: .45rem; }
+  .slide.dense .art, .slide.dense .art-fallback { width: 2.4rem; height: 2.4rem; }
+  .slide.dense .meta .name { font-size: .86rem; }
+  .slide.dense .meta .sub { font-size: .72rem; }
+  .slide.dense .plays { font-size: .74rem; }
   .eyebrow { font-size: .72rem; margin-bottom: .45rem; letter-spacing: .14em; }
   h1 { font-size: clamp(2rem, 10.5vw, 3.4rem); margin-bottom: .65rem; }
   h2 { font-size: clamp(1.35rem, 6.5vw, 2.1rem); margin-bottom: .7rem; }
@@ -338,7 +350,7 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
         SlideClose(sb);
 
         // 8 — discoveries
-        SlideOpen(sb, 8, "t8");
+        SlideOpen(sb, 8, "t8 dense");
         sb.Append("<div class=\"eyebrow\">New to you</div>\n");
         sb.Append("<h2>First-heards &amp; new artists</h2>\n");
         if (data.NewArtists.Count == 0 && data.Discoveries.Count == 0)
@@ -427,14 +439,20 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
     step(1);
   });
   let touchX = null;
+  let touchY = null;
   document.getElementById('deck').addEventListener('touchstart', e => {
     touchX = e.changedTouches[0]?.clientX ?? null;
+    touchY = e.changedTouches[0]?.clientY ?? null;
   }, { passive: true });
   document.getElementById('deck').addEventListener('touchend', e => {
     if (touchX == null) return;
-    const dx = (e.changedTouches[0]?.clientX ?? touchX) - touchX;
+    const x = e.changedTouches[0]?.clientX ?? touchX;
+    const y = e.changedTouches[0]?.clientY ?? touchY;
+    const dx = x - touchX;
+    const dy = y - (touchY ?? y);
     touchX = null;
-    if (Math.abs(dx) < 48) return;
+    touchY = null;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
     step(dx < 0 ? 1 : -1);
   }, { passive: true });
   go(0);
