@@ -203,14 +203,41 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
     touch-action: none;
     gap: .25rem;
   }
-  .slide.dense h2 { margin-bottom: .45rem; }
-  .slide.dense .lead { font-size: .9rem; margin-bottom: .35rem !important; }
-  .slide.dense .rank-list { gap: .4rem; }
-  .slide.dense .rank-item { gap: .45rem; }
-  .slide.dense .art, .slide.dense .art-fallback { width: 2.4rem; height: 2.4rem; }
-  .slide.dense .meta .name { font-size: .86rem; }
-  .slide.dense .meta .sub { font-size: .72rem; }
-  .slide.dense .plays { font-size: .74rem; }
+  /* Second-to-last summary (discoveries): fit the viewport — no in-slide scroll. */
+  .slide.summary {
+    justify-content: flex-start;
+    overflow: hidden;
+    touch-action: none;
+    gap: .15rem;
+  }
+  .slide.summary h2 {
+    font-size: clamp(1.15rem, 5.5vw, 1.55rem);
+    margin-bottom: .35rem;
+    line-height: 1.05;
+  }
+  .slide.summary .eyebrow { margin-bottom: .3rem; }
+  .slide.summary .lead {
+    font-size: .82rem;
+    margin: .35rem 0 .3rem !important;
+    opacity: .85;
+  }
+  .slide.summary .rank-list { gap: .32rem; margin-top: 0; }
+  .slide.summary .rank-item {
+    grid-template-columns: 1.15rem 2.15rem 1fr;
+    gap: .4rem;
+  }
+  .slide.summary .rank-n { font-size: .92rem; }
+  .slide.summary .art,
+  .slide.summary .art-fallback {
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: .35rem;
+    box-shadow: none;
+    font-size: .85rem;
+  }
+  .slide.summary .meta .name { font-size: .82rem; }
+  .slide.summary .meta .sub { font-size: .68rem; }
+  .slide.summary .plays { font-size: .68rem; }
   .eyebrow { font-size: .72rem; margin-bottom: .45rem; letter-spacing: .14em; }
   h1 { font-size: clamp(2rem, 10.5vw, 3.4rem); margin-bottom: .65rem; }
   h2 { font-size: clamp(1.35rem, 6.5vw, 2.1rem); margin-bottom: .7rem; }
@@ -247,6 +274,15 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
   .slide.finale h1 { font-size: clamp(1.7rem, 8vw, 3.4rem); }
   .slide.finale .lead { font-size: .9rem; }
   .hero-art { width: min(28vw, 10rem); height: min(28vw, 10rem); margin-bottom: .7rem; }
+  .slide.summary h2 { font-size: 1.1rem; margin-bottom: .25rem; }
+  .slide.summary .lead { font-size: .75rem; margin: .25rem 0 .2rem !important; }
+  .slide.summary .rank-list { gap: .22rem; }
+  .slide.summary .rank-item { grid-template-columns: 1rem 1.85rem 1fr; gap: .3rem; }
+  .slide.summary .art,
+  .slide.summary .art-fallback { width: 1.85rem; height: 1.85rem; font-size: .75rem; }
+  .slide.summary .meta .name { font-size: .76rem; }
+  .slide.summary .meta .sub { display: none; }
+  .slide.summary .plays { font-size: .64rem; }
 }
 </style>
 </head>
@@ -349,10 +385,10 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
         sb.Append("</div>\n");
         SlideClose(sb);
 
-        // 8 — discoveries
-        SlideOpen(sb, 8, "t8 dense");
+        // 8 — discoveries summary (second-to-last; must fit mobile without scrolling)
+        SlideOpen(sb, 8, "t8 summary");
         sb.Append("<div class=\"eyebrow\">New to you</div>\n");
-        sb.Append("<h2>First-heards &amp; new artists</h2>\n");
+        sb.Append("<h2>New finds</h2>\n");
         if (data.NewArtists.Count == 0 && data.Discoveries.Count == 0)
         {
             sb.Append("<p class=\"empty\">No first-time finds this year.</p>\n");
@@ -361,12 +397,12 @@ h2 { font-size: clamp(1.55rem, 6.5vw, 4rem); margin-bottom: 1.1rem; }
         {
             if (data.NewArtists.Count > 0)
             {
-                sb.Append("<p class=\"lead\" style=\"margin-bottom:.85rem\">New artists</p>\n");
+                sb.Append("<p class=\"lead\">New artists</p>\n");
                 RankList(sb, data.NewArtists);
             }
             if (data.Discoveries.Count > 0)
             {
-                sb.Append("<p class=\"lead\" style=\"margin:1.4rem 0 .85rem\">First-heard tracks</p>\n");
+                sb.Append("<p class=\"lead\">First-heard tracks</p>\n");
                 sb.Append("<ul class=\"rank-list\">\n");
                 var i = 1;
                 foreach (var d in data.Discoveries)

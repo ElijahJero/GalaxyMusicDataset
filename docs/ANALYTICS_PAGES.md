@@ -45,7 +45,7 @@ At-a-glance numbers for the selected range (and all-time in a secondary line).
 | --- | --- |
 | Total scrobbles | `COUNT(*)` on ranged scrobbles |
 | Unique tracks / artists / albums | `COUNT(DISTINCT TrackId / ArtistId / AlbumId)` |
-| Listening time | `SUM(Tracks.DurationMs)` where duration is known; also show `% of plays missing duration` |
+| Listening time | `SUM(Tracks.DurationMs)` for plays with a known length, plus an estimate for the rest: missing plays × average `DurationMs` of distinct tracks that already have a length (range first, then catalog). Display-only — never writes that average onto `Track.DurationMs`. |
 | Days tracked | distinct local dates with ≥1 scrobble (all-time, not the filter) |
 | Average scrobbles / day | total / calendar days in range (or days tracked for all-time) |
 | Current streak | consecutive local days with ≥1 scrobble, ending today or yesterday |
